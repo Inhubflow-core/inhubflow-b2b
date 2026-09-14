@@ -8,7 +8,7 @@ const NO_LAYOUT_PATHS = ["/login", "/live-chat", "/book"];
 
 export default function Layout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const isEmbed = router.query.embed === "true";
+  const isEmbed = router.query?.embed === "true";
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Initialize and persist sidebar collapse preference
@@ -40,8 +40,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     handleCollapse(!isCollapsed);
   };
 
+  const pathname = router.pathname || "";
   const isNoLayout = NO_LAYOUT_PATHS.some(
-    (p) => router.pathname === p || router.pathname.startsWith(`${p}/`)
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
 
   if (isNoLayout) {

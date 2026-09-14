@@ -21,7 +21,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "loading") return;
-    if (!session && !isPublicPath(router.pathname)) {
+    if (!session && !isPublicPath(router.pathname || "")) {
       router.replace("/login");
     }
   }, [session, status, router]);
@@ -34,7 +34,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session && !isPublicPath(router.pathname)) return null;
+  if (!session && !isPublicPath(router.pathname || "")) return null;
 
   return <>{children}</>;
 }

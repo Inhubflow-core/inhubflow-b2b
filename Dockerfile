@@ -10,22 +10,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Ensure devDependencies (like typescript) are installed even if Coolify injects NODE_ENV=production at build time
-ENV NODE_ENV=development
-
+# Copy dependency definitions and install all dependencies (including devDependencies like TypeScript)
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY . .
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
+# Ensure standard production environment for Next.js build and runtime
+ENV NODE_ENV=production
+
 # Build Next.js application
 RUN npm run build
-
-# Switch to production for runtime
-ENV NODE_ENV=production
 
 # Data directory — mount a volume here to persist the SQLite DB
 RUN mkdir -p /data && chown node:node /data

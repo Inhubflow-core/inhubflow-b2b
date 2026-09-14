@@ -1,4 +1,5 @@
 import Head from "next/head";
+import type { GetServerSideProps } from "next";
 import { useState, useEffect, useMemo } from "react";
 import {
   RiCalendarEventLine,
@@ -582,3 +583,7 @@ export default function PublicBookingPage() {
     </>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return { props: {} };
+};
