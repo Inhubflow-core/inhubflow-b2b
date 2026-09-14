@@ -31,6 +31,8 @@ import {
   RiArrowRightLine,
   RiInformationLine,
   RiQuestionLine,
+  RiGroupLine,
+  RiLineChartLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -127,6 +129,137 @@ export const getServerSideProps: GetServerSideProps = async () => {
   };
 };
 
+export interface SignalDefinition {
+  id: string;
+  title: string;
+  badge: string;
+  group: "A" | "B" | "C" | "D";
+  groupTitle: string;
+  description: string;
+  icon: any;
+  color: string;
+  badgeBg: string;
+  inputKind: "post_url" | "profile_or_company_url" | "keywords" | "roles_or_industry";
+}
+
+export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
+  // Grupo A: Señales Sociales y de Competencia (Las de mayor conversión)
+  {
+    id: "competitor_reactions",
+    title: "Reacciones a Posts de Competidores",
+    badge: "Alta Conversión",
+    group: "A",
+    groupTitle: "Grupo A: Social & Competencia",
+    description: "Decisores que dieron Like, Celebrate, Insightful o Support a posts de competidores o referentes del nicho.",
+    icon: RiThumbUpLine,
+    color: "text-amber-500",
+    badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    inputKind: "post_url",
+  },
+  {
+    id: "high_intent_comments",
+    title: "Comentarios en Publicaciones Clave",
+    badge: "Máxima Intención",
+    group: "A",
+    groupTitle: "Grupo A: Social & Competencia",
+    description: "Comentaristas en posts de debate o dolor. La IA extrae el texto exacto para citar su opinión en el mensaje.",
+    icon: RiChat1Line,
+    color: "text-blue-500",
+    badgeBg: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+    inputKind: "post_url",
+  },
+  {
+    id: "competitor_followers",
+    title: "Seguidores de Competidores / Referentes",
+    badge: "Afinidad de Marca",
+    group: "A",
+    groupTitle: "Grupo A: Social & Competencia",
+    description: "Profesionales que siguen a empresas competidoras o a sus fundadores y líderes de opinión en LinkedIn.",
+    icon: RiGroupLine,
+    color: "text-indigo-500",
+    badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+    inputKind: "profile_or_company_url",
+  },
+
+  // Grupo B: Señales de Carrera y Cambio de Puesto (Timing perfecto)
+  {
+    id: "new_in_role",
+    title: "Nuevo Cargo en los Últimos 90 Días",
+    badge: "Timing Perfecto",
+    group: "B",
+    groupTitle: "Grupo B: Carrera & Puesto",
+    description: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días buscan proveedores y tienen presupuesto.",
+    icon: RiExchangeLine,
+    color: "text-emerald-500",
+    badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+    inputKind: "roles_or_industry",
+  },
+  {
+    id: "internal_promotion",
+    title: "Ascenso Interno a Decisor",
+    badge: "Nuevo Poder de Compra",
+    group: "B",
+    groupTitle: "Grupo B: Carrera & Puesto",
+    description: "Profesionales que acaban de ser promovidos internamente a puestos de liderazgo con capacidad de decisión.",
+    icon: RiBriefcaseLine,
+    color: "text-purple-500",
+    badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+    inputKind: "roles_or_industry",
+  },
+
+  // Grupo C: Señales de Actividad y Contenido (Calidad de conexión)
+  {
+    id: "active_poster",
+    title: "Creadores Activos (<30 días)",
+    badge: "Bandeja Activa",
+    group: "C",
+    groupTitle: "Grupo C: Actividad & Contenido",
+    description: "Decisores que publican activamente en LinkedIn, garantizando que su bandeja de entrada está activa y abierta.",
+    icon: RiSparklingLine,
+    color: "text-rose-500",
+    badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+    inputKind: "profile_or_company_url",
+  },
+  {
+    id: "keyword_intent",
+    title: "Palabras Clave de Intención de Compra",
+    badge: "Dolor Activo 24/7",
+    group: "C",
+    groupTitle: "Grupo C: Actividad & Contenido",
+    description: "Rastrea publicaciones públicas preguntando por recomendaciones ('alternativa a...', 'busco CRM', 'hiring SDRs').",
+    icon: RiSearchLine,
+    color: "text-teal-500",
+    badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+    inputKind: "keywords",
+  },
+
+  // Grupo D: Señales de Crecimiento de Empresa (Capacidad de pago)
+  {
+    id: "hiring_spree",
+    title: "Hiring Spree (Contratación Activa)",
+    badge: "Presupuesto Activo",
+    group: "D",
+    groupTitle: "Grupo D: Crecimiento de Empresa",
+    description: "Empresas con vacantes abiertas para roles clave (comerciales, marketing, ingeniería). Si contratan, compran software.",
+    icon: RiBuildingLine,
+    color: "text-orange-500",
+    badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+    inputKind: "roles_or_industry",
+  },
+  {
+    id: "company_growth",
+    title: "Empresas en Hipercrecimiento",
+    badge: "Expansión +20%",
+    group: "D",
+    groupTitle: "Grupo D: Crecimiento de Empresa",
+    description: "Empresas de tu ICP cuya plantilla ha crecido más de un 15% o 20% en los últimos 6 meses en LinkedIn.",
+    icon: RiLineChartLine,
+    color: "text-cyan-500",
+    badgeBg: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300",
+    inputKind: "roles_or_industry",
+  },
+];
+
 export default function SignalsPage({
   initialMonitors,
   lists,
@@ -152,10 +285,13 @@ export default function SignalsPage({
 
   // Modal Nuevo Monitor
   const [showNewModal, setShowNewModal] = useState(false);
-  const [newType, setNewType] = useState<"post_engagement" | "influencer_activity" | "job_changes">("post_engagement");
+  const [newType, setNewType] = useState<string>("competitor_reactions");
+  const [newGroupFilter, setNewGroupFilter] = useState<"ALL" | "A" | "B" | "C" | "D">("ALL");
   const [newName, setNewName] = useState("");
   const [newCompetitor, setNewCompetitor] = useState("");
   const [newTargetUrl, setNewTargetUrl] = useState("");
+  const [newKeywords, setNewKeywords] = useState("");
+  const [newTargetRoles, setNewTargetRoles] = useState("");
   const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
   const [newTargetList, setNewTargetList] = useState("");
   const [creatingMonitor, setCreatingMonitor] = useState(false);
@@ -220,6 +356,16 @@ export default function SignalsPage({
       return;
     }
 
+    const selectedDef = SIGNAL_DEFINITIONS.find((d) => d.id === newType);
+    let targetUrlToSend = newTargetUrl.trim() || undefined;
+    if (selectedDef?.inputKind === "roles_or_industry" && newTargetRoles.trim()) {
+      targetUrlToSend = newTargetRoles.trim();
+    }
+
+    const keywordsArray = newKeywords.trim()
+      ? newKeywords.split(",").map((k) => k.trim()).filter(Boolean)
+      : undefined;
+
     setCreatingMonitor(true);
     try {
       const res = await fetch("/api/signals", {
@@ -229,7 +375,8 @@ export default function SignalsPage({
           name: newName.trim(),
           type: newType,
           competitor_name: newCompetitor.trim() || undefined,
-          target_url: newTargetUrl.trim() || undefined,
+          target_url: targetUrlToSend,
+          keywords: keywordsArray,
           mode: newMode,
           target_list_id: newTargetList || undefined,
         }),
@@ -242,6 +389,8 @@ export default function SignalsPage({
         setNewName("");
         setNewCompetitor("");
         setNewTargetUrl("");
+        setNewKeywords("");
+        setNewTargetRoles("");
         // Auto-escanear para poblar prospectos iniciales
         handleScanMonitor(created.id, created.name);
       } else {
@@ -721,12 +870,24 @@ export default function SignalsPage({
                           {lead.company ? `@ ${lead.company}` : ""}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                          {lead.signal_type === "post_comment"
+                          {lead.signal_type === "post_comment" || lead.signal_type === "high_intent_comments"
                             ? "Comentó en Post"
-                            : lead.signal_type === "post_reaction"
+                            : lead.signal_type === "post_reaction" || lead.signal_type === "competitor_reactions"
                             ? "Reaccionó a Post"
-                            : lead.signal_type === "job_change"
-                            ? "Nuevo en el Cargo"
+                            : lead.signal_type === "job_change" || lead.signal_type === "new_in_role"
+                            ? "Nuevo en el Cargo (<90d)"
+                            : lead.signal_type === "internal_promotion"
+                            ? "Ascenso Interno"
+                            : lead.signal_type === "competitor_followers"
+                            ? "Seguidor de Competidor"
+                            : lead.signal_type === "active_poster"
+                            ? "Creador Activo (<30d)"
+                            : lead.signal_type === "keyword_intent"
+                            ? "Palabras Clave de Compra"
+                            : lead.signal_type === "hiring_spree"
+                            ? "Contratación Activa (Hiring)"
+                            : lead.signal_type === "company_growth"
+                            ? "Empresa en Expansión"
                             : "Señal de Intención"}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
@@ -807,274 +968,521 @@ export default function SignalsPage({
         {activeTab === "monitors" && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {monitors.map((m) => (
-                <div
-                  key={m.id}
-                  className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs flex flex-col justify-between space-y-4"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500 dark:bg-rose-500/20">
-                          {m.type === "job_changes" ? (
-                            <RiExchangeLine size={18} />
-                          ) : (
-                            <RiChat1Line size={18} />
-                          )}
-                        </span>
-                        <div>
-                          <h4 className="font-bold text-sm text-gray-900 dark:text-white">
-                            {m.name}
-                          </h4>
-                          <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {m.type === "post_engagement"
-                              ? "Post de Competidor"
-                              : m.type === "job_changes"
-                              ? "Job Changers (<90 días)"
-                              : "Actividad de Referente"}
+              {monitors.map((m) => {
+                const def = SIGNAL_DEFINITIONS.find((d) => d.id === m.type);
+                const IconComp = def ? def.icon : RiRadarLine;
+                const signalTitle = def ? def.title : (m.type === "post_engagement" ? "Post de Competidor" : m.type === "job_changes" ? "Job Changers (<90 días)" : "Señal de Intención");
+                const badgeColor = def ? def.color : "text-rose-500";
+                return (
+                  <div
+                    key={m.id}
+                    className="p-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 ${badgeColor}`}>
+                            <IconComp size={18} />
                           </span>
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                              {m.name}
+                            </h4>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {signalTitle}
+                            </span>
+                          </div>
                         </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            m.mode === "autopilot"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                          }`}
+                        >
+                          {m.mode === "autopilot" ? "Autopilot" : "Review Mode"}
+                        </span>
                       </div>
 
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          m.mode === "autopilot"
-                            ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                        }`}
+                      {m.competitor_name && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="font-semibold">Competidor/Objetivo:</span> {m.competitor_name}
+                        </p>
+                      )}
+
+                      {m.target_url && (
+                        <a
+                          href={m.target_url.startsWith("http") ? m.target_url : `https://${m.target_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 truncate"
+                        >
+                          <RiExternalLinkLine size={12} className="shrink-0" /> {m.target_url}
+                        </a>
+                      )}
+
+                      <div className="pt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800">
+                        <span>Total captados: <strong className="text-gray-900 dark:text-white">{m.total_leads || 0}</strong></span>
+                        <span>Pendientes: <strong className="text-rose-600">{m.pending_leads || 0}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <button
+                        onClick={() => handleScanMonitor(m.id, m.name)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 transition-colors"
                       >
-                        {m.mode === "autopilot" ? "Autopilot" : "Review Mode"}
+                        <RiRefreshLine size={14} /> Escanear Ahora
+                      </button>
+
+                      <span className="text-[11px] text-gray-400">
+                        {m.last_checked_at
+                          ? `Escaneado ${new Date(m.last_checked_at).toLocaleDateString()}`
+                          : "Nunca escaneado"}
                       </span>
                     </div>
-
-                    {m.competitor_name && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        <span className="font-semibold">Competidor/Objetivo:</span> {m.competitor_name}
-                      </p>
-                    )}
-
-                    {m.target_url && (
-                      <a
-                        href={m.target_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 truncate"
-                      >
-                        <RiExternalLinkLine size={12} className="shrink-0" /> {m.target_url}
-                      </a>
-                    )}
-
-                    <div className="pt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800">
-                      <span>Total captados: <strong className="text-gray-900 dark:text-white">{m.total_leads || 0}</strong></span>
-                      <span>Pendientes: <strong className="text-rose-600">{m.pending_leads || 0}</strong></span>
-                    </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
-                    <button
-                      onClick={() => handleScanMonitor(m.id, m.name)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 transition-colors"
-                    >
-                      <RiRefreshLine size={14} /> Escanear Ahora
-                    </button>
-
-                    <span className="text-[11px] text-gray-400">
-                      {m.last_checked_at
-                        ? `Escaneado ${new Date(m.last_checked_at).toLocaleDateString()}`
-                        : "Nunca escaneado"}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* TAB 3: GUÍA ESTRATÉGICA */}
+        {/* TAB 3: GUÍA ESTRATÉGICA DE 8+1 SEÑALES */}
         {activeTab === "guide" && (
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                Cómo Funciona el Outbound Basado en Señales (Gojiberry Model)
+          <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs space-y-8">
+            <div className="space-y-2 border-b border-gray-100 dark:border-gray-800 pb-5">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                  Metodología Intent-Based Outreach
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Inspirada en el modelo de Gojiberry AI
+                </span>
+              </div>
+              <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white">
+                Matriz Completa de Señales de Intención de Compra
               </h3>
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                La prospección en frío tradicional (enviar el mismo mensaje a listas estáticas) tiene tasas de respuesta inferiores al 3%.
-                El modelo de señales de intención invierte la ecuación: contactas a personas en el instante en que demuestran un problema activo.
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-3xl">
+                La prospección en frío masiva obtiene menos del 3% de respuesta porque contacta a destiempo. 
+                Signal Radar detecta momentos de compra activos para que tu primer mensaje tenga hasta un <strong>40%+ de respuesta</strong>.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/20 space-y-2">
-                <span className="font-bold text-sm text-rose-700 dark:text-rose-300">
-                  1. Posts de Competidores
-                </span>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Cuando tu competencia publica sobre su solución y alguien comenta con dudas o interés, es el prospecto más caliente del mercado. Nuestro radar lo extrae y redacta un abridor contextual.
-                </p>
+            {/* Los 4 Grupos Estratégicos */}
+            <div className="space-y-6">
+              {/* GRUPO A */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
+                  <span className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center text-xs">
+                    A
+                  </span>
+                  <span>Grupo A: Señales Sociales y de Competencia (Mayor Tasa de Conversión)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {SIGNAL_DEFINITIONS.filter((s) => s.group === "A").map((sig) => (
+                    <div key={sig.id} className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <sig.icon className={sig.color} size={18} />
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                          {sig.badge}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
+                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
-                <span className="font-bold text-sm text-amber-700 dark:text-amber-300">
-                  2. Nuevos en el Cargo
-                </span>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Los nuevos directores y gerentes gastan hasta el 70% de su presupuesto en los primeros 90 días para cambiar herramientas. Felicítalos y preséntate como su aliado estratégico.
-                </p>
+              {/* GRUPO B */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xs">
+                    B
+                  </span>
+                  <span>Grupo B: Señales de Carrera y Cambio de Puesto (Timing Perfecto)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {SIGNAL_DEFINITIONS.filter((s) => s.group === "B").map((sig) => (
+                    <div key={sig.id} className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <sig.icon className={sig.color} size={18} />
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                          {sig.badge}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
+                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-2">
-                <span className="font-bold text-sm text-purple-700 dark:text-purple-300">
-                  3. Modo Revisión vs Piloto
-                </span>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Inicia en <strong>Review Mode</strong> para revisar cada mensaje generado por la IA. Cuando compruebes la calidad y relevancia del copy, activa el <strong>Autopilot</strong> para prospectar en automático.
-                </p>
+              {/* GRUPO C */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
+                  <span className="w-6 h-6 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center text-xs">
+                    C
+                  </span>
+                  <span>Grupo C: Señales de Actividad, Contenido y Palabras Clave (Calidad de Conexión)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {SIGNAL_DEFINITIONS.filter((s) => s.group === "C").map((sig) => (
+                    <div key={sig.id} className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/15 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <sig.icon className={sig.color} size={18} />
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                          {sig.badge}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
+                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* GRUPO D */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
+                  <span className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center text-xs">
+                    D
+                  </span>
+                  <span>Grupo D: Señales de Crecimiento Empresarial (Alta Capacidad de Pago)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {SIGNAL_DEFINITIONS.filter((s) => s.group === "D").map((sig) => (
+                    <div key={sig.id} className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <sig.icon className={sig.color} size={18} />
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                          {sig.badge}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
+                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal: Crear Monitor de Señal */}
+        {/* Modal: Crear Monitor de Señal (Con 8+1 Señales) */}
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-            <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 p-6 shadow-2xl space-y-5">
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <RiRadarLine className="text-rose-500" size={20} />
-                  <h3 className="font-bold text-base text-gray-900 dark:text-white">
-                    Configurar Nuevo Monitor de Señales
-                  </h3>
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 rounded-3xl border border-gray-300 dark:border-gray-700 p-6 md:p-8 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600">
+                    <RiRadarLine size={22} />
+                  </span>
+                  <div>
+                    <h3 className="font-black text-base md:text-lg text-gray-900 dark:text-white">
+                      Configurar Monitor de Señales
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Elige qué tipo de evento de intención deseas vigilar en LinkedIn
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowNewModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <RiCloseLine size={20} />
+                  <RiCloseLine size={22} />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateMonitor} className="space-y-4">
-                {/* Tipo de Señal */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Tipo de Señal de Intención
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNewType("post_engagement")}
-                      className={`p-3 rounded-xl border text-left text-xs transition-all ${
-                        newType === "post_engagement"
-                          ? "border-rose-500 bg-rose-50/50 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 font-bold"
-                          : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <RiChat1Line className="mb-1 text-rose-500" size={16} />
-                      Post de Competidor
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setNewType("job_changes")}
-                      className={`p-3 rounded-xl border text-left text-xs transition-all ${
-                        newType === "job_changes"
-                          ? "border-rose-500 bg-rose-50/50 dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 font-bold"
-                          : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <RiExchangeLine className="mb-1 text-rose-500" size={16} />
-                      Job Changers (&lt;90 días)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Nombre del Monitor */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Nombre del Monitor *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Ej: Competidor X - Post Lanzamiento CRM"
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                  />
-                </div>
-
-                {/* Nombre Competidor / Referente */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Nombre del Competidor o Marca
-                  </label>
-                  <input
-                    type="text"
-                    value={newCompetitor}
-                    onChange={(e) => setNewCompetitor(e.target.value)}
-                    placeholder="Ej: Salesforce, HubSpot, Lemlist..."
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                  />
-                </div>
-
-                {/* URL del Post o Perfil */}
-                {newType === "post_engagement" && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      URL de la Publicación de LinkedIn
+              <form onSubmit={handleCreateMonitor} className="space-y-5">
+                {/* Filtro de Grupos de Señales */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-900 dark:text-white">
+                      1. Selecciona el Tipo de Señal ({SIGNAL_DEFINITIONS.length} disponibles)
                     </label>
-                    <input
-                      type="url"
-                      value={newTargetUrl}
-                      onChange={(e) => setNewTargetUrl(e.target.value)}
-                      placeholder="https://www.linkedin.com/posts/..."
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                      Rastrearemos a todos los profesionales que comenten o reaccionen a este post.
+                    <span className="text-[11px] text-gray-400">
+                      {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.groupTitle}
                     </span>
                   </div>
-                )}
 
-                {/* Modo de Operación: Review vs Autopilot */}
+                  {/* Segmented Filter Bar */}
+                  <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setNewGroupFilter("ALL")}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        newGroupFilter === "ALL"
+                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      Todas (9)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewGroupFilter("A")}
+                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+                        newGroupFilter === "A"
+                          ? "bg-white dark:bg-gray-700 text-amber-700 dark:text-amber-300 shadow-xs"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      A: Social & Competencia
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewGroupFilter("B")}
+                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+                        newGroupFilter === "B"
+                          ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-300 shadow-xs"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      B: Carrera & Puesto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewGroupFilter("C")}
+                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+                        newGroupFilter === "C"
+                          ? "bg-white dark:bg-gray-700 text-rose-700 dark:text-rose-300 shadow-xs"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      C: Keywords & Contenido
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewGroupFilter("D")}
+                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+                        newGroupFilter === "D"
+                          ? "bg-white dark:bg-gray-700 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      D: Crecimiento
+                    </button>
+                  </div>
+
+                  {/* Grid de Señales con scroll suave */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {SIGNAL_DEFINITIONS.filter(
+                      (s) => newGroupFilter === "ALL" || s.group === newGroupFilter
+                    ).map((sig) => {
+                      const isSelected = newType === sig.id;
+                      const SigIcon = sig.icon;
+                      return (
+                        <button
+                          key={sig.id}
+                          type="button"
+                          onClick={() => setNewType(sig.id)}
+                          className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-1.5 ${
+                            isSelected
+                              ? "border-rose-500 bg-rose-50/60 dark:bg-rose-950/40 ring-2 ring-rose-500/20"
+                              : "border-gray-200 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-850"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <span className={`p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 ${sig.color}`}>
+                                <SigIcon size={16} />
+                              </span>
+                              <span className="font-bold text-xs text-gray-900 dark:text-white leading-tight">
+                                {sig.title}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white shrink-0">
+                                <RiCheckLine size={13} />
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">
+                            {sig.description}
+                          </p>
+                          <div className="pt-1 flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${sig.badgeBg}`}>
+                              {sig.badge}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Parámetros del Monitor */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                  {/* Nombre del Monitor */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Nombre del Monitor *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="Ej: Radar Competidor - Q3"
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+
+                  {/* Competidor o Marca Referente */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Competidor o Empresa Referente (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newCompetitor}
+                      onChange={(e) => setNewCompetitor(e.target.value)}
+                      placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Inputs Dinámicos según la Señal Elegida */}
+                {(() => {
+                  const selectedDef = SIGNAL_DEFINITIONS.find((s) => s.id === newType);
+                  if (!selectedDef) return null;
+
+                  if (selectedDef.inputKind === "post_url") {
+                    return (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          URL de la Publicación de LinkedIn *
+                        </label>
+                        <input
+                          type="url"
+                          required
+                          value={newTargetUrl}
+                          onChange={(e) => setNewTargetUrl(e.target.value)}
+                          placeholder="https://www.linkedin.com/posts/..."
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Rastrearemos automáticamente los comentaristas o reacciones a esta publicación.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (selectedDef.inputKind === "profile_or_company_url") {
+                    return (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          URL del Perfil o Empresa de LinkedIn *
+                        </label>
+                        <input
+                          type="url"
+                          required
+                          value={newTargetUrl}
+                          onChange={(e) => setNewTargetUrl(e.target.value)}
+                          placeholder="https://www.linkedin.com/company/... o https://www.linkedin.com/in/..."
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Monitorearemos los seguidores, publicaciones recientes o conexiones del perfil/empresa objetivo.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (selectedDef.inputKind === "keywords") {
+                    return (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Palabras Clave de Intención de Compra (separadas por comas) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newKeywords}
+                          onChange={(e) => setNewKeywords(e.target.value)}
+                          placeholder="Ej: alternativa a CRM, busco agencia de ventas, problemas con HubSpot, hiring SDRs"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          El radar detectará publicaciones y discusiones públicas en LinkedIn que contengan estas frases de compra activa.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (selectedDef.inputKind === "roles_or_industry") {
+                    return (
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Cargos, Roles o Industria Objetivo (ICP)
+                        </label>
+                        <input
+                          type="text"
+                          value={newTargetRoles}
+                          onChange={(e) => setNewTargetRoles(e.target.value)}
+                          placeholder="Ej: CEO, Founder, VP of Sales, Director Comercial, SaaS, Fintech"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-rose-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          Filtrará a los prospectos que coincidan con estos cargos o sectores prioritarios.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
+
+                {/* 4. Modo de Operación: Review vs Autopilot */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Modo de Ejecución (Inspirado en Gojiberry)
+                    Modo de Ejecución
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setNewMode("review")}
-                      className={`p-3 rounded-xl border text-left text-xs transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left text-xs transition-all ${
                         newMode === "review"
-                          ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold"
+                          ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
                           : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      <div className="font-bold">Modo Revisión</div>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal">
-                        Revisas y apruebas cada mensaje antes de enviar.
+                      <div className="font-bold flex items-center justify-between">
+                        <span>Modo Revisión</span>
+                        {newMode === "review" && <RiCheckLine className="text-brand-500" size={16} />}
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
+                        Revisas y apruebas cada mensaje antes de disparar la prospección.
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setNewMode("autopilot")}
-                      className={`p-3 rounded-xl border text-left text-xs transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left text-xs transition-all ${
                         newMode === "autopilot"
-                          ? "border-purple-500 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold"
+                          ? "border-purple-500 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
                           : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                       }`}
                     >
-                      <div className="font-bold">Piloto Automático</div>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal">
-                        La IA califica y envía automáticamente 24/7.
+                      <div className="font-bold flex items-center justify-between">
+                        <span>Piloto Automático</span>
+                        {newMode === "autopilot" && <RiCheckLine className="text-purple-500" size={16} />}
+                      </div>
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
+                        La IA califica y encola la prospección automáticamente 24/7.
                       </div>
                     </button>
                   </div>
                 </div>
 
-                {/* Lista Destino */}
+                {/* 5. Lista Destino */}
                 {lists.length > 0 && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -1095,18 +1503,18 @@ export default function SignalsPage({
                   </div>
                 )}
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-gray-200 dark:border-gray-800">
                   <button
                     type="button"
                     onClick={() => setShowNewModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={creatingMonitor}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-sm"
+                    className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
                   >
                     {creatingMonitor ? "Creando..." : "Crear & Activar Monitor"}
                   </button>

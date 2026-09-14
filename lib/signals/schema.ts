@@ -1,6 +1,20 @@
 import type Database from "better-sqlite3";
 
-export type SignalType = "post_engagement" | "influencer_activity" | "job_changes" | "ask_query";
+export type SignalType =
+  | "competitor_reactions"   // Grupo A: Reacciones a posts de competidores
+  | "high_intent_comments"   // Grupo A: Comentarios de alta intención
+  | "competitor_followers"   // Grupo A: Seguidores de competidor / referente
+  | "new_in_role"            // Grupo B: Nuevo en el cargo (<90 días)
+  | "internal_promotion"     // Grupo B: Ascenso interno a decisor
+  | "active_poster"          // Grupo C: Creadores activos (<30 días)
+  | "keyword_intent"         // Grupo C: Búsqueda por palabras clave de compra
+  | "hiring_spree"           // Grupo D: Empresas con vacantes / contratación activa
+  | "company_growth"         // Grupo D: Empresas en hipercrecimiento
+  // Compatibilidad con tipos anteriores:
+  | "post_engagement"
+  | "influencer_activity"
+  | "job_changes"
+  | "ask_query";
 export type SignalMode = "review" | "autopilot";
 export type SignalStatus = "active" | "paused" | "completed";
 export type SignalLeadStatus = "pending" | "approved" | "rejected" | "imported";
