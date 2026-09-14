@@ -52,7 +52,7 @@ export async function probeLinkedInAuthenticationWall(page: Page): Promise<Linke
     await page.goto("https://www.linkedin.com/feed/", {
       waitUntil: "domcontentloaded",
       timeout: 25_000,
-    }).catch((e) => {
+    }).catch((e: any) => {
       navigationFailed = true;
       console.warn(`[auth-wall] Probe navigation warning: ${e instanceof Error ? e.message : String(e)}`);
     });
