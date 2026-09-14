@@ -13,9 +13,8 @@
     "test:sdr-shadow": "node scripts/test-sdr-shadow.cjs",
     "test:sdr-runtime": "node scripts/test-sdr-runtime.cjs",
     "test:sdr-authorization": "node scripts/test-sdr-authorization.cjs",
-    "test:linkedin-connection-sync": "node scripts/test-linkedin-connection-sync.cjs",
-    "test:linkedin-campaign-inbox": "node scripts/test-linkedin-campaign-inbox.cjs",
     "test:xray": "node scripts/test-xray.cjs",
+    "test:unipile": "node scripts/test-unipile.cjs",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {
@@ -36,9 +35,6 @@
     "nodemailer": "^7.0.13",
     "openai": "^6.34.0",
     "papaparse": "^5.5.3",
-    "playwright": "^1.58.2",
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-icons": "^5.6.0",

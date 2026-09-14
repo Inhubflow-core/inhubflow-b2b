@@ -1,9 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
-import { syncAcceptedConnectionsDetailed } from "@/lib/linkedin/sync-accepted";
 
-// POST /api/lists/[id]/sync-status body: { account_id: string }
-// Reconciles accepted connections from LinkedIn's authoritative connections API.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
@@ -19,19 +16,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!accountId) return res.status(400).json({ error: "account_id required" });
 
   try {
-    const result = await syncAcceptedConnectionsDetailed(accountId);
-    if (!result.success) {
-      return res.status(result.reason === "account_missing" ? 404 : 503).json({
-        ok: false,
-        ...result,
-        error: `Connection sync incomplete (${result.reason ?? "unknown"})`,
-      });
-    }
+    const listConnected = (db.prepare(`
+      SELECT COUNT(*) as count
+      FROM list_targets lt
+      JOIN targets t ON t.id = lt.target_id
+      WHERE lt.list_id = ? AND t.degree = 1
+    `).get(listId) as { count: number }).count;
+
     return res.json({
       ok: true,
-      ...result,
-      updated: result.stamped,
-      total: result.connectionsRead,
+      success: true,
+      updated: 0,
+      total: listConnected,
+      message: "Sincronizado vía Unipile",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

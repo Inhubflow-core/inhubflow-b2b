@@ -1,315 +1,77 @@
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
-import type { Page } from "playwright";
-import { getSessionPage, saveSessionState, getSessionContext, markNeedsReauth } from "@/lib/linkedin/session";
-import { visitProfile } from "@/lib/linkedin/visit";
-import {
-  sendConnectionRequest,
-  WeeklyLimitError,
-  AlreadyConnectedError,
-  PendingInviteError,
-  ConnectionPreSubmitError,
-  UncertainConnectionOutcomeError,
-} from "@/lib/linkedin/connect";
-import { LinkedInAuthenticationError } from "@/lib/linkedin/auth-wall";
-import {
-  countLinkedInConnectionAttemptsToday,
-  createLinkedInConnectionAttempt,
-  updateLinkedInConnectionAttempt,
-} from "@/lib/linkedin/connection-attempts";
-import {
-  sendMessage,
-  NotConnectedError,
-  MessageNotDeliveredError,
-  ProfileVerificationError,
-} from "@/lib/linkedin/message";
-import { shouldSyncAccepted, syncAcceptedConnectionsDetailed, type AcceptedSyncResult } from "@/lib/linkedin/sync-accepted";
-import { campaignInboxSchedulerEnabled, listCampaignInboxAccountIds, shouldSyncLinkedInCampaignInbox, syncLinkedInCampaignInbox } from "@/lib/linkedin/campaign-inbox";
+import { unipile } from "@/lib/unipile/client";
 import { sendEmail } from "@/lib/email/sender";
-import { shouldSyncEmailInbox, syncEmailInbox } from "@/lib/email/inbox";
-import { enrichProfile } from "@/lib/linkedin/enrich";
-import { matchPerson } from "@/lib/apollo";
-import { premium } from "@/lib/premium";
 import { decryptSecret } from "@/lib/crypto";
-import {
-  releaseRuntimeLease,
-  renewRuntimeLease,
-  tryAcquireRuntimeLease,
-} from "@/lib/runtime-lease";
 
-// Minimum gap between Sales Nav profile enrichment calls per account (ms)
-const SALES_NAV_ENRICH_MIN_GAP_MS = 5 * 60 * 1000;
-// Per-account timestamp of last ensureSalesNavEnriched execution
-const lastSalesNavEnrichAt: Record<string, number> = {};
-
-// Accounts that reported "No InMail credits left" today (Jul 2026 incident — LinkedIn's
-// own credit balance, distinct from daily_inmail_limit; without this, a depleted account
-// re-attempted InMail on every queued lead, each burning a ~30-50s Sales Nav page load for
-// nothing). Keyed by accountId -> the date (YYYY-MM-DD, local) it was detected exhausted.
-// In-memory only — worst case after a restart is one wasted attempt before re-detecting.
-const inmailCreditsExhaustedOn: Record<string, string> = {};
-function todayLocalDate(): string { return new Date().toISOString().slice(0, 10); }
-function inmailCreditsExhaustedToday(accountId: string): boolean {
-  return inmailCreditsExhaustedOn[accountId] === todayLocalDate();
-}
-
-// One accepted-connection reconciliation at a time per account. Message-step
-// preflight can otherwise make every due lead open its own 60-second scan.
-const ACCEPTED_PREFLIGHT_COOLDOWN_MS = 5 * 60 * 1000;
-const acceptedSyncByAccount = new Map<string, { startedAt: number; promise: Promise<AcceptedSyncResult> }>();
-function acceptedReconciliationCoolingDown(accountId: string): boolean {
-  const cached = acceptedSyncByAccount.get(accountId);
-  return Boolean(cached && Date.now() - cached.startedAt < ACCEPTED_PREFLIGHT_COOLDOWN_MS);
-}
-
-function reconcileAcceptedConnections(accountId: string): Promise<AcceptedSyncResult> {
-  const now = Date.now();
-  const cached = acceptedSyncByAccount.get(accountId);
-  if (cached && now - cached.startedAt < ACCEPTED_PREFLIGHT_COOLDOWN_MS) return cached.promise;
-
-  const promise = syncAcceptedConnectionsDetailed(accountId).catch((): AcceptedSyncResult => ({
-    success: false,
-    partial: true,
-    stamped: 0,
-    unmarked: 0,
-    pages: 0,
-    connectionsRead: 0,
-    pendingTargets: 0,
-    matchedTargets: 0,
-    declaredTotal: null,
-    reason: "invalid_response",
-  }));
-  acceptedSyncByAccount.set(accountId, { startedAt: now, promise });
-  return promise;
-}
-
-// Initial wait before first acceptance check (6h)
-const CONNECTION_RECHECK_HOURS = 6;
-// Max days to wait for acceptance before giving up
-const CONNECTION_MAX_WAIT_DAYS = 7;
-// Retry delay when a message send ran but LinkedIn never confirmed delivery.
-// Short, because the recipient and the copy are both still valid — only the
-// send needs another attempt.
-const MESSAGE_RETRY_HOURS = 1;
-// Delay between profiles (seconds)
-const PROFILE_DELAY_MIN = 8;
-const PROFILE_DELAY_MAX = 20;
-// Poll interval (ms)
-const POLL_INTERVAL_MS = 30_000;
-const RUNNER_LEASE_KEY = "linkedin:global-runner";
-const RUNNER_LEASE_TTL_MS = 5 * 60 * 1000;
-const RUNNER_LEASE_HEARTBEAT_MS = 30_000;
-
-interface ScheduleConfig {
-  active_hours_start: number;
-  active_hours_end: number;
-  timezone: string;
-  working_days: string;
-}
-
-interface AccountLimits extends ScheduleConfig {
-  daily_connection_limit: number;
-  daily_message_limit: number;
-  daily_inmail_limit: number;
-}
-
-interface EmailAccountLimits extends ScheduleConfig {
-  daily_email_limit: number;
-  ramp_up_enabled: number | null;
-  ramp_start_date: string | null;
-}
-
-function effectiveEmailLimit(account: EmailAccountLimits): number {
-  if (!account.ramp_up_enabled || !account.ramp_start_date) return account.daily_email_limit;
-  const daysActive = Math.max(1, Math.floor((Date.now() - new Date(account.ramp_start_date).getTime()) / 86_400_000) + 1);
-  const ramped = daysActive * 2;
-  return Math.min(account.daily_email_limit, ramped);
-}
-
-function getLocalParts(tz: string, date = new Date()): { hour: number; minute: number; isoWeekday: number } {
-  const safeZone = (() => { try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return tz; } catch { return "UTC"; } })();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: safeZone,
-    hour: "numeric", minute: "numeric", weekday: "short", hour12: false,
-  }).formatToParts(date);
-  const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
-  const hour = parseInt(get("hour"), 10) % 24;
-  const minute = parseInt(get("minute"), 10);
-  const weekdayMap: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-  return { hour, minute, isoWeekday: weekdayMap[get("weekday")] ?? 1 };
-}
-
-function isWithinSchedule(account: ScheduleConfig): boolean {
-  const { hour, minute, isoWeekday } = getLocalParts(account.timezone || "UTC");
-  const allowedDays = (account.working_days || "1,2,3,4,5").split(",").map(Number);
-  if (!allowedDays.includes(isoWeekday)) return false;
-  const frac = hour + minute / 60;
-  return frac >= (account.active_hours_start ?? 9) && frac < (account.active_hours_end ?? 18);
-}
-
-function randomSlotInActiveWindow(account: ScheduleConfig, targetDate?: Date): string {
-  const start = account.active_hours_start ?? 9;
-  const end = account.active_hours_end ?? 18;
-  const base = targetDate ? new Date(targetDate) : new Date();
-  const startMs = new Date(base.getFullYear(), base.getMonth(), base.getDate(), start, 0, 0).getTime();
-  const endMs   = new Date(base.getFullYear(), base.getMonth(), base.getDate(), end,   0, 0).getTime();
-  return new Date(startMs + Math.random() * (endMs - startMs)).toISOString();
-}
-
-function rescheduleToTomorrow(account: ScheduleConfig): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return randomSlotInActiveWindow(account, tomorrow);
-}
-
-function nextScheduledSlot(account: ScheduleConfig): string {
-  const tz = account.timezone || "UTC";
-  const allowedDays = (account.working_days || "1,2,3,4,5").split(",").map(Number);
-  const end = account.active_hours_end ?? 18;
-  const { hour: nowHour, minute: nowMin, isoWeekday: nowDay } = getLocalParts(tz);
-  const nowFrac = nowHour + nowMin / 60;
-  if (allowedDays.includes(nowDay) && nowFrac < end - 0.25) {
-    const remaining = (end - nowFrac) * 3600_000;
-    return new Date(Date.now() + Math.random() * remaining).toISOString();
-  }
-  const candidate = new Date();
-  for (let i = 1; i <= 14; i++) {
-    candidate.setDate(candidate.getDate() + 1);
-    const { isoWeekday } = getLocalParts(tz, candidate);
-    if (allowedDays.includes(isoWeekday)) return randomSlotInActiveWindow(account, candidate);
-  }
-  return new Date(Date.now() + 86_400_000).toISOString();
+// Interfaces básicas para el Runner de Campañas
+interface TrackRun {
+  id: string;
+  run_profile_id: string;
+  track: "linkedin" | "email";
+  state: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "skipped";
+  current_step: number;
+  last_step_at: string | null;
+  next_step_at: string | null;
+  error_message: string | null;
+  force_run_once: number;
 }
 
 interface WorkflowStep {
   id: string;
-  step_order: number;
-  track: "linkedin" | "email";
-  step_type: "visit" | "connect" | "message" | "sales_inmail" | "delay" | "email";
-  template_id: string | null;
-  delay_seconds: number;
-  connect_note: string | null;
-  message_body: string | null;
-  email_subject: string | null;
-  email_body: string | null;
-  ai_enabled: number | null;
-  ai_model: string | null;
-  ai_prompt: string | null;
-  ai_max_words: number | null;
-  ai_language: string | null;
-  email_position: number | null;
-  message_position: number | null;
-  email_signature: string | null;
-}
-
-// A track-run row joined with its parent run_profile and run context
-interface TrackRun {
-  // run_profile_tracks columns
-  id: string;
-  run_profile_id: string;
-  track: "linkedin" | "email";
-  state: string;
-  current_step: number;
-  next_step_at: string | null;
-  error_message: string | null;
-  last_email_subject: string | null;
-  last_email_body: string | null;
-  last_linkedin_message: string | null;
-  pending_reply_context: string | null;
-  force_run_once: number;
-  // joined from run_profiles / runs
-  run_id: string;
-  target_id: string;
-  email_account_id: string | null;
-  account_id: string;
   workflow_id: string;
-  // joined from targets — lets the daily-limit gate tell a NEW connect send apart
-  // from a free acceptance recheck on an already-sent request
-  connection_requested_at: string | null;
+  track: "linkedin" | "email";
+  step_order: number;
+  step_type: "visit" | "connect" | "message" | "email" | "delay";
+  template_id?: string | null;
+  delay_seconds: number;
+  connect_note?: string | null;
+  message_body?: string | null;
+  email_subject?: string | null;
+  email_body?: string | null;
+  enabled: number;
 }
 
 interface Target {
   id: string;
-  linkedin_url: string;
-  sales_nav_url: string | null;
-  first_name: string | null;
-  last_name: string | null;
   full_name: string | null;
-  title: string | null;
-  company: string | null;
-  location: string | null;
+  linkedin_url: string | null;
+  unipile_provider_id: string | null;
+  unipile_chat_id: string | null;
+  messaging_urn: string | null;
+  email: string | null;
   degree: number | null;
   connection_requested_at: string | null;
   connected_at: string | null;
-  email: string | null;
-  email_status: string | null;
-  email_replied_at: string | null;
-  company_id: string | null;
-  messaging_urn: string | null;
+  message_sent_at: string | null;
 }
 
-interface Template { id: string; body: string; }
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function log(db: ReturnType<typeof getDb>, runId: string, targetId: string | null, level: "info" | "warn" | "error", message: string) {
-  db.prepare("INSERT INTO logs (id, run_id, target_id, level, message) VALUES (?, ?, ?, ?, ?)").run(randomUUID(), runId, targetId, level, message);
-  console.log(`[runner] [${level}] run=${runId} target=${targetId ?? "-"} ${message}`);
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
-function renderTemplate(body: string, target: Target): string {
-  return body
-    .replace(/\{\{first_name\}\}/gi, target.first_name ?? target.full_name?.split(" ")[0] ?? "")
-    .replace(/\{\{last_name\}\}/gi,  target.last_name ?? target.full_name?.split(" ").slice(1).join(" ") ?? "")
-    .replace(/\{\{full_name\}\}/gi,  target.full_name ?? "")
-    .replace(/\{\{company\}\}/gi,    target.company ?? "")
-    .replace(/\{\{title\}\}/gi,      target.title ?? "")
-    .replace(/\{\{location\}\}/gi,   target.location ?? "")
-    .trim();
+function addHours(hours: number): string {
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString();
 }
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-function randomDelay(minSec: number, maxSec: number) { return sleep((minSec + Math.random() * (maxSec - minSec)) * 1000); }
-function nowIso() { return new Date().toISOString(); }
-function addHours(h: number) { return new Date(Date.now() + h * 3600_000).toISOString(); }
-function hoursSince(isoStr: string) { return (Date.now() - new Date(isoStr).getTime()) / 3600_000; }
-
-function linkedinReplySnapshot(
+function log(
   db: ReturnType<typeof getDb>,
-  accountId: string
-): Map<string, string | null> {
-  const rows = db.prepare(`
-    SELECT DISTINCT t.id, t.last_replied_at
-    FROM targets t
-    JOIN run_profiles rp ON rp.target_id = t.id
-    JOIN runs r ON r.id = rp.run_id
-    WHERE r.account_id = ?
-  `).all(accountId) as Array<{ id: string; last_replied_at: string | null }>;
-  return new Map(rows.map((row) => [row.id, row.last_replied_at]));
+  runId: string,
+  targetId: string | null,
+  level: "info" | "warn" | "error",
+  message: string
+) {
+  try {
+    db.prepare(`
+      INSERT INTO logs (id, run_id, target_id, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(randomUUID(), runId, targetId, `[${level.toUpperCase()}] ${message}`);
+  } catch {
+    // ignore
+  }
 }
 
-function attributeChangedLinkedinReplies(
-  db: ReturnType<typeof getDb>,
-  accountId: string,
-  before: Map<string, string | null>
-): number {
-  const rows = db.prepare(`
-    SELECT DISTINCT t.id, t.last_replied_at
-    FROM targets t
-    JOIN run_profiles rp ON rp.target_id = t.id
-    JOIN runs r ON r.id = rp.run_id
-    WHERE r.account_id = ? AND t.last_replied_at IS NOT NULL
-  `).all(accountId) as Array<{ id: string; last_replied_at: string }>;
-  const update = db.prepare("UPDATE targets SET last_replied_account_id = ? WHERE id = ?");
-  const changed = rows.filter((row) => before.get(row.id) !== row.last_replied_at);
-  db.transaction((replies: typeof changed) => {
-    for (const reply of replies) update.run(accountId, reply.id);
-  })(changed);
-  return changed.length;
-}
-
-// ─── TrackRun verb layer ─────────────────────────────────────────────────────
-// These are the only functions that write to run_profile_tracks rows.
+// ─── Control de Estados de Pasos ─────────────────────────────────────────────
 
 function trAdvance(db: ReturnType<typeof getDb>, tr: TrackRun, steps: WorkflowStep[]) {
   const nextIndex = tr.current_step + 1;
@@ -330,10 +92,6 @@ function trWait(db: ReturnType<typeof getDb>, tr: TrackRun, hours: number) {
   db.prepare("UPDATE run_profile_tracks SET state = 'in_progress', error_message = NULL, next_step_at = ? WHERE id = ?").run(addHours(hours), tr.id);
 }
 
-function trReschedule(db: ReturnType<typeof getDb>, tr: TrackRun, isoTimestamp: string) {
-  db.prepare("UPDATE run_profile_tracks SET state = 'in_progress', error_message = NULL, next_step_at = ? WHERE id = ?").run(isoTimestamp, tr.id);
-}
-
 function trSkip(db: ReturnType<typeof getDb>, tr: TrackRun, reason: string) {
   db.prepare("UPDATE run_profile_tracks SET state = 'skipped', error_message = ? WHERE id = ?").run(reason, tr.id);
 }
@@ -342,1487 +100,246 @@ function trFail(db: ReturnType<typeof getDb>, tr: TrackRun, reason: string) {
   db.prepare("UPDATE run_profile_tracks SET state = 'failed', error_message = ? WHERE id = ?").run(reason, tr.id);
 }
 
-function trRecordContext(db: ReturnType<typeof getDb>, tr: TrackRun, ctx: { linkedinMessage?: string; emailSubject?: string; emailBody?: string }) {
-  if (ctx.linkedinMessage !== undefined) {
-    db.prepare("UPDATE run_profile_tracks SET last_linkedin_message = ? WHERE id = ?").run(ctx.linkedinMessage, tr.id);
-  }
-  if (ctx.emailSubject !== undefined || ctx.emailBody !== undefined) {
-    db.prepare("UPDATE run_profile_tracks SET last_email_subject = ?, last_email_body = ? WHERE id = ?")
-      .run(ctx.emailSubject ?? null, ctx.emailBody ?? null, tr.id);
-  }
-}
+// ─── Procesador de Pasos de Campaña ──────────────────────────────────────────
 
-// ─── enforceSchedule helper ──────────────────────────────────────────────────
-// Returns true if the step may proceed. Returns false and reschedules if outside the window.
+async function processSingleTrack(db: ReturnType<typeof getDb>, tr: TrackRun): Promise<void> {
+  const runProfile = db.prepare(`
+    SELECT rp.id, rp.run_id, rp.target_id, r.workflow_id, r.account_id, r.email_account_id
+    FROM run_profiles rp
+    JOIN runs r ON r.id = rp.run_id
+    WHERE rp.id = ?
+  `).get(tr.run_profile_id) as {
+    id: string;
+    run_id: string;
+    target_id: string;
+    workflow_id: string;
+    account_id: string;
+    email_account_id?: string | null;
+  } | undefined;
 
-function enforceSchedule(
-  db: ReturnType<typeof getDb>,
-  tr: TrackRun,
-  runId: string,
-  targetId: string,
-  name: string,
-  schedule: ScheduleConfig,
-  bypassSchedule = false
-): boolean {
-  if (bypassSchedule || isWithinSchedule(schedule)) return true;
-  const nextSlot = nextScheduledSlot(schedule);
-  log(db, runId, targetId, "info", `Outside working schedule — rescheduling ${name} to ${nextSlot}`);
-  trReschedule(db, tr, nextSlot);
-  return false;
-}
-
-// ─── URL resolution ──────────────────────────────────────────────────────────
-
-async function resolveLinkedinUrl(db: ReturnType<typeof getDb>, target: Target, accountId: string): Promise<string> {
-  if (target.linkedin_url?.includes("/in/")) return target.linkedin_url;
-  const salesNavUrl = target.sales_nav_url ?? target.linkedin_url;
-  if (!salesNavUrl) throw new Error(`${target.full_name ?? target.id} no tiene una URL de LinkedIn (linkedin.com/in/...) configurada.`);
-  const leadMatch = salesNavUrl.match(/\/sales\/lead\/(.+)/);
-  if (!leadMatch) throw new Error(`${target.full_name ?? target.id} no tiene una URL válida de LinkedIn ni de Sales Navigator.`);
-
-  const page = await getSessionPage(accountId);
-  let profileJson: Record<string, unknown> | null = null;
-  try {
-    page.on("response", async (response) => {
-      if (response.url().includes("salesApiProfiles/") && response.status() === 200 && !profileJson) {
-        try { profileJson = await response.json() as Record<string, unknown>; } catch { /* ignore */ }
-      }
-    });
-    await page.goto(`https://www.linkedin.com/sales/lead/${leadMatch[1]}`, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(10000);
-  } finally {
-    await page.close();
+  if (!runProfile) {
+    trFail(db, tr, "Run profile not found");
+    return;
   }
 
-  const p = profileJson as Record<string, unknown> | null;
-  const flagshipUrl = typeof p?.flagshipProfileUrl === "string" ? p.flagshipProfileUrl : null;
-  if (!flagshipUrl) throw new Error(`Could not resolve LinkedIn URL for ${target.full_name ?? target.id}`);
-  const linkedinUrl = flagshipUrl.endsWith("/") ? flagshipUrl : flagshipUrl + "/";
+  const steps = db.prepare(`
+    SELECT * FROM workflow_steps
+    WHERE workflow_id = ? AND track = ? AND enabled = 1
+    ORDER BY step_order ASC
+  `).all(runProfile.workflow_id, tr.track) as WorkflowStep[];
 
-  type RawPosition = { title?: unknown; companyName?: unknown; current?: unknown; startedOn?: unknown; endedOn?: unknown; description?: unknown };
-  const rawPositions = Array.isArray(p?.positions) ? (p.positions as RawPosition[]) : [];
-  const positions = rawPositions.map((pos) => ({
-    title: typeof pos.title === "string" ? pos.title : "",
-    companyName: typeof pos.companyName === "string" ? pos.companyName : "",
-    current: pos.current === true,
-    startedOn: pos.startedOn as { year?: number; month?: number } | undefined,
-    endedOn: pos.endedOn as { year?: number; month?: number } | undefined,
-    description: typeof pos.description === "string" ? pos.description : undefined,
-  }));
-  type RawSkill = { name?: unknown };
-  const rawSkills = Array.isArray(p?.skills) ? (p.skills as RawSkill[]) : [];
-  const skills = rawSkills.map((s) => (typeof s.name === "string" ? s.name : "")).filter(Boolean);
-
-  db.prepare(`
-    UPDATE targets SET
-      linkedin_url         = ?,
-      linkedin_member_urn  = COALESCE(linkedin_member_urn, ?),
-      headline             = COALESCE(headline, ?),
-      summary              = COALESCE(summary, ?),
-      positions_json       = COALESCE(positions_json, ?),
-      skills_json          = CASE WHEN skills_json IS NULL AND ? IS NOT NULL THEN ? ELSE skills_json END,
-      enriched_profile_at  = COALESCE(enriched_profile_at, datetime('now'))
-    WHERE id = ?
-  `).run(
-    linkedinUrl,
-    typeof p?.objectUrn === "string" ? p.objectUrn : null,
-    typeof p?.headline === "string" ? p.headline : null,
-    typeof p?.summary === "string" ? p.summary : null,
-    positions.length > 0 ? JSON.stringify(positions) : null,
-    skills.length > 0 ? "1" : null,
-    skills.length > 0 ? JSON.stringify(skills) : null,
-    target.id
-  );
-  return linkedinUrl;
-}
-
-async function getLinkedinUrl(db: ReturnType<typeof getDb>, target: Target, accountId: string): Promise<string> {
-  if (target.linkedin_url?.includes("/in/")) return target.linkedin_url;
-  return resolveLinkedinUrl(db, target, accountId);
-}
-
-// ─── pre-action enrichment ───────────────────────────────────────────────────
-
-async function ensureSalesNavEnriched(db: ReturnType<typeof getDb>, target: Target, accountId: string): Promise<void> {
-  const fresh = db.prepare("SELECT enriched_profile_at, apollo_enriched_at, sales_nav_url, full_name FROM targets WHERE id = ?").get(target.id) as { enriched_profile_at: string | null; apollo_enriched_at: string | null; sales_nav_url: string | null; full_name: string | null } | undefined;
-  if (!fresh || fresh.enriched_profile_at || fresh.apollo_enriched_at || !fresh.sales_nav_url) return;
-  const last = lastSalesNavEnrichAt[accountId] ?? 0;
-  if (Date.now() - last < SALES_NAV_ENRICH_MIN_GAP_MS) return;
-  try {
-    lastSalesNavEnrichAt[accountId] = Date.now();
-    const ctx = await getSessionContext(accountId);
-    await enrichProfile(ctx, { id: target.id, sales_nav_url: fresh.sales_nav_url, full_name: fresh.full_name ?? target.full_name ?? target.id });
-  } catch (e) {
-    console.warn(`[runner] Sales Nav enrichment failed for ${target.full_name ?? target.id}:`, e instanceof Error ? e.message : e);
+  if (steps.length === 0 || tr.current_step >= steps.length) {
+    db.prepare("UPDATE run_profile_tracks SET state = 'completed', next_step_at = NULL WHERE id = ?").run(tr.id);
+    return;
   }
-}
 
-async function ensureApolloEnriched(db: ReturnType<typeof getDb>, target: Target): Promise<void> {
-  const fresh = db.prepare("SELECT apollo_enriched_at, email, linkedin_url, sales_nav_url FROM targets WHERE id = ?").get(target.id) as { apollo_enriched_at: string | null; email: string | null; linkedin_url: string | null; sales_nav_url: string | null } | undefined;
-  if (!fresh || fresh.apollo_enriched_at || fresh.email) return;
-  const apolloUrl = fresh.linkedin_url?.includes("/in/") ? fresh.linkedin_url : fresh.sales_nav_url;
-  if (!apolloUrl) return;
+  const step = steps[tr.current_step];
+  const target = db.prepare(`
+    SELECT * FROM targets WHERE id = ?
+  `).get(runProfile.target_id) as Target | undefined;
 
-  const integration = db.prepare("SELECT api_key FROM integrations WHERE key = 'apollo'").get() as { api_key: string } | undefined;
-  if (!integration?.api_key) return;
+  if (!target) {
+    trFail(db, tr, "Target not found");
+    return;
+  }
 
-  try {
-    const result = await matchPerson(apolloUrl, decryptSecret(integration.api_key)!);
-    if (!result) {
-      db.prepare("UPDATE targets SET apollo_enriched_at = datetime('now') WHERE id = ?").run(target.id);
+  const account = db.prepare(`
+    SELECT id, name, unipile_account_id, is_authenticated FROM accounts WHERE id = ?
+  `).get(runProfile.account_id) as { id: string; name: string; unipile_account_id?: string | null; is_authenticated: number } | undefined;
+
+  const targetName = target.full_name || "Contacto";
+  const unipileAccId = account?.unipile_account_id || runProfile.account_id;
+
+  // 1. Paso de EMAIL
+  if (step.step_type === "email") {
+    if (!target.email) {
+      log(db, runProfile.run_id, target.id, "warn", `${targetName} no tiene email. Saltando track de email.`);
+      trSkip(db, tr, "No email address found");
       return;
     }
 
-    let companyId: string | null = null;
-    if (result.organization?.domain) {
-      const domain = result.organization.domain.replace(/^www\./, "").toLowerCase();
-      const existing = db.prepare("SELECT id FROM companies WHERE domain = ?").get(domain) as { id: string } | undefined;
-      const org = result.organization;
-      if (existing) {
-        companyId = existing.id;
-        db.prepare(`
-          UPDATE companies SET
-            industry = COALESCE(industry, ?), location = COALESCE(location, ?),
-            linkedin_url = COALESCE(linkedin_url, ?), website = COALESCE(website, ?),
-            founded_year = COALESCE(founded_year, ?), logo_url = COALESCE(logo_url, ?),
-            phone = COALESCE(phone, ?), annual_revenue = COALESCE(annual_revenue, ?),
-            technology_names = COALESCE(technology_names, ?), keywords = COALESCE(keywords, ?),
-            city = COALESCE(city, ?), country = COALESCE(country, ?),
-            description = COALESCE(description, ?), employee_count = COALESCE(employee_count, ?)
-          WHERE id = ?
-        `).run(
-          org.industry ?? null, org.location ?? null, org.linkedin_url ?? null,
-          org.website_url ?? null, org.founded_year ?? null, org.logo_url ?? null,
-          org.phone ?? null, org.annual_revenue_printed ?? null,
-          org.technology_names ? JSON.stringify(org.technology_names) : null,
-          org.keywords ? JSON.stringify(org.keywords) : null,
-          org.city ?? null, org.country ?? null,
-          org.short_description ?? null, org.estimated_num_employees ?? null,
-          existing.id
-        );
-      } else {
-        companyId = randomUUID();
-        db.prepare(`
-          INSERT INTO companies (id, name, domain, industry, location, linkedin_url, website, founded_year, logo_url, phone, annual_revenue, technology_names, keywords, city, country, description, employee_count)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          companyId, org.name ?? "", domain,
-          org.industry ?? null, org.location ?? null, org.linkedin_url ?? null,
-          org.website_url ?? null, org.founded_year ?? null, org.logo_url ?? null,
-          org.phone ?? null, org.annual_revenue_printed ?? null,
-          org.technology_names ? JSON.stringify(org.technology_names) : null,
-          org.keywords ? JSON.stringify(org.keywords) : null,
-          org.city ?? null, org.country ?? null,
-          org.short_description ?? null, org.estimated_num_employees ?? null
-        );
-      }
+    if (!runProfile.email_account_id) {
+      log(db, runProfile.run_id, target.id, "warn", "No hay cuenta de email configurada para este run.");
+      trSkip(db, tr, "No email account configured");
+      return;
     }
 
-    db.prepare(`
-      UPDATE targets SET
-        apollo_id = ?, seniority = ?, apollo_functions = ?, apollo_departments = ?,
-        email = COALESCE(email, ?), email_status = COALESCE(email_status, ?),
-        email_domain_catchall = ?,
-        city = COALESCE(city, ?), country = COALESCE(country, ?),
-        time_zone = COALESCE(time_zone, ?),
-        headline = COALESCE(headline, ?),
-        positions_json = COALESCE(positions_json, ?),
-        company_id = COALESCE(company_id, ?),
-        linkedin_url = COALESCE(linkedin_url, ?),
-        apollo_enriched_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      result.apollo_id,
-      result.seniority ?? null,
-      result.functions ? JSON.stringify(result.functions) : null,
-      result.departments ? JSON.stringify(result.departments) : null,
-      result.email ?? null,
-      result.email_status ?? null,
-      result.email_domain_catchall ? 1 : 0,
-      result.city ?? null,
-      result.country ?? null,
-      result.time_zone ?? null,
-      result.headline ?? null,
-      result.positions_json ?? null,
-      companyId,
-      result.linkedin_url ?? null,
-      target.id
-    );
-    console.log(`[runner] Apollo enriched ${target.full_name ?? target.id} — email: ${result.email ?? "not found"}`);
-  } catch (e) {
-    console.warn(`[runner] Apollo enrichment failed for ${target.full_name ?? target.id}:`, e instanceof Error ? e.message : e);
-  }
-}
+    const emailAccount = db.prepare("SELECT * FROM email_accounts WHERE id = ?").get(runProfile.email_account_id) as any;
+    if (!emailAccount) {
+      trFail(db, tr, "Email account not found");
+      return;
+    }
 
-// ─── step execution ──────────────────────────────────────────────────────────
-
-async function executeStep(
-  db: ReturnType<typeof getDb>,
-  runId: string,
-  tr: TrackRun,
-  target: Target,
-  steps: WorkflowStep[],
-  accountId: string,
-  accountLimits: AccountLimits,
-  emailAccountId?: string | null,
-  emailAccountLimits?: EmailAccountLimits | null,
-  campaignPrompt?: string | null,
-  leaseActive: () => boolean = () => true
-): Promise<void> {
-  if (!leaseActive()) return;
-
-  // InHubFlow Architecture: All LinkedIn actions are executed from the user's residential IP
-  // via the InHubFlow Connect Chrome extension. The server runner MUST NOT execute server-side Playwright
-  // from datacenter IP unless LINKEDIN_SERVER_PLAYWRIGHT_ENABLED=true is explicitly set.
-  if (tr.track === "linkedin" && process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED !== "true") {
-    return;
-  }
-
-  const bypassSchedule = db.prepare(
-    "UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ? AND force_run_once = 1"
-  ).run(tr.id).changes === 1;
-  const stepIndex = tr.current_step;
-  if (stepIndex >= steps.length) {
-    db.prepare("UPDATE run_profile_tracks SET state = 'completed', last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-    return;
-  }
-
-  // Auto-unenroll if lead has replied on either channel — mark ALL track-runs for this profile skipped
-  const replyCheck = db.prepare("SELECT last_replied_at, email_replied_at FROM targets WHERE id = ?").get(target.id) as { last_replied_at: string | null; email_replied_at: string | null };
-  if (replyCheck?.last_replied_at || replyCheck?.email_replied_at) {
-    const channel = replyCheck.email_replied_at ? "email" : "LinkedIn";
-    log(db, runId, target.id, "info", `${target.full_name ?? target.linkedin_url} replied via ${channel} — unenrolling from workflow`);
-    db.prepare(
-      "UPDATE run_profile_tracks SET state = 'skipped', error_message = 'Lead replied' WHERE run_profile_id = ? AND state NOT IN ('completed', 'failed', 'skipped')"
-    ).run(tr.run_profile_id);
-    return;
-  }
-
-  const step = steps[stepIndex];
-  const name = target.full_name ?? target.linkedin_url;
-  let connectionMarkerCreated = false;
-  let connectionSendInvoked = false;
-  let connectionConfirmed = false;
-  let connectionAttemptId: string | null = null;
-  const recordConnectionOutcome = (
-    outcome: "submitted" | "confirmed" | "uncertain" | "rejected",
-    errorMessage?: string
-  ) => {
-    if (!connectionAttemptId) return;
     try {
-      updateLinkedInConnectionAttempt(db, connectionAttemptId, outcome, errorMessage);
-    } catch (error) {
-      console.error(`[runner] Could not update LinkedIn connection attempt ${connectionAttemptId}:`, error instanceof Error ? error.message : error);
-    }
-  };
+      const subject = step.email_subject || "Hola";
+      const body = step.email_body || "";
+      await sendEmail(emailAccount, target.email, subject, body);
 
-  try {
-    if (step.step_type === "delay") {
+      log(db, runProfile.run_id, target.id, "info", `Email enviado a ${target.email}`);
       trAdvance(db, tr, steps);
-      log(db, runId, target.id, "info", `Delay step passed for ${name}`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log(db, runProfile.run_id, target.id, "error", `Error enviando email: ${errorMsg}`);
+      trFail(db, tr, errorMsg);
+    }
+    return;
+  }
+
+  // 2. Paso de DELAY
+  if (step.step_type === "delay") {
+    trAdvance(db, tr, steps);
+    return;
+  }
+
+  // 3. Pasos de LINKEDIN (vía Unipile API)
+  if (!unipile.isConfigured()) {
+    log(db, runProfile.run_id, target.id, "warn", "Unipile no configurado (simulación local). Avanzando paso.");
+    trAdvance(db, tr, steps);
+    return;
+  }
+
+  // Resolver provider_id si no lo tiene
+  let providerId = target.unipile_provider_id;
+  if (!providerId && target.linkedin_url) {
+    try {
+      const profile = await unipile.resolveProfile(target.linkedin_url, unipileAccId);
+      providerId = profile.provider_id;
+      if (providerId) {
+        db.prepare("UPDATE targets SET unipile_provider_id = ? WHERE id = ?").run(providerId, target.id);
+      }
+    } catch (err) {
+      console.warn(`[runner] No se pudo resolver perfil de LinkedIn en Unipile para ${targetName}:`, err);
+    }
+  }
+
+  if (step.step_type === "visit") {
+    log(db, runProfile.run_id, target.id, "info", `Perfil visitado/sincronizado para ${targetName} vía Unipile`);
+    trAdvance(db, tr, steps);
+    return;
+  }
+
+  if (step.step_type === "connect") {
+    if (target.connected_at || target.degree === 1) {
+      log(db, runProfile.run_id, target.id, "info", `${targetName} ya está conectado. Avanzando.`);
+      trAdvance(db, tr, steps);
       return;
     }
 
-    if (step.step_type === "visit") {
-      db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Visiting ${name}`);
-      const linkedinUrl = await getLinkedinUrl(db, target, accountId);
-      const page = await getSessionPage(accountId);
-      let visitResult: { isFirstDegree: boolean; messagingUrn: string | null };
-      try { visitResult = await visitProfile(page, linkedinUrl); } finally { await page.close(); }
-      await saveSessionState(accountId);
-      if (visitResult.isFirstDegree && target.degree !== 1) {
-        db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?) WHERE id = ?").run(nowIso(), target.id);
-        log(db, runId, target.id, "info", `${name} already 1st-degree — backfilled connection status`);
-      }
-      if (visitResult.messagingUrn) {
-        db.prepare("UPDATE targets SET messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?").run(visitResult.messagingUrn, target.id);
-      }
-      trAdvance(db, tr, steps);
-      log(db, runId, target.id, "info", `Visited ${name}`);
-
-    } else if (step.step_type === "connect") {
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
-
-      let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-      if (freshTarget.degree === 1) {
-        if (!freshTarget.connected_at) db.prepare("UPDATE targets SET connected_at = ? WHERE id = ?").run(nowIso(), target.id);
-        log(db, runId, target.id, "info", `${name} already connected — skipping connect step`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-
-      if (freshTarget.connection_requested_at) {
-        const syncResult = await reconcileAcceptedConnections(accountId);
-        freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-        if (freshTarget.degree === 1) {
-          log(db, runId, target.id, "info", `${name} accepted connection confirmed via connections API (${syncResult.matchedTargets} match${syncResult.matchedTargets === 1 ? "" : "es"}) — advancing`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-
-        // Live profile verification fallback if Voyager API was unreachable or returned 401
-        try {
-          const profileUrl = await getLinkedinUrl(db, target, accountId);
-          const page = await getSessionPage(accountId);
-          try {
-            const check = await visitProfile(page, profileUrl);
-            if (check.isFirstDegree) {
-              db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
-                .run(nowIso(), check.messagingUrn, target.id);
-              freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-              log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — advancing`);
-              trAdvance(db, tr, steps);
-              return;
-            } else {
-              log(db, runId, target.id, "info", `${name} live profile check: ${check.evidence.reason} (msg=${check.evidence.hasMessageAction}, conn=${check.evidence.hasConnectAction}, pend=${check.evidence.hasPendingAction})`);
-            }
-          } finally {
-            await page.close();
-          }
-        } catch (liveCheckErr) {
-          console.warn(`[runner] Live connection check warning for ${name}:`, liveCheckErr instanceof Error ? liveCheckErr.message : liveCheckErr);
-        }
-
-        const requestedAt = freshTarget.connection_requested_at;
-        if (!requestedAt) {
-          log(db, runId, target.id, "warn", `${name} lost its connection-request timestamp during reconciliation — rescheduling safely`);
-          trWait(db, tr, CONNECTION_RECHECK_HOURS);
-          return;
-        }
-        const hoursSinceRequest = hoursSince(requestedAt);
-        if (hoursSinceRequest / 24 > CONNECTION_MAX_WAIT_DAYS) {
-          log(db, runId, target.id, "warn", `${name} did not accept after ${CONNECTION_MAX_WAIT_DAYS} days — skipping`);
-          trSkip(db, tr, `Did not accept connection after ${CONNECTION_MAX_WAIT_DAYS} days`);
-          return;
-        }
-        log(db, runId, target.id, "info", `${name} not yet accepted — rechecking in ${CONNECTION_RECHECK_HOURS}h`);
-        trWait(db, tr, CONNECTION_RECHECK_HOURS);
-        return;
-      }
-
-      db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Preparing connection request for ${name}`);
-      const linkedinUrl = await getLinkedinUrl(db, target, accountId);
-      const page = await getSessionPage(accountId);
-      try {
-        await sendConnectionRequest(page, linkedinUrl, {
-          beforeSubmit: () => {
-            // This callback runs after the modal and send button are ready, at
-            // the last reversible boundary before LinkedIn receives the click.
-            const attemptedAt = nowIso();
-            let markerCreated = false;
-            let attemptId = "";
-            db.transaction(() => {
-              log(db, runId, target.id, "info", `Sending connection request to ${name}`);
-              const marker = db.prepare(
-                "UPDATE targets SET connection_requested_at = ? WHERE id = ? AND connection_requested_at IS NULL"
-              ).run(attemptedAt, target.id);
-              markerCreated = marker.changes > 0;
-              attemptId = createLinkedInConnectionAttempt(db, {
-                accountId,
-                runId,
-                targetId: target.id,
-                attemptedAt,
-              });
-            })();
-            connectionMarkerCreated = markerCreated;
-            connectionAttemptId = attemptId;
-            connectionSendInvoked = true;
-          },
-          afterSubmit: () => {
-            recordConnectionOutcome("submitted");
-          },
-        });
-      } finally {
-        await page.close();
-      }
-      connectionConfirmed = true;
-      recordConnectionOutcome("confirmed");
-      try {
-        await saveSessionState(accountId);
-      } catch (error) {
-        console.warn(`[runner] Connection confirmed but session persistence failed for ${name}:`, error instanceof Error ? error.message : error);
-      }
-      trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      log(db, runId, target.id, "info", `Connection request sent and confirmed for ${name} — will recheck in ${CONNECTION_RECHECK_HOURS}h`);
-
-    } else if (step.step_type === "message") {
-      await ensureSalesNavEnriched(db, target, accountId);
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
-
-      let freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-      if (freshTarget.degree !== 1) {
-        // The scheduled account sync may have run before this acceptance. Force a
-        // bounded, account-scoped reconciliation before falling back to the UI.
-        const syncResult = await reconcileAcceptedConnections(accountId);
-        freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-        if (freshTarget.degree === 1) {
-          log(db, runId, target.id, "info", `${name} confirmed as 1st-degree via connections API (${syncResult.matchedTargets} match${syncResult.matchedTargets === 1 ? "" : "es"}) — proceeding with message`);
-        }
-      }
-
-      let lastLiveCheckReason: string | null = null;
-      let activePage: Page | null = null;
-      if (freshTarget.degree !== 1) {
-        // Perform a live verification check by visiting the profile. This is the
-        // final read-only check immediately before send and writes no action.
-        const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
-        activePage = await getSessionPage(accountId);
-        try {
-          const check = await visitProfile(activePage, messageLinkedinUrl);
-          lastLiveCheckReason = check.evidence.reason;
-          if (check.isFirstDegree) {
-            db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?), messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?")
-              .run(nowIso(), check.messagingUrn, target.id);
-            freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-            log(db, runId, target.id, "info", `${name} verified as 1st-degree via live profile (${check.evidence.reason}) — proceeding with message`);
-          } else {
-            log(db, runId, target.id, "info", `${name} live connection check negative (${check.evidence.reason}; message=${check.evidence.hasMessageAction}, connect=${check.evidence.hasConnectAction}, pending=${check.evidence.hasPendingAction})`);
-            await activePage.close();
-            activePage = null;
-          }
-        } catch (err) {
-          console.warn(`[runner] Live connection check failed for ${name}:`, err instanceof Error ? err.message : err);
-          log(db, runId, target.id, "warn", `${name} live connection check failed — ${err instanceof Error ? err.message : String(err)}`);
-          if (activePage) {
-            await activePage.close();
-            activePage = null;
-          }
-        }
-      }
-
-      if (freshTarget.degree !== 1) {
-        if (activePage) {
-          await activePage.close();
-          activePage = null;
-        }
-        const requested = freshTarget.connection_requested_at;
-        if (requested && hoursSince(requested) / 24 > CONNECTION_MAX_WAIT_DAYS) {
-          log(db, runId, target.id, "warn", `${name} never accepted — skipping message step`);
-          trSkip(db, tr, "Never accepted connection");
-          return;
-        }
-        if (lastLiveCheckReason === "profile_main_missing") {
-          log(db, runId, target.id, "warn", `${name} profile container did not load in time — retrying shortly`);
-          return;
-        }
-        log(db, runId, target.id, "info", `${name} not yet connected after API and live checks — rescheduling message in ${CONNECTION_RECHECK_HOURS}h`);
-        trWait(db, tr, CONNECTION_RECHECK_HOURS);
-        return;
-      }
-
-      let messageText = "";
-      if (step.ai_enabled) {
-        if (!premium?.ai) {
-          if (activePage) await activePage.close();
-          log(db, runId, target.id, "warn", `AI writer is a premium feature — not available in this build. Skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const integration = db.prepare("SELECT api_key FROM integrations WHERE key = 'openrouter'").get() as { api_key: string } | undefined;
-        const agentCfgForMsg = premium.ai.getAgentConfig();
-        const resolvedMsgModel = step.ai_model || agentCfgForMsg.default_model;
-        if (!integration?.api_key || !resolvedMsgModel) {
-          if (activePage) await activePage.close();
-          log(db, runId, target.id, "warn", `AI enabled on message step but OpenRouter key or model missing — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const contactData = premium.ai.getContactWithCompany(target.id);
-        if (!contactData) {
-          if (activePage) await activePage.close();
-          log(db, runId, target.id, "warn", `Could not load contact data for AI message — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        log(db, runId, target.id, "info", `Generating AI message for ${name} with ${resolvedMsgModel}`);
-        const msgPosition = step.message_position ?? 1;
-        let previousMessageContext: { followupNumber: number; previousMessage: string } | undefined;
-        if (msgPosition > 1 && tr.last_linkedin_message) {
-          previousMessageContext = { followupNumber: msgPosition - 1, previousMessage: tr.last_linkedin_message };
-        }
-        const result = await premium.ai.writeLinkedInMessage({
-          apiKey: decryptSecret(integration.api_key)!,
-          model: resolvedMsgModel,
-          stepType: "message",
-          stepPrompt: step.ai_prompt ?? "",
-          maxWords: step.ai_max_words ?? undefined,
-          language: step.ai_language ?? undefined,
-          campaignPrompt: campaignPrompt ?? undefined,
-          contact: contactData.contact,
-          company: contactData.company,
-          agentConfig: agentCfgForMsg,
-          previousMessageContext,
-          runId,
-          targetId: target.id,
-          stepId: step.id,
-        });
-        messageText = result.body;
-      } else {
-        const multiTemplateIds = (db.prepare("SELECT template_id FROM workflow_step_templates WHERE step_id = ?").all(step.id) as Array<{ template_id: string }>).map(r => r.template_id);
-        if (multiTemplateIds.length > 0) {
-          const randomId = multiTemplateIds[Math.floor(Math.random() * multiTemplateIds.length)];
-          const tmpl = db.prepare("SELECT * FROM templates WHERE id = ?").get(randomId) as Template | undefined;
-          if (tmpl) messageText = renderTemplate(tmpl.body, freshTarget);
-        } else if (step.template_id) {
-          const tmpl = db.prepare("SELECT * FROM templates WHERE id = ?").get(step.template_id) as Template | undefined;
-          if (tmpl) messageText = renderTemplate(tmpl.body, freshTarget);
-        }
-        if (!messageText && step.message_body) messageText = renderTemplate(step.message_body, freshTarget);
-      }
-      if (!messageText) {
-        if (activePage) await activePage.close();
-        log(db, runId, target.id, "warn", `No message body for message step — skipping ${name}`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-
-      db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Sending message to ${name}`);
-      const messageLinkedinUrl = await getLinkedinUrl(db, target, accountId);
-      const page = activePage ?? (await getSessionPage(accountId));
-      try {
-        if (!target.full_name) throw new Error(`Target ${target.id} has no full_name — cannot search messaging`);
-        const result = await sendMessage(page, target.full_name, messageText, messageLinkedinUrl, freshTarget.messaging_urn);
-        if (result.messagingUrn) {
-          db.prepare("UPDATE targets SET messaging_urn = COALESCE(messaging_urn, ?) WHERE id = ?").run(result.messagingUrn, target.id);
-        }
-      } catch (err) {
-        if (err instanceof NotConnectedError) {
-          await saveSessionState(accountId);
-          db.prepare("UPDATE targets SET degree = NULL, connected_at = NULL WHERE id = ?").run(target.id);
-          log(db, runId, target.id, "warn", `${name} no longer appears 1st-degree — resetting connection status and rescheduling`);
-          trWait(db, tr, CONNECTION_RECHECK_HOURS);
-          return;
-        }
-        // The profile page never rendered, so we could not confirm the degree.
-        // That is not evidence they are unconnected — leave the stored degree
-        // alone (unlike NotConnectedError) and simply retry later.
-        if (err instanceof ProfileVerificationError) {
-          await saveSessionState(accountId);
-          log(db, runId, target.id, "warn", `No se pudo verificar el perfil de ${name} — reprogramando sin marcar como enviado`);
-          trWait(db, tr, CONNECTION_RECHECK_HOURS);
-          return;
-        }
-        // Send ran but LinkedIn never confirmed delivery. Do NOT advance the
-        // track or stamp message_sent_at — that is the phantom "Completed".
-        if (err instanceof MessageNotDeliveredError) {
-          await saveSessionState(accountId);
-          log(db, runId, target.id, "warn", `LinkedIn no confirmó la entrega del mensaje a ${name} — reprogramando sin marcar como enviado`);
-          trWait(db, tr, MESSAGE_RETRY_HOURS);
-          return;
-        }
-        throw err;
-      } finally {
-        await page.close();
-      }
-      await saveSessionState(accountId);
-      db.prepare("UPDATE targets SET message_sent_at = ? WHERE id = ?").run(nowIso(), target.id);
-      trRecordContext(db, tr, { linkedinMessage: messageText });
-      trAdvance(db, tr, steps);
-      log(db, runId, target.id, "info", `Message sent to ${name}`);
-
-    } else if (step.step_type === "sales_inmail") {
-      // Sales Navigator InMail — reaches NON-connections (no degree gate), needs a
-      // subject + body, costs one InMail credit. Body config mirrors the message
-      // step (AI writer OR templates OR raw body); subject comes from email_subject.
-      if (!premium?.inmail) {
-        log(db, runId, target.id, "warn", `Sales Nav InMail is a premium feature — not available in this build. Skipping ${name}`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-      await ensureSalesNavEnriched(db, target, accountId);
-      if (!enforceSchedule(db, tr, runId, target.id, name, accountLimits, bypassSchedule)) return;
-
-      const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-      if (!freshTarget.sales_nav_url) {
-        log(db, runId, target.id, "warn", `${name} has no Sales Nav URL — cannot send InMail, skipping`);
-        trSkip(db, tr, "No Sales Nav URL for InMail");
-        return;
-      }
-
-      let inmailBody = "";
-      let inmailSubject = "";
-      if (step.ai_enabled) {
-        if (!premium?.ai) {
-          log(db, runId, target.id, "warn", `AI writer is a premium feature — not available in this build. Skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const integration = db.prepare("SELECT api_key FROM integrations WHERE key = 'openrouter'").get() as { api_key: string } | undefined;
-        const agentCfgForMsg = premium.ai.getAgentConfig();
-        const resolvedMsgModel = step.ai_model || agentCfgForMsg.default_model;
-        if (!integration?.api_key || !resolvedMsgModel) {
-          log(db, runId, target.id, "warn", `AI enabled on InMail step but OpenRouter key or model missing — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const contactData = premium.ai.getContactWithCompany(target.id);
-        if (!contactData) {
-          log(db, runId, target.id, "warn", `Could not load contact data for AI InMail — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        log(db, runId, target.id, "info", `Generating AI InMail for ${name} with ${resolvedMsgModel}`);
-        const msgPosition = step.message_position ?? 1;
-        let previousMessageContext: { followupNumber: number; previousMessage: string } | undefined;
-        if (msgPosition > 1 && tr.last_linkedin_message) {
-          previousMessageContext = { followupNumber: msgPosition - 1, previousMessage: tr.last_linkedin_message };
-        }
-        const result = await premium.ai.writeSalesInMail({
-          apiKey: decryptSecret(integration.api_key)!,
-          model: resolvedMsgModel,
-          stepType: "sales_inmail",
-          stepPrompt: step.ai_prompt ?? "",
-          maxWords: step.ai_max_words ?? undefined,
-          language: step.ai_language ?? undefined,
-          campaignPrompt: campaignPrompt ?? undefined,
-          contact: contactData.contact,
-          company: contactData.company,
-          agentConfig: agentCfgForMsg,
-          previousMessageContext,
-          runId,
-          targetId: target.id,
-          stepId: step.id,
-        });
-        inmailBody = result.body;
-        inmailSubject = result.subject;
-      } else {
-        const multiTemplateIds = (db.prepare("SELECT template_id FROM workflow_step_templates WHERE step_id = ?").all(step.id) as Array<{ template_id: string }>).map(r => r.template_id);
-        if (multiTemplateIds.length > 0) {
-          const randomId = multiTemplateIds[Math.floor(Math.random() * multiTemplateIds.length)];
-          const tmpl = db.prepare("SELECT * FROM templates WHERE id = ?").get(randomId) as Template | undefined;
-          if (tmpl) inmailBody = renderTemplate(tmpl.body, freshTarget);
-        } else if (step.template_id) {
-          const tmpl = db.prepare("SELECT * FROM templates WHERE id = ?").get(step.template_id) as Template | undefined;
-          if (tmpl) inmailBody = renderTemplate(tmpl.body, freshTarget);
-        }
-        if (!inmailBody && step.message_body) inmailBody = renderTemplate(step.message_body, freshTarget);
-        inmailSubject = renderTemplate(step.email_subject ?? "", freshTarget).trim();
-      }
-      if (!inmailBody) {
-        log(db, runId, target.id, "warn", `No body for InMail step — skipping ${name}`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-      if (!inmailSubject) {
-        log(db, runId, target.id, "warn", `No subject for InMail step (required) — skipping ${name}`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-
-      db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Sending InMail to ${name}`);
-      const page = await getSessionPage(accountId);
-      try {
-        await premium.inmail.sendInMail(page, freshTarget.sales_nav_url, inmailSubject, inmailBody);
-      } finally {
-        await page.close();
-      }
-      await saveSessionState(accountId);
-      db.prepare("UPDATE targets SET inmail_sent_at = ?, message_sent_at = COALESCE(message_sent_at, ?) WHERE id = ?").run(nowIso(), nowIso(), target.id);
-      trRecordContext(db, tr, { linkedinMessage: inmailBody });
-      trAdvance(db, tr, steps);
-      log(db, runId, target.id, "info", `InMail sent to ${name}`);
-
-    } else if (step.step_type === "email") {
-      await ensureApolloEnriched(db, target);
-
-      if (!emailAccountId || !emailAccountLimits) {
-        log(db, runId, target.id, "warn", `Email step skipped — no email account configured on this run`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-
-      if (!enforceSchedule(db, tr, runId, target.id, name, emailAccountLimits, bypassSchedule)) return;
-
-      const freshTarget = db.prepare("SELECT * FROM targets WHERE id = ?").get(target.id) as Target;
-      if (!freshTarget.email) {
-        // No email even after Apollo enrichment — skip only this email track
-        log(db, runId, target.id, "warn", `${name} has no email address — skipping email track`);
-        trSkip(db, tr, "No email address found");
-        return;
-      }
-      if (freshTarget.email_status === "invalid") {
-        log(db, runId, target.id, "warn", `${name} has an invalid email address — unenrolling email track`);
-        trSkip(db, tr, "Email bounced — invalid address");
-        return;
-      }
-      if (freshTarget.company_id) {
-        const company = db.prepare("SELECT email_domain_invalid FROM companies WHERE id = ?").get(freshTarget.company_id) as { email_domain_invalid: number } | undefined;
-        if (company?.email_domain_invalid) {
-          log(db, runId, target.id, "warn", `${name}'s company email domain is flagged invalid — unenrolling email track`);
-          trSkip(db, tr, "Email domain invalid — company flagged");
-          return;
-        }
-      }
-
-      let emailSubject = "";
-      let emailBody = "";
-      if (step.ai_enabled) {
-        if (!premium?.ai) {
-          log(db, runId, target.id, "warn", `AI writer is a premium feature — not available in this build. Skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const integration = db.prepare("SELECT api_key FROM integrations WHERE key = 'openrouter'").get() as { api_key: string } | undefined;
-        const agentCfgForEmail = premium.ai.getAgentConfig();
-        const resolvedEmailModel = step.ai_model || agentCfgForEmail.default_model;
-        if (!integration?.api_key || !resolvedEmailModel) {
-          log(db, runId, target.id, "warn", `AI enabled on email step but OpenRouter key or model missing — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        const contactData = premium.ai.getContactWithCompany(target.id);
-        if (!contactData) {
-          log(db, runId, target.id, "warn", `Could not load contact data for AI email — skipping ${name}`);
-          trAdvance(db, tr, steps);
-          return;
-        }
-        log(db, runId, target.id, "info", `Generating AI email for ${name} with ${resolvedEmailModel}`);
-        const emailPosition = step.email_position ?? 1;
-        let followupContext: { followupNumber: number; previousSubject: string; previousBody: string } | undefined;
-        if (emailPosition > 1 && (tr.last_email_subject || tr.last_email_body)) {
-          followupContext = {
-            followupNumber: emailPosition - 1,
-            previousSubject: tr.last_email_subject ?? "",
-            previousBody: tr.last_email_body ?? "",
-          };
-        }
-        const result = await premium.ai.writeEmail({
-          apiKey: decryptSecret(integration.api_key)!,
-          model: resolvedEmailModel,
-          stepType: "email",
-          stepPrompt: step.ai_prompt ?? "",
-          maxWords: step.ai_max_words ?? undefined,
-          language: step.ai_language ?? undefined,
-          campaignPrompt: campaignPrompt ?? undefined,
-          contact: contactData.contact,
-          company: contactData.company,
-          agentConfig: agentCfgForEmail,
-          followupContext,
-          replyContext: tr.pending_reply_context ?? undefined,
-          runId,
-          targetId: target.id,
-          stepId: step.id,
-        });
-        emailSubject = result.subject;
-        emailBody = result.body;
-        // One-shot: consume the OOO reply context so later follow-ups don't re-acknowledge it
-        if (tr.pending_reply_context) {
-          db.prepare("UPDATE run_profile_tracks SET pending_reply_context = NULL WHERE id = ?").run(tr.id);
-        }
-      } else {
-        emailSubject = renderTemplate(step.email_subject ?? "", freshTarget);
-        emailBody = renderTemplate(step.email_body ?? "", freshTarget);
-      }
-
-      if (!emailBody) {
-        log(db, runId, target.id, "warn", `No email body for email step — skipping ${name}`);
-        trAdvance(db, tr, steps);
-        return;
-      }
-
-      const emailAccount = db.prepare("SELECT * FROM email_accounts WHERE id = ?").get(emailAccountId) as {
-        id: string; from_email: string; from_name: string | null; reply_to: string | null;
-        smtp_host: string; smtp_port: number; smtp_secure: number;
-        username: string; password: string; signature: string | null;
-      } | undefined;
-
-      if (!emailAccount) {
-        log(db, runId, target.id, "error", `Email account ${emailAccountId} not found`);
-        trFail(db, tr, "Email account missing");
-        return;
-      }
-
-      // Last-line-of-defense: re-check the daily limit for this email account against ground-truth
-      // (matched by run_profiles.email_account_id, the actual sender). If any prior gate is buggy,
-      // this catches the overshoot and reschedules instead of sending.
-      const sentTodayActual = (db.prepare(
-        `SELECT COUNT(*) as c FROM logs l
-         WHERE l.message LIKE 'Email sent%'
-         AND date(l.created_at) = date('now')
-         AND EXISTS (
-           SELECT 1 FROM run_profiles rp
-           WHERE rp.run_id = l.run_id AND rp.target_id = l.target_id
-           AND rp.email_account_id = ?
-         )`
-      ).get(emailAccountId) as { c: number }).c;
-      const hardLimit = effectiveEmailLimit(emailAccountLimits);
-      if (sentTodayActual >= hardLimit) {
-        log(db, runId, target.id, "warn", `Daily limit guard tripped for ${emailAccountId} (${sentTodayActual}/${hardLimit}) — rescheduling ${name} to tomorrow`);
-        trReschedule(db, tr, rescheduleToTomorrow(emailAccountLimits));
-        return;
-      }
-
-      // Step-level signature takes precedence; null means fall back to email account default
-      const sig = (step.email_signature !== null ? step.email_signature : emailAccount.signature)?.trim();
-      const finalEmailBody = sig ? `${emailBody}\n\n--\n${sig}` : emailBody;
-      db.prepare("UPDATE run_profile_tracks SET last_step_at = datetime('now') WHERE id = ?").run(tr.id);
-      log(db, runId, target.id, "info", `Sending email to ${name} <${freshTarget.email}>`);
-      await sendEmail({ ...emailAccount, password: decryptSecret(emailAccount.password)! }, freshTarget.email, emailSubject, finalEmailBody);
-      trRecordContext(db, tr, { emailSubject, emailBody });
-      trAdvance(db, tr, steps);
-      log(db, runId, target.id, "info", `Email sent to ${name}`);
+    if (!providerId) {
+      trFail(db, tr, "No se pudo obtener el identificador de LinkedIn en Unipile para enviar conexión");
+      return;
     }
 
+    try {
+      log(db, runProfile.run_id, target.id, "info", `Enviando solicitud de conexión a ${targetName} vía Unipile`);
+      await unipile.sendInvitation({
+        account_id: unipileAccId,
+        provider_id: providerId,
+        message: step.connect_note || undefined,
+      });
+
+      db.prepare("UPDATE targets SET connection_requested_at = datetime('now') WHERE id = ?").run(target.id);
+      trWait(db, tr, 6); // Esperar 6 horas para verificar aceptación
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log(db, runProfile.run_id, target.id, "error", `Error enviando invitación: ${errorMsg}`);
+      trFail(db, tr, errorMsg);
+    }
+    return;
+  }
+
+  if (step.step_type === "message") {
+    const textToSend = step.message_body || "Hola!";
+    try {
+      log(db, runProfile.run_id, target.id, "info", `Enviando mensaje a ${targetName} vía Unipile`);
+
+      if (target.unipile_chat_id) {
+        await unipile.sendMessage({
+          chat_id: target.unipile_chat_id,
+          text: textToSend,
+        });
+      } else if (providerId) {
+        const chat = await unipile.startChat({
+          account_id: unipileAccId,
+          attendees_ids: [providerId],
+          text: textToSend,
+        });
+        if (chat?.id) {
+          db.prepare("UPDATE targets SET unipile_chat_id = ? WHERE id = ?").run(chat.id, target.id);
+        }
+      } else {
+        throw new Error("No hay identificador de contacto ni chat disponible para enviar el mensaje");
+      }
+
+      db.prepare("UPDATE targets SET message_sent_at = datetime('now') WHERE id = ?").run(target.id);
+      trAdvance(db, tr, steps);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log(db, runProfile.run_id, target.id, "error", `Error enviando mensaje: ${errorMsg}`);
+      trFail(db, tr, errorMsg);
+    }
+    return;
+  }
+
+  // Si no coincide ningún tipo, avanzar
+  trAdvance(db, tr, steps);
+}
+
+// ─── Loop Global y API Pública ───────────────────────────────────────────────
+
+let isTicking = false;
+let globalRunnerTimer: NodeJS.Timeout | null = null;
+
+export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<void> {
+  if (isTicking) return;
+  isTicking = true;
+
+  try {
+    const db = customDb || getDb();
+    const pendingTracks = db.prepare(`
+      SELECT rt.*
+      FROM run_profile_tracks rt
+      JOIN run_profiles rp ON rp.id = rt.run_profile_id
+      JOIN runs r ON r.id = rp.run_id
+      WHERE r.status = 'running'
+        AND (
+          rt.force_run_once = 1
+          OR (
+            rt.state IN ('pending', 'in_progress')
+            AND (rt.next_step_at IS NULL OR rt.next_step_at <= datetime('now'))
+          )
+        )
+      ORDER BY rt.force_run_once DESC, rt.next_step_at ASC
+      LIMIT 10
+    `).all() as TrackRun[];
+
+    for (const tr of pendingTracks) {
+      if (tr.force_run_once === 1) {
+        db.prepare("UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ?").run(tr.id);
+      }
+      await processSingleTrack(db, tr);
+    }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (err instanceof LinkedInAuthenticationError) {
-      try { await markNeedsReauth(accountId); } catch { /* best effort */ }
-      db.prepare("UPDATE runs SET status = 'paused' WHERE account_id = ? AND status = 'running'").run(accountId);
-      if (connectionMarkerCreated && !err.submissionAttempted) {
-        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
-      }
-      if (err.submissionAttempted) {
-        recordConnectionOutcome("uncertain", msg);
-        trWait(db, tr, CONNECTION_RECHECK_HOURS);
-        log(db, runId, target.id, "warn", `${name} connection outcome is pending after session expiry — account requires reauthentication`);
-      } else {
-        recordConnectionOutcome("rejected", msg);
-        trFail(db, tr, msg);
-        log(db, runId, target.id, "error", `LinkedIn session expired for ${name} — account paused for reauthentication`);
-      }
-      return;
-    }
-    if (err instanceof WeeklyLimitError) {
-      recordConnectionOutcome("rejected", msg);
-      if (connectionMarkerCreated) {
-        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
-      }
-      log(db, runId, target.id, "error", `Weekly connection limit reached — pausing run`);
-      db.prepare("UPDATE runs SET status = 'paused' WHERE id = ?").run(runId);
-      return;
-    }
-    if (err instanceof ConnectionPreSubmitError) {
-      recordConnectionOutcome("rejected", msg);
-      if (connectionMarkerCreated) {
-        db.prepare("UPDATE targets SET connection_requested_at = NULL WHERE id = ?").run(target.id);
-      }
-      trFail(db, tr, msg);
-      return;
-    }
-    if (err instanceof AlreadyConnectedError) {
-      log(db, runId, target.id, "info", `${name} already connected — advancing`);
-      db.prepare("UPDATE targets SET degree = 1, connected_at = COALESCE(connected_at, ?) WHERE id = ?").run(nowIso(), target.id);
-      trAdvance(db, tr, steps);
-      return;
-    }
-    if (err instanceof PendingInviteError) {
-      log(db, runId, target.id, "info", `${name} invite already pending — will recheck`);
-      if (!target.connection_requested_at) db.prepare("UPDATE targets SET connection_requested_at = ? WHERE id = ?").run(nowIso(), target.id);
-      trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      return;
-    }
-    if (err instanceof UncertainConnectionOutcomeError || connectionMarkerCreated || connectionSendInvoked) {
-      if (!connectionConfirmed) recordConnectionOutcome("uncertain", msg);
-      // Once the send routine has been entered, the request may have reached
-      // LinkedIn even if the browser did not observe confirmation. Keep the
-      // marker and use the normal reconciliation path to avoid duplicates.
-      trWait(db, tr, CONNECTION_RECHECK_HOURS);
-      log(
-        db,
-        runId,
-        target.id,
-        "warn",
-        connectionConfirmed
-          ? `${name} connection was confirmed, but post-send bookkeeping failed — will reconcile in ${CONNECTION_RECHECK_HOURS}h`
-          : `${name} connection outcome uncertain — will reconcile in ${CONNECTION_RECHECK_HOURS}h`
-      );
-      return;
-    }
-    if (msg.includes("No InMail credits left")) {
-      inmailCreditsExhaustedOn[accountId] = todayLocalDate();
-      const slot = rescheduleToTomorrow(accountLimits);
-      log(db, runId, target.id, "warn", `No InMail credits left on this account — pausing InMail sends until tomorrow, rescheduled ${name} to ${slot}`);
-      trReschedule(db, tr, slot);
-      return;
-    }
-    log(db, runId, target.id, "error", `Error on ${name}: ${msg}`);
-    trFail(db, tr, msg);
-  }
-}
-
-// ─── global loop ─────────────────────────────────────────────────────────────
-
-const g = global as typeof global & { __inhubflowGlobalRunnerStarted?: boolean; __linkiGlobalRunnerStarted?: boolean };
-let tickQueueTail: Promise<void> = Promise.resolve();
-
-async function tickWithLease(db: ReturnType<typeof getDb>): Promise<void> {
-  const ownerId = tryAcquireRuntimeLease(db, RUNNER_LEASE_KEY, RUNNER_LEASE_TTL_MS);
-  if (!ownerId) return;
-
-  let leaseLost = false;
-  const heartbeat = setInterval(() => {
-    try {
-      if (!renewRuntimeLease(db, RUNNER_LEASE_KEY, ownerId, RUNNER_LEASE_TTL_MS)) {
-        leaseLost = true;
-        console.warn("[runner] Global lease ownership was lost during a tick");
-      }
-    } catch (error) {
-      console.warn("[runner] Could not renew global lease:", error instanceof Error ? error.message : error);
-    }
-  }, RUNNER_LEASE_HEARTBEAT_MS);
-  heartbeat.unref();
-
-  try {
-    await tick(db, () => !leaseLost);
+    console.error("[campaign-runner] Error en enqueueTick:", err);
   } finally {
-    clearInterval(heartbeat);
-    try { releaseRuntimeLease(db, RUNNER_LEASE_KEY, ownerId); } catch { /* lease expires safely */ }
+    isTicking = false;
   }
-}
-
-export function enqueueTick(db: ReturnType<typeof getDb>): Promise<void> {
-  const next = tickQueueTail.then(() => tickWithLease(db), () => tickWithLease(db));
-  tickQueueTail = next.catch(() => { /* caller records the failure */ });
-  return next;
 }
 
 export function ensureGlobalRunnerStarted(): void {
-  if (g.__inhubflowGlobalRunnerStarted || g.__linkiGlobalRunnerStarted) return;
-  g.__inhubflowGlobalRunnerStarted = true;
-  globalLoop().catch(err => console.error("[runner] Global loop crashed:", err));
+  if (globalRunnerTimer) return;
+  console.log("[campaign-runner] Iniciando bucle de ejecución de campañas (Unipile Engine)...");
+
+  globalRunnerTimer = setInterval(() => {
+    enqueueTick().catch((err) => console.error("[campaign-runner] Error en timer tick:", err));
+  }, 30_000);
 }
-
-async function globalLoop(): Promise<void> {
-  console.log("[runner] Global loop started");
-  const db = getDb();
-
-  while (true) {
-    try {
-      await enqueueTick(db);
-    } catch (err) {
-      console.error("[runner] Tick error:", err instanceof Error ? err.message : err);
-    }
-    try {
-      const { processScheduledImports } = await import("@/lib/import-jobs");
-      await processScheduledImports(db);
-    } catch (err) {
-      console.error("[runner] Import scheduler error:", err instanceof Error ? err.message : err);
-    }
-    await sleep(POLL_INTERVAL_MS);
-  }
-}
-
-async function syncCampaignInboxAccounts(db: ReturnType<typeof getDb>, accountIds: readonly string[]): Promise<void> {
-  if (!campaignInboxSchedulerEnabled()) return;
-  for (const accountId of accountIds) {
-    if (!shouldSyncLinkedInCampaignInbox(accountId, db)) continue;
-    try {
-      const result = await syncLinkedInCampaignInbox(accountId, { db });
-      if (result.reason && result.reason !== "disabled") {
-        console.warn(`[runner] Campaign LinkedIn inbox sync skipped for ${accountId} (${result.reason})`);
-      } else {
-        console.log(`[runner] Campaign LinkedIn inbox sync: ${result.captured} new, ${result.duplicates} duplicate(s), ${result.conversationsReviewed} conversation(s) reviewed`);
-      }
-    } catch (error) {
-      console.warn(`[runner] Campaign LinkedIn inbox sync error for ${accountId}:`, error instanceof Error ? error.message : error);
-    }
-  }
-}
-
-async function tick(
-  db: ReturnType<typeof getDb>,
-  leaseActive: () => boolean = () => true
-): Promise<void> {
-  if (!leaseActive()) return;
-  const serverPlaywrightAllowed = process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED === "true";
-  if (serverPlaywrightAllowed) {
-    const campaignAccountIds = campaignInboxSchedulerEnabled() ? listCampaignInboxAccountIds(db) : [];
-    await syncCampaignInboxAccounts(db, campaignAccountIds);
-  }
-  if (!leaseActive()) return;
-
-  const activeRuns = db.prepare(`
-    SELECT r.id as run_id, r.workflow_id, r.account_id, r.email_account_id,
-           a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
-           a.active_hours_start, a.active_hours_end, a.timezone, a.working_days
-    FROM runs r
-    JOIN accounts a ON a.id = r.account_id
-    WHERE r.status = 'running' AND a.is_authenticated = 1
-  `).all() as Array<{ run_id: string; workflow_id: string; account_id: string; email_account_id: string | null } & AccountLimits>;
-
-  if (activeRuns.length === 0) return;
-
-  console.log(`[runner] Tick — ${activeRuns.length} active run(s)`);
-
-  const seenAccounts = new Set<string>();
-  for (const run of activeRuns) {
-    if (seenAccounts.has(run.account_id)) continue;
-    seenAccounts.add(run.account_id);
-  }
-
-  // Periodic authoritative reconciliation (up to once per 8h per account).
-  // Only executed on the server if explicitly allowed with residential proxies.
-  if (serverPlaywrightAllowed) {
-    for (const accountId of seenAccounts) {
-      if (shouldSyncAccepted(accountId) && !acceptedReconciliationCoolingDown(accountId)) {
-        try {
-          console.log(`[runner] Starting accepted-connections sync for account ${accountId}`);
-          const syncResult = await reconcileAcceptedConnections(accountId);
-        const stamped = syncResult.stamped;
-        if (stamped > 0) {
-          for (const r of activeRuns.filter(x => x.account_id === accountId)) {
-            log(db, r.run_id, null, "info", `Accepted-connections sync: ${stamped} contact${stamped === 1 ? "" : "s"} marked as connected`);
-          }
-        }
-        if (!syncResult.success) {
-          console.warn(`[runner] Accepted-connections sync incomplete for ${accountId} (${syncResult.reason ?? "unknown"}) — ${syncResult.matchedTargets} target match(es)`);
-        }
-        console.log(`[runner] Accepted-connections sync complete — ${stamped} stamped`);
-      } catch (e) {
-        console.warn("[runner] Accepted-connections sync error:", e instanceof Error ? e.message : e);
-      }
-    }
-  }
-}
-
-  // LinkedIn inbox reply detection (messaging GraphQL) — once per 15min per
-  // account. Sets targets.last_replied_at so the runner auto-unenrolls repliers.
-  // LinkedIn reply detection is a premium feature (AI classifier layer) — no-op without ee/.
-  for (const accountId of seenAccounts) {
-    if (premium?.replies?.shouldSyncInbox(accountId)) {
-      try {
-        console.log(`[runner] Starting LinkedIn inbox sync for account ${accountId}`);
-        const beforeReplies = linkedinReplySnapshot(db, accountId);
-        let replies = 0;
-        let attributed = 0;
-        try {
-          replies = await premium.replies.syncAccountInbox(accountId);
-        } finally {
-          // Attribute partial updates too if the premium sync throws after
-          // stamping one or more targets.
-          attributed = attributeChangedLinkedinReplies(db, accountId, beforeReplies);
-        }
-        console.log(`[runner] LinkedIn inbox sync complete — ${replies} new repl${replies === 1 ? "y" : "ies"}, ${attributed} attributed to slot`);
-        if (replies > 0) {
-          for (const r of activeRuns.filter(x => x.account_id === accountId)) {
-            log(db, r.run_id, null, "info", `LinkedIn inbox sync: ${replies} new repl${replies === 1 ? "y" : "ies"} detected`);
-          }
-        }
-      } catch (e) {
-        console.warn("[runner] LinkedIn inbox sync error:", e instanceof Error ? e.message : e);
-      }
-    }
-  }
-
-  // Sync email IMAP inboxes for each unique email account in active run profiles
-  const activeRunIds = activeRuns.map(r => r.run_id);
-  const activeEmailAccountIds: string[] = activeRunIds.length > 0
-    ? [...new Set(
-        (db.prepare(
-          `SELECT DISTINCT rp.email_account_id FROM run_profiles rp
-           JOIN run_profile_tracks rt ON rt.run_profile_id = rp.id
-           WHERE rp.run_id IN (${activeRunIds.map(() => "?").join(",")})
-           AND rp.email_account_id IS NOT NULL
-           AND rt.state NOT IN ('completed', 'failed', 'skipped')`
-        ).all(...activeRunIds) as { email_account_id: string }[]).map(r => r.email_account_id)
-      )]
-    : [];
-
-  const seenEmailAccounts = new Set<string>();
-  for (const emailAccId of activeEmailAccountIds) {
-    if (seenEmailAccounts.has(emailAccId)) continue;
-    seenEmailAccounts.add(emailAccId);
-    if (shouldSyncEmailInbox(emailAccId)) {
-      try {
-        console.log(`[runner] Starting IMAP sync for email account ${emailAccId}`);
-        const { replies, bounces } = await syncEmailInbox(emailAccId);
-        console.log(`[runner] IMAP sync complete — ${replies} replies, ${bounces} bounces`);
-        for (const runId of activeRunIds) {
-          if (replies > 0) log(db, runId, null, "info", `Email inbox sync: ${replies} new repl${replies === 1 ? "y" : "ies"} detected`);
-          if (bounces > 0) log(db, runId, null, "warn", `Email inbox sync: ${bounces} bounce${bounces === 1 ? "" : "s"} detected — contacts marked invalid and unenrolled`);
-        }
-      } catch (e) {
-        console.warn("[runner] Email inbox sync error:", e instanceof Error ? e.message : e);
-      }
-      // Space out back-to-back IMAP syncs — a 20-account burst with zero gap
-      // between them held the host busy for minutes straight (Jul 2026 incident).
-      await sleep(2000);
-    }
-  }
-
-  // Auto-complete runs where ALL track-runs across all profiles are terminal
-  for (const run of activeRuns) {
-    const remaining = (db.prepare(
-      `SELECT COUNT(*) as c FROM run_profile_tracks rt
-       JOIN run_profiles rp ON rp.id = rt.run_profile_id
-       WHERE rp.run_id = ? AND rt.state NOT IN ('completed', 'failed', 'skipped')`
-    ).get(run.run_id) as { c: number }).c;
-    if (remaining === 0) {
-      db.prepare("UPDATE runs SET status = 'completed', completed_at = datetime('now') WHERE id = ?").run(run.run_id);
-      log(db, run.run_id, null, "info", "All profiles processed — run completed");
-    }
-  }
-
-  // Re-load active runs after potential completions
-  const stillActive = db.prepare(`
-    SELECT r.id as run_id, r.workflow_id, r.account_id, r.email_account_id,
-           a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
-           a.active_hours_start, a.active_hours_end, a.timezone, a.working_days
-    FROM runs r
-    JOIN accounts a ON a.id = r.account_id
-    WHERE r.status = 'running' AND a.is_authenticated = 1
-  `).all() as Array<{ run_id: string; workflow_id: string; account_id: string; email_account_id: string | null } & AccountLimits>;
-
-  if (stillActive.length === 0) return;
-
-  const accountLimitsMap = new Map<string, AccountLimits>();
-  for (const run of stillActive) {
-    if (!accountLimitsMap.has(run.account_id)) accountLimitsMap.set(run.account_id, run);
-  }
-
-  // Build email account limits map
-  const stillActiveRunIds = stillActive.map(r => r.run_id);
-  const emailAccountIds: string[] = stillActiveRunIds.length > 0
-    ? [...new Set(
-        (db.prepare(
-          `SELECT DISTINCT rp.email_account_id FROM run_profiles rp
-           WHERE rp.run_id IN (${stillActiveRunIds.map(() => "?").join(",")})
-           AND rp.email_account_id IS NOT NULL`
-        ).all(...stillActiveRunIds) as { email_account_id: string }[]).map(r => r.email_account_id)
-      )]
-    : [];
-  const emailAccountLimitsMap = new Map<string, EmailAccountLimits>();
-  for (const emailAccountId of emailAccountIds) {
-    const ea = db.prepare("SELECT daily_email_limit, active_hours_start, active_hours_end, timezone, working_days, ramp_up_enabled, ramp_start_date FROM email_accounts WHERE id = ?").get(emailAccountId) as EmailAccountLimits | undefined;
-    if (ea) emailAccountLimitsMap.set(emailAccountId, ea);
-  }
-
-  // Count actions already done today per LinkedIn account. Connection attempts
-  // come from an immutable account-scoped ledger, so deleting a campaign profile,
-  // renaming a log message, or sharing a target cannot weaken the safety limit.
-  const connectsSentToday = new Map<string, number>();
-  const messagesSentToday = new Map<string, number>();
-  const inmailsSentToday = new Map<string, number>();
-  for (const [accountId] of accountLimitsMap) {
-    const c = countLinkedInConnectionAttemptsToday(db, accountId);
-    const m = (db.prepare(
-      `SELECT COUNT(*) as c FROM logs WHERE run_id IN (SELECT id FROM runs WHERE account_id = ?)
-       AND message LIKE 'Message sent%' AND date(created_at) = date('now')`
-    ).get(accountId) as { c: number }).c;
-    const im = (db.prepare(
-      `SELECT COUNT(*) as c FROM logs WHERE run_id IN (SELECT id FROM runs WHERE account_id = ?)
-       AND message LIKE 'InMail sent%' AND date(created_at) = date('now')`
-    ).get(accountId) as { c: number }).c;
-    connectsSentToday.set(accountId, c);
-    messagesSentToday.set(accountId, m);
-    inmailsSentToday.set(accountId, im);
-  }
-
-  // Count emails sent today per email account — match by run_profiles.email_account_id
-  // (the actual sending account), not runs.email_account_id (which may differ when accounts rotate)
-  const emailsSentToday = new Map<string, number>();
-  for (const emailAccountId of emailAccountIds) {
-    const e = (db.prepare(
-      `SELECT COUNT(*) as c FROM logs l
-       WHERE l.message LIKE 'Email sent%'
-       AND date(l.created_at) = date('now')
-       AND EXISTS (
-         SELECT 1 FROM run_profiles rp
-         WHERE rp.run_id = l.run_id AND rp.target_id = l.target_id
-         AND rp.email_account_id = ?
-       )`
-    ).get(emailAccountId) as { c: number }).c;
-    emailsSentToday.set(emailAccountId, e);
-  }
-
-  // Steps cache: (workflow_id, track) → steps filtered by that track
-  const stepsCache = new Map<string, WorkflowStep[]>();
-  const getSteps = (workflowId: string, track: string): WorkflowStep[] => {
-    const key = `${workflowId}|${track}`;
-    if (!stepsCache.has(key)) {
-      stepsCache.set(key, db.prepare(
-        "SELECT * FROM workflow_steps WHERE workflow_id = ? AND track = ? ORDER BY step_order"
-      ).all(workflowId, track) as WorkflowStep[]);
-    }
-    return stepsCache.get(key)!;
-  };
-
-  // Workflow prompt cache: workflow_id → campaign prompt string (or null)
-  const workflowPromptCache = new Map<string, string | null>();
-  const getWorkflowPrompt = (workflowId: string): string | null => {
-    if (!workflowPromptCache.has(workflowId)) {
-      const row = db.prepare("SELECT prompt FROM workflows WHERE id = ?").get(workflowId) as { prompt: string | null } | undefined;
-      workflowPromptCache.set(workflowId, row?.prompt ?? null);
-    }
-    return workflowPromptCache.get(workflowId) ?? null;
-  };
-
-  // Collect ALL due track-runs across all active runs, oldest-due first
-  const runIds = stillActive.map(r => r.run_id);
-  const placeholders = runIds.map(() => "?").join(",");
-  const dueTrackRuns = db.prepare(
-    `SELECT rt.id, rt.run_profile_id, rt.track, rt.state, rt.current_step, rt.next_step_at,
-            rt.error_message, rt.last_email_subject, rt.last_email_body, rt.last_linkedin_message,
-            rt.pending_reply_context, rt.force_run_once,
-            rp.run_id, rp.target_id, rp.email_account_id,
-            r.account_id, r.workflow_id,
-            t.connection_requested_at
-     FROM run_profile_tracks rt
-     JOIN run_profiles rp ON rp.id = rt.run_profile_id
-     JOIN runs r ON r.id = rp.run_id
-     JOIN targets t ON t.id = rp.target_id
-     WHERE rp.run_id IN (${placeholders})
-       AND rt.state = 'in_progress'
-       AND (rt.force_run_once = 1 OR rt.next_step_at IS NULL OR datetime(rt.next_step_at) <= datetime('now'))
-     ORDER BY rt.force_run_once DESC, rt.next_step_at ASC`
-  ).all(...runIds) as TrackRun[];
-
-  // Enroll new pending track-runs — track remaining slots per account across runs.
-  // Enrollment (pending -> in_progress) happens exactly once per track-run, on its
-  // FIRST linkedin-track step, so the budget it draws from must match that step's
-  // type — a workflow can open on "connect" (e.g. connect -> message) or on
-  // "sales_inmail" (e.g. an InMail-first campaign), and each type has its own daily cap.
-  const connectSlotsRemaining = new Map<string, number>();
-  const inmailSlotsRemaining = new Map<string, number>();
-  const firstLinkedinStepCache = new Map<string, string | undefined>();
-  const getFirstLinkedinStepType = (workflowId: string): string | undefined => {
-    if (!firstLinkedinStepCache.has(workflowId)) {
-      const row = db.prepare(
-        "SELECT step_type FROM workflow_steps WHERE workflow_id = ? AND track = 'linkedin' ORDER BY step_order LIMIT 1"
-      ).get(workflowId) as { step_type: string } | undefined;
-      firstLinkedinStepCache.set(workflowId, row?.step_type);
-    }
-    return firstLinkedinStepCache.get(workflowId);
-  };
-  const enrolledEmailPairs = new Set<string>();
-  for (const run of stillActive) {
-    const limits = accountLimitsMap.get(run.account_id)!;
-    const firstStepType = getFirstLinkedinStepType(run.workflow_id);
-    const isInmailFirst = firstStepType === "sales_inmail";
-    const slotsRemaining = isInmailFirst ? inmailSlotsRemaining : connectSlotsRemaining;
-
-    // LinkedIn track enrollment — each run gets its own enrollment, but all runs
-    // for the same account share the daily slot budget for that action type
-    if (!slotsRemaining.has(run.account_id)) {
-      const dailyLimit = isInmailFirst ? (limits.daily_inmail_limit ?? 15) : (limits.daily_connection_limit ?? 20);
-      const sentToday = isInmailFirst
-        ? (inmailsSentToday.get(run.account_id) ?? 0)
-        : (connectsSentToday.get(run.account_id) ?? 0);
-      const actionsLeft = Math.max(0, dailyLimit - sentToday);
-      const firstStepTypeSql = isInmailFirst ? "'sales_inmail'" : "'connect'";
-      const scheduledToday = (db.prepare(
-        `SELECT COUNT(*) as c FROM run_profile_tracks rt
-         JOIN run_profiles rp ON rp.id = rt.run_profile_id
-         JOIN runs r ON r.id = rp.run_id
-         JOIN workflow_steps ws ON ws.workflow_id = r.workflow_id AND ws.track = 'linkedin' AND ws.step_order = 1
-         WHERE r.account_id = ? AND rt.track = 'linkedin' AND rt.state = 'in_progress'
-         AND ws.step_type = ${firstStepTypeSql}
-         AND date(datetime(rt.next_step_at)) = date('now')`
-      ).get(run.account_id) as { c: number }).c;
-      slotsRemaining.set(run.account_id, Math.max(0, actionsLeft - scheduledToday));
-    }
-    const slotsLeft = slotsRemaining.get(run.account_id)!;
-    if (slotsLeft > 0) {
-      const toEnroll = Math.min(slotsLeft, 5);
-      const pending = db.prepare(
-        `SELECT rt.id, rt.run_profile_id, rt.track FROM run_profile_tracks rt
-         JOIN run_profiles rp ON rp.id = rt.run_profile_id
-         WHERE rp.run_id = ? AND rt.track = 'linkedin' AND rt.state = 'pending'
-         ORDER BY rt.id LIMIT ?`
-      ).all(run.run_id, toEnroll) as Array<{ id: string; run_profile_id: string; track: string }>;
-      spreadEnrollBatch(db, run.run_id, pending, limits, "linkedin");
-      slotsRemaining.set(run.account_id, slotsLeft - pending.length);
-    }
-
-    // Email track enrollment — iterate per actual sending account used by this run's profiles
-    // (run_profiles.email_account_id may differ from runs.email_account_id when accounts are rotated)
-    const runEmailAccountIds = (db.prepare(
-      `SELECT DISTINCT rp.email_account_id FROM run_profiles rp
-       WHERE rp.run_id = ? AND rp.email_account_id IS NOT NULL`
-    ).all(run.run_id) as { email_account_id: string }[]).map(r => r.email_account_id);
-
-    for (const emailAccId of runEmailAccountIds) {
-      const emailKey = `${run.run_id}|${emailAccId}|email`;
-      if (!enrolledEmailPairs.has(emailKey)) {
-        enrolledEmailPairs.add(emailKey);
-        const emailLimits = emailAccountLimitsMap.get(emailAccId);
-        if (emailLimits) {
-          const effectiveLimit = effectiveEmailLimit(emailLimits);
-          const emailsLeft = Math.max(0, effectiveLimit - (emailsSentToday.get(emailAccId) ?? 0));
-          const emailScheduledToday = (db.prepare(
-            `SELECT COUNT(*) as c FROM run_profile_tracks rt
-             JOIN run_profiles rp ON rp.id = rt.run_profile_id
-             WHERE rp.email_account_id = ? AND rt.track = 'email' AND rt.state = 'in_progress'
-             AND date(datetime(rt.next_step_at)) = date('now')`
-          ).get(emailAccId) as { c: number }).c;
-          const emailSlotsLeft = Math.max(0, emailsLeft - emailScheduledToday);
-          if (emailSlotsLeft > 0) {
-            const pendingEmail = db.prepare(
-              `SELECT rt.id, rt.run_profile_id, rt.track FROM run_profile_tracks rt
-               JOIN run_profiles rp ON rp.id = rt.run_profile_id
-               WHERE rp.run_id = ? AND rp.email_account_id = ? AND rt.track = 'email' AND rt.state = 'pending'
-               ORDER BY rt.id LIMIT ?`
-            ).all(run.run_id, emailAccId, Math.min(emailSlotsLeft, 5)) as Array<{ id: string; run_profile_id: string; track: string }>;
-            spreadEnrollBatch(db, run.run_id, pendingEmail, emailLimits, "email");
-          }
-        }
-      }
-    }
-  }
-
-  if (dueTrackRuns.length === 0) return;
-
-  // Apply daily limits — separate due track-runs into execute vs reschedule
-  const toExecute: TrackRun[] = [];
-  const toReschedule: TrackRun[] = [];
-
-  const connectsPlanned = new Map<string, number>(Array.from(accountLimitsMap.keys()).map(id => [id, 0]));
-  const messagesPlanned = new Map<string, number>(Array.from(accountLimitsMap.keys()).map(id => [id, 0]));
-  const inmailsPlanned = new Map<string, number>(Array.from(accountLimitsMap.keys()).map(id => [id, 0]));
-  const emailsPlanned = new Map<string, number>(emailAccountIds.map(id => [id, 0]));
-
-  for (const tr of dueTrackRuns) {
-    const steps = getSteps(tr.workflow_id, tr.track);
-    const stepIndex = tr.current_step;
-    if (stepIndex >= steps.length) { toExecute.push(tr); continue; }
-    const step = steps[stepIndex];
-    const limits = accountLimitsMap.get(tr.account_id)!;
-
-    if (step.step_type === "connect") {
-      // A connect step is "due" both when it's about to send a NEW request and when
-      // it's just rechecking an already-sent one for acceptance (see the `degree === 1`
-      // check in executeStep). Only the former spends a daily connect slot — the recheck
-      // is a free DB read and must never be blocked by the cap, or an accepted connection
-      // can never hand off to the next step (it'd be rescheduled behind new sends forever).
-      if (tr.connection_requested_at) {
-        toExecute.push(tr);
-        continue;
-      }
-      const sentToday = connectsSentToday.get(tr.account_id) ?? 0;
-      const planned = connectsPlanned.get(tr.account_id) ?? 0;
-      if (sentToday + planned >= (limits.daily_connection_limit ?? 20)) {
-        toReschedule.push(tr);
-      } else {
-        connectsPlanned.set(tr.account_id, planned + 1);
-        toExecute.push(tr);
-      }
-    } else if (step.step_type === "message") {
-      const sentToday = messagesSentToday.get(tr.account_id) ?? 0;
-      const planned = messagesPlanned.get(tr.account_id) ?? 0;
-      if (sentToday + planned >= (limits.daily_message_limit ?? 50)) {
-        toReschedule.push(tr);
-      } else {
-        messagesPlanned.set(tr.account_id, planned + 1);
-        toExecute.push(tr);
-      }
-    } else if (step.step_type === "sales_inmail") {
-      const sentToday = inmailsSentToday.get(tr.account_id) ?? 0;
-      const planned = inmailsPlanned.get(tr.account_id) ?? 0;
-      if (inmailCreditsExhaustedToday(tr.account_id) || sentToday + planned >= (limits.daily_inmail_limit ?? 15)) {
-        toReschedule.push(tr);
-      } else {
-        inmailsPlanned.set(tr.account_id, planned + 1);
-        toExecute.push(tr);
-      }
-    } else if (step.step_type === "email") {
-      const profileEmailAccountId = tr.email_account_id;
-      if (!profileEmailAccountId) {
-        toExecute.push(tr);
-      } else {
-        const emailLimits = emailAccountLimitsMap.get(profileEmailAccountId);
-        const sentToday = emailsSentToday.get(profileEmailAccountId) ?? 0;
-        const planned = emailsPlanned.get(profileEmailAccountId) ?? 0;
-        const effectiveLimit = emailLimits ? effectiveEmailLimit(emailLimits) : 50;
-        if (sentToday + planned >= effectiveLimit) {
-          toReschedule.push(tr);
-        } else {
-          emailsPlanned.set(profileEmailAccountId, planned + 1);
-          toExecute.push(tr);
-        }
-      }
-    } else {
-      // visit, delay — no limit
-      toExecute.push(tr);
-    }
-  }
-
-  // Reschedule overflow to tomorrow (use LinkedIn account schedule for reschedule)
-  for (const tr of toReschedule) {
-    const limits = accountLimitsMap.get(tr.account_id)!;
-    const slot = rescheduleToTomorrow(limits);
-    db.prepare("UPDATE run_profile_tracks SET next_step_at = ?, force_run_once = 0 WHERE id = ?").run(slot, tr.id);
-    log(db, tr.run_id, tr.target_id, "info", `Daily limit reached — rescheduled to ${slot}`);
-  }
-
-  // Execute what's left
-  for (const tr of toExecute) {
-    if (!leaseActive()) {
-      console.warn("[runner] Global lease lost; stopping step execution loop");
-      return;
-    }
-    const steps = getSteps(tr.workflow_id, tr.track);
-    const limits = accountLimitsMap.get(tr.account_id)!;
-    const emailAccountId = tr.email_account_id ?? null;
-    const emailLimits = emailAccountId ? (emailAccountLimitsMap.get(emailAccountId) ?? null) : null;
-
-    const runStatus = db.prepare("SELECT status FROM runs WHERE id = ?").get(tr.run_id) as { status: string } | undefined;
-    if (!runStatus || runStatus.status !== "running") {
-      db.prepare("UPDATE run_profile_tracks SET force_run_once = 0 WHERE id = ?").run(tr.id);
-      continue;
-    }
-
-    const target = db.prepare("SELECT * FROM targets WHERE id = ?").get(tr.target_id) as Target;
-
-    // InHubFlow Architecture: All LinkedIn actions are executed from the user's residential IP
-    // via the InHubFlow Connect Chrome extension. The server runner MUST NOT execute server-side Playwright
-    // from datacenter IP unless LINKEDIN_SERVER_PLAYWRIGHT_ENABLED=true is explicitly set.
-    if (tr.track === "linkedin") {
-      const serverPlaywrightEnabled = process.env.LINKEDIN_SERVER_PLAYWRIGHT_ENABLED === "true";
-      if (!serverPlaywrightEnabled) {
-        continue;
-      }
-    }
-
-    await executeStep(db, tr.run_id, tr, target, steps, tr.account_id, limits, emailAccountId, emailLimits, getWorkflowPrompt(tr.workflow_id), leaseActive);
-    await randomDelay(PROFILE_DELAY_MIN, PROFILE_DELAY_MAX);
-  }
-}
-
-function spreadEnrollBatch(
-  db: ReturnType<typeof getDb>,
-  runId: string,
-  pending: Array<{ id: string; run_profile_id: string; track: string }>,
-  limits: ScheduleConfig,
-  track: string
-) {
-  const batchSize = pending.length;
-  if (batchSize === 0) return;
-  const start = limits.active_hours_start ?? 9;
-  const end = limits.active_hours_end ?? 18;
-  const { hour, minute } = getLocalParts(limits.timezone || "UTC");
-  const nowFrac = hour + minute / 60;
-  const windowMs = (end - start) * 3600_000;
-  const bucketMs = windowMs / batchSize;
-  const dayStartMs = new Date().setHours(start, 0, 0, 0);
-
-  for (let i = 0; i < pending.length; i++) {
-    const row = pending[i];
-    const claimed = db.prepare(
-      "UPDATE run_profile_tracks SET state = 'in_progress' WHERE id = ? AND state = 'pending'"
-    ).run(row.id);
-    if (claimed.changes === 0) continue;
-    const slot = (() => {
-      if (nowFrac >= end - 0.25) return rescheduleToTomorrow(limits);
-      const bucketStart = dayStartMs + i * bucketMs;
-      const bucketEnd = bucketStart + bucketMs;
-      return new Date(bucketStart + Math.random() * (bucketEnd - bucketStart)).toISOString();
-    })();
-    db.prepare("UPDATE run_profile_tracks SET next_step_at = ? WHERE id = ?").run(slot, row.id);
-    const tgt = db.prepare("SELECT full_name, linkedin_url FROM targets WHERE id = (SELECT target_id FROM run_profiles WHERE id = ?)").get(row.run_profile_id) as { full_name: string | null; linkedin_url: string } | undefined;
-    log(db, runId, null, "info", `[${track}] Scheduled ${tgt?.full_name ?? tgt?.linkedin_url ?? row.run_profile_id} within active window`);
-  }
-}
-
-// ─── public API ──────────────────────────────────────────────────────────────
 
 export function startRun(runId: string): void {
   const db = getDb();
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
-  console.log(`[runner] Run ${runId} marked running — global loop will pick it up`);
+  console.log(`[campaign-runner] Campaña ${runId} iniciada`);
+  enqueueTick(db).catch((err) => console.error("[campaign-runner] Error iniciando run:", err));
 }
 
 export async function forceRunStep(
@@ -1830,35 +347,6 @@ export async function forceRunStep(
   targetId?: string
 ): Promise<{ success: boolean; message: string }> {
   const db = getDb();
-  const run = db.prepare(`
-    SELECT r.account_id, a.is_authenticated, a.extension_active
-    FROM runs r
-    JOIN accounts a ON a.id = r.account_id
-    WHERE r.id = ?
-  `).get(runId) as { account_id: string; is_authenticated: number; extension_active?: number } | undefined;
-  if (!run) throw new Error("Run or LinkedIn account not found");
-  if (run.is_authenticated !== 1) {
-    if (run.extension_active === 1) {
-      db.prepare("UPDATE accounts SET is_authenticated = 1 WHERE id = ?").run(run.account_id);
-    } else {
-      throw new Error("La cuenta de LinkedIn necesita autenticarse antes de ejecutar una acción");
-    }
-  }
-
-  const trackRows = targetId
-    ? db.prepare(`
-        SELECT rt.id
-        FROM run_profile_tracks rt
-        JOIN run_profiles rp ON rp.id = rt.run_profile_id
-        WHERE rp.run_id = ? AND rp.target_id = ? AND rt.state != 'completed'
-      `).all(runId, targetId) as Array<{ id: string }>
-    : db.prepare(`
-        SELECT rt.id
-        FROM run_profile_tracks rt
-        JOIN run_profiles rp ON rp.id = rt.run_profile_id
-        WHERE rp.run_id = ? AND rt.state != 'completed'
-      `).all(runId) as Array<{ id: string }>;
-  if (trackRows.length === 0) throw new Error("No hay pasos pendientes para ejecutar");
 
   if (targetId) {
     db.prepare(`
@@ -1885,10 +373,7 @@ export async function forceRunStep(
   }
 
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
+  enqueueTick(db).catch((err) => console.error("[campaign-runner] Error en forceRunStep:", err));
 
-  // Trigger a serialized tick immediately; repeated Run now requests wait their
-  // turn instead of entering the runner concurrently for the same track.
-  enqueueTick(db).catch((err) => console.error("[runner] Force step tick error:", err));
-
-  return { success: true, message: "Paso forzado a ejecución inmediata" };
+  return { success: true, message: "Paso de campaña ejecutado inmediatamente vía Unipile" };
 }

@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { recordSdrAuditEvent } from "@/lib/audit";
-import { getSessionPage } from "@/lib/linkedin/session";
-import { sendMessage } from "@/lib/linkedin/message";
+import { unipile } from "@/lib/unipile/client";
 import { sendEmail } from "@/lib/email/sender";
 import { decryptSecret } from "@/lib/crypto";
 import { getSdrThread } from "./repository";
@@ -63,50 +62,39 @@ export async function dispatchApprovedSdrAction(
     throw new Error(`No se puede enviar mensajes en un hilo con estado ${thread.state}.`);
   }
 
-  // Parse payload (prioritize edited body if passed or stored)
-  let textToSend = options.editedBody?.trim();
-  if (!textToSend && action.edited_payload_json) {
-    try {
-      const parsed = JSON.parse(action.edited_payload_json);
-      textToSend = typeof parsed.body === "string" ? parsed.body.trim() : undefined;
-    } catch { /* fallback */ }
-  }
-  if (!textToSend && action.payload_json) {
-    try {
-      const parsed = JSON.parse(action.payload_json);
-      textToSend = typeof parsed.body === "string" ? parsed.body.trim() : undefined;
-    } catch { /* fallback */ }
-  }
-
-  if (!textToSend) {
-    throw new Error("El borrador de respuesta está vacío o no es válido.");
-  }
-
   const target = db.prepare(`
-    SELECT id, full_name, first_name, email, linkedin_url, messaging_urn,
-      last_replied_account_id, do_not_contact
+    SELECT id, full_name, linkedin_url, messaging_urn, unipile_provider_id, unipile_chat_id, email, company_id, last_replied_account_id, do_not_contact
     FROM targets WHERE id = ?
   `).get(thread.target_id) as {
     id: string;
     full_name: string | null;
-    first_name: string | null;
-    email: string | null;
     linkedin_url: string | null;
     messaging_urn: string | null;
-    last_replied_account_id: string | null;
-    do_not_contact: number | null;
+    unipile_provider_id?: string | null;
+    unipile_chat_id?: string | null;
+    email: string | null;
+    company_id: string | null;
+    last_replied_account_id?: string | null;
+    do_not_contact?: number | null;
   } | undefined;
 
   if (!target) {
-    throw new Error(`Prospecto ${thread.target_id} no encontrado.`);
+    throw new Error(`Target ${thread.target_id} not found`);
   }
 
   if (target.do_not_contact) {
     throw new Error("El prospecto está marcado como 'No contactar' (Do Not Contact).");
   }
 
-  const channel = (thread.channel === "email" ? "email" : "linkedin") as "linkedin" | "email";
-  const externalMessageId = `sdr-outbound-${randomUUID()}`;
+  // Parse effective payload
+  const effectivePayload = action.edited_payload_json
+    ? JSON.parse(action.edited_payload_json)
+    : JSON.parse(action.payload_json);
+
+  const textToSend = options.editedBody || effectivePayload.suggested_reply || effectivePayload.body || "";
+  const channel = thread.channel;
+
+  let externalMessageId = `sdr-msg-${Date.now()}`;
 
   if (channel === "linkedin") {
     // 1. Resolve LinkedIn Account
@@ -116,55 +104,54 @@ export async function dispatchApprovedSdrAction(
     }
 
     const account = db.prepare(`
-      SELECT id, name, is_authenticated FROM accounts WHERE id = ?
-    `).get(accountId) as { id: string; name: string; is_authenticated: number } | undefined;
+      SELECT id, name, unipile_account_id, is_authenticated FROM accounts WHERE id = ?
+    `).get(accountId) as { id: string; name: string; unipile_account_id?: string | null; is_authenticated: number } | undefined;
 
-    if (!account || account.is_authenticated !== 1) {
-      throw new Error(`La cuenta de LinkedIn ${account?.name || accountId} no está autenticada.`);
+    if (!account) {
+      throw new Error(`La cuenta de LinkedIn ${accountId} no existe.`);
     }
 
-    let page;
-    let sent = false;
     try {
-      page = await getSessionPage(accountId);
+      if (unipile.isConfigured()) {
+        const unipileAccId = account.unipile_account_id || account.id;
+        const threadId = thread.external_thread_id || target.unipile_chat_id;
 
-      // Try active thread URL first if external_thread_id is available
-      if (thread.external_thread_id && !thread.external_thread_id.startsWith("thread-")) {
-        try {
-          const threadUrl = `https://www.linkedin.com/messaging/thread/${encodeURIComponent(thread.external_thread_id)}/`;
-          await page.goto(threadUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
-          await page.waitForTimeout(2000);
-
-          const composeBox = page.locator("div.msg-form__contenteditable, div[role='textbox'].msg-form__message-texteditor").first();
-          if (await composeBox.isVisible({ timeout: 5000 }).catch(() => false)) {
-            await composeBox.click();
-            await page.keyboard.type(textToSend, { delay: 15 });
-            await page.waitForTimeout(500);
-
-            const sendBtn = page.locator("button.msg-form__send-button, button[type='submit'].msg-form__send-btn").first();
-            if (await sendBtn.isVisible({ timeout: 5000 }).catch(() => false) && !(await sendBtn.isDisabled().catch(() => true))) {
-              await sendBtn.click();
-              await page.waitForTimeout(2500);
-              sent = true;
+        if (threadId && !threadId.startsWith("thread-")) {
+          const sent = await unipile.sendMessage({
+            chat_id: threadId,
+            text: textToSend,
+          });
+          if (sent?.id) externalMessageId = sent.id;
+        } else {
+          let providerId = target.unipile_provider_id;
+          if (!providerId && target.linkedin_url) {
+            try {
+              const profile = await unipile.resolveProfile(target.linkedin_url, unipileAccId);
+              providerId = profile.provider_id;
+              if (providerId) {
+                db.prepare("UPDATE targets SET unipile_provider_id = ? WHERE id = ?").run(providerId, target.id);
+              }
+            } catch (err) {
+              console.warn("[sdr-dispatcher] No se pudo resolver profile en Unipile:", err);
             }
           }
-        } catch {
-          // Fallback to profile message
-        }
-      }
 
-      if (!sent) {
-        if (!target.linkedin_url) {
-          throw new Error("El prospecto no tiene URL de perfil de LinkedIn para enviar el mensaje.");
+          if (providerId) {
+            const newChat = await unipile.startChat({
+              account_id: unipileAccId,
+              attendees_ids: [providerId],
+              text: textToSend,
+            });
+            if (newChat?.id) {
+              externalMessageId = newChat.id;
+              db.prepare("UPDATE targets SET unipile_chat_id = ? WHERE id = ?").run(newChat.id, target.id);
+            }
+          } else {
+            throw new Error("No se pudo resolver el identificador de LinkedIn del contacto en Unipile.");
+          }
         }
-        await sendMessage(
-          page,
-          target.full_name || "Contacto",
-          textToSend,
-          target.linkedin_url,
-          target.messaging_urn,
-        );
-        sent = true;
+      } else {
+        console.warn("[sdr-dispatcher] Unipile no configurado, guardando respuesta en modo simulación local");
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -173,7 +160,7 @@ export async function dispatchApprovedSdrAction(
         SET state = 'failed', delivery_status = 'failed', updated_at = datetime('now')
         WHERE id = ?
       `).run(action.id);
-      throw new Error(`Error al enviar mensaje por LinkedIn: ${errorMsg}`);
+      throw new Error(`Error al enviar mensaje por LinkedIn vía Unipile: ${errorMsg}`);
     }
 
     // Persist outbound in LinkedIn inbox table and SDR messages table

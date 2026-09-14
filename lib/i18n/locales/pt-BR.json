@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Painel Principal",
     "leadFinder": "Lead Finder",
+    "signalRadar": "Signal Radar",
     "lists": "Listas",
     "contacts": "Contatos",
     "pipeline": "Pipeline/Kamban",

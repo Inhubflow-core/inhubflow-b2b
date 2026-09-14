@@ -8,6 +8,7 @@ import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
 import { applyPipelineSchema } from "@/lib/pipeline/schema";
 import { applyCalendarSchema } from "@/lib/calendar/schema";
+import { applySignalSchema } from "@/lib/signals/schema";
 import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
 
 function resolveDbPath(): string {
@@ -711,6 +712,11 @@ function runMigrations(db: Database.Database) {
     // Extension worker tracking: registers client-side extension status and ping
     "ALTER TABLE accounts ADD COLUMN extension_active INTEGER DEFAULT 0",
     "ALTER TABLE accounts ADD COLUMN last_extension_ping_at TEXT",
+    // Unipile API Integration
+    "ALTER TABLE accounts ADD COLUMN unipile_account_id TEXT",
+    "ALTER TABLE accounts ADD COLUMN unipile_status TEXT",
+    "ALTER TABLE targets ADD COLUMN unipile_provider_id TEXT",
+    "ALTER TABLE targets ADD COLUMN unipile_chat_id TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -961,6 +967,9 @@ function runMigrations(db: Database.Database) {
 
   // Calendar and scheduling module
   applyCalendarSchema(db);
+
+  // Signal Radar module: Intent-based signal monitors, hot leads, and events
+  applySignalSchema(db);
 }
 
 // Unblocks any tracks in a 'message' step that were rescheduled due to transient profile render delays
