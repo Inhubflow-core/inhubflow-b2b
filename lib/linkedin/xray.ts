@@ -1,11 +1,4 @@
-import { chromium } from "playwright-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { SearchLead, SearchProgressCallback } from "./search";
-
-chromium.use(StealthPlugin());
-
-const HEADLESS = process.env.HEADLESS !== "false";
-const CHROMIUM_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export type XRayErrorCode =
   | "browser_unavailable"

@@ -1,12 +1,16 @@
-import { chromium } from "playwright-extra";
 import type { Browser, BrowserContext, BrowserContextOptions, Page } from "playwright";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { getDb } from "@/lib/db";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { LinkedInAuthenticationError } from "./auth-wall";
 import { linkedInDefaultUserAgent } from "./cookie-state";
 
-chromium.use(StealthPlugin());
+// Playwright / chromium is deprecated in favor of Unipile API
+const chromium: any = {
+  use: () => {},
+  launch: async () => {
+    throw new Error("El navegador headless local ha sido retirado. Usa la API oficial de Unipile.");
+  },
+};
 
 let browser: Browser | null = null;
 const contexts: Map<string, BrowserContext> = new Map();

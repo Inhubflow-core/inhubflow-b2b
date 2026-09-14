@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import {
-  searchLinkedInProfiles,
   saveProfilesToList,
   SearchProgressEvent,
   SearchLead,
