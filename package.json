@@ -15,6 +15,11 @@
     "test:sdr-authorization": "node scripts/test-sdr-authorization.cjs",
     "test:xray": "node scripts/test-xray.cjs",
     "test:unipile": "node scripts/test-unipile.cjs",
+    "check:unipile": "node scripts/check-unipile-readiness.cjs",
+    "configure:unipile-webhooks": "node scripts/configure-unipile-webhooks.cjs",
+    "test:linkedin-runner": "node scripts/test-linkedin-runner.cjs",
+    "test:unipile-migrations": "node scripts/test-unipile-migrations.cjs",
+    "typecheck": "tsc --noEmit",
     "mirror:ee": "node scripts/mirror-ee.js"
   },
   "dependencies": {

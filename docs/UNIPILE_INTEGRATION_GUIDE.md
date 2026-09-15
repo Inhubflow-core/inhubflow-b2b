@@ -1,86 +1,132 @@
-# Guía de Integración con Unipile API
+# Integración de LinkedIn con Unipile
 
-## 1. Visión General
-InHubFlow utiliza **Unipile API** como el motor cloud oficial para la gestión de cuentas de LinkedIn, envío de mensajes, solicitudes de conexión y sincronización bidireccional en tiempo real del Inbox mediante Webhooks.
+## Arquitectura
 
-Esto reemplaza completamente los antiguos scrapers locales de Playwright/Chromium, eliminando:
-- La fragilidad ante cambios en el DOM o popups de LinkedIn.
-- El riesgo de bloqueos por huellas digitales de navegador headless.
-- La necesidad de copiar manualmente cookies `li_at`.
-- El consumo excesivo de memoria RAM y CPU en el servidor.
+Unipile es el único transporte de LinkedIn de InHubFlow para:
 
----
+- resolución y enriquecimiento de perfiles;
+- solicitudes de conexión;
+- mensajes de campaña y respuestas humanas/SDR;
+- sincronización histórica y en tiempo real del Inbox;
+- detección de nuevas relaciones;
+- estado de las cuentas conectadas.
 
-## 2. Configuración de Variables de Entorno
+La extensión de Chrome y el ejecutor local Playwright/Chromium fueron retirados. El Lead Finder continúa usando Serper.dev y no depende de esta integración.
 
-Agrega las siguientes variables a tu archivo `.env.local` (o variables de entorno en producción):
+## Variables de entorno
 
 ```bash
-# URL base de tu Data Source Name en Unipile (proporcionada en tu dashboard)
-UNIPILE_DSN="https://api1.unipile.com:13342"
+UNIPILE_DSN="https://apiXX.unipile.com:12345"
+UNIPILE_API_KEY="..."
 
-# Token de acceso generado en dashboard.unipile.com/access-tokens
-UNIPILE_API_KEY="tu_unipile_api_key_aqui"
+# Secreto interno, generado por InHubFlow, para el estado del callback Hosted Auth.
+UNIPILE_CALLBACK_SECRET="..."
+
+# Token obligatorio para los webhooks v1 actuales. Configura el mismo valor en
+# el encabezado X-InHubFlow-Webhook-Token de cada webhook.
+UNIPILE_WEBHOOK_TOKEN="..."
+
+# Opcional: secretos HMAC si la cuenta se migra a Webhook Endpoints API v2.
+UNIPILE_WEBHOOK_SECRET="..."
+UNIPILE_WEBHOOK_SECRETS="...,..."
 ```
 
-Para verificar tu conexión en cualquier momento:
+Genera `UNIPILE_CALLBACK_SECRET` de forma independiente, por ejemplo:
+
 ```bash
-npm run test:unipile
+openssl rand -hex 32
 ```
 
----
+Nunca reutilices ni expongas `UNIPILE_API_KEY` en el navegador.
 
-## 3. Flujo de Vinculación de Cuentas (Hosted Auth)
+## Hosted Auth
 
-En lugar de pedir contraseñas o cookies privadas, la plataforma utiliza el **Hosted Auth Link** de Unipile:
+1. El usuario crea o selecciona un slot local en **Configuración → LinkedIn**.
+2. `POST /api/accounts/unipile-link` verifica autorización sobre el slot.
+3. InHubFlow genera estado firmado y solicita una URL Hosted Auth.
+4. Para una cuenta nueva utiliza `type=create`; para una cuenta ya asociada utiliza `type=reconnect`.
+5. Unipile llama a `/api/accounts/unipile-callback?state=...`.
+6. El callback verifica el estado, consulta la cuenta en Unipile y guarda `accounts.unipile_account_id` y su estado real.
 
-1. El usuario hace clic en **"Conectar LinkedIn"** en la sección de Configuración de InHubFlow.
-2. InHubFlow llama a `POST /api/accounts/unipile-link`.
-3. El servidor solicita a Unipile una URL de autenticación segura (`POST /api/v1/hosted/accounts/link`).
-4. El usuario es redirigido a la pantalla oficial y segura de Unipile donde introduce su cuenta de LinkedIn (soporta 2FA sin errores).
-5. Al completarse la vinculación:
-   - Unipile redirige al usuario de vuelta a InHubFlow (`/settings?unipile_status=success`).
-   - Unipile envía un evento webhook de tipo `account_status_changed` marcando la cuenta como activa.
+El UUID local nunca se envía como `account_id` remoto. Si una cuenta antigua no tiene asociación, el runner solo puede adoptar una cuenta LinkedIn remota en estado `OK` que no esté asignada a otro slot.
 
----
+## Webhooks obligatorios
 
-## 4. Arquitectura de Webhooks (Inbox en Tiempo Real y Agente SDR)
+Configura en Unipile tres webhooks habilitados hacia:
 
-Unipile envía notificaciones push a InHubFlow para mantener el Inbox actualizado al instante sin hacer peticiones continuas (polling).
-
-### Endpoint del Webhook:
-```
-POST https://tu-dominio.com/api/webhooks/unipile
+```text
+https://TU_DOMINIO/api/webhooks/unipile
 ```
 
-### Eventos Procesados:
-* `message_received`:
-  1. Registra el mensaje en la tabla `linkedin_inbox_messages`.
-  2. Actualiza la fecha de última respuesta del prospecto (`targets.last_replied_at`).
-  3. Despierta al **Agente SDR con IA** (`publishInboundMessage`) para calificar la respuesta o generar un borrador inteligente.
-* `invitation_accepted`:
-  - Marca al contacto como conexión de 1er grado (`targets.degree = 1`) y fecha de conexión.
-* `account_status_changed`:
-  - Actualiza el estado operativo de la cuenta (`OK`, `CHECKPOINT`, `DISCONNECTED`).
+| Source | Eventos necesarios | Uso |
+|---|---|---|
+| `messaging` | `message_received` | Inbox entrante/saliente y SDR |
+| `users` | `new_relation` | Aceptación de conexiones |
+| `account_status` | `creation_success`, `creation_fail`, `deleted`, `reconnected`, `sync_success`, `stopped`, `ok`, `connecting`, `error`, `credentials`, `permissions` | Salud de la cuenta |
 
----
+Con las credenciales v1 actuales, cada webhook debe enviar `X-InHubFlow-Webhook-Token`; el endpoint compara el token en tiempo constante y rechaza cualquier petición que no coincida. Si la cuenta se migra a la Webhook Endpoints API v2, el mismo endpoint también admite `unipile-signature` con HMAC-SHA256 sobre `timestamp.raw_body`, múltiples secretos y una ventana antirreplay de cinco minutos.
 
-## 5. Envío de Mensajes e Invitaciones
+## Motor de secuencias
 
-Toda acción de mensajería se realiza a través del cliente centralizado `lib/unipile/client.ts`:
+### Visitar perfil
 
-* **Enviar Invitación:**
-  ```typescript
-  await unipile.sendInvitation({
-    account_id: account.unipile_account_id,
-    provider_id: target.unipile_provider_id,
-    message: "Hola, me gustaría conectar...",
-  });
-  ```
-* **Enviar Mensaje en Chat:**
-  ```typescript
-  await unipile.sendMessage({
-    chat_id: threadId,
-    text: "Hola! ¿Cómo estás?",
-  });
-  ```
+`visit` llama siempre a `resolveProfile(..., linkedin_sections=*)`. Guarda la identidad remota y completa únicamente datos vacíos del prospecto. No avanza si Unipile no confirma el perfil.
+
+### Solicitar conexión
+
+`connect`:
+
+- consulta el estado de relación antes de invitar;
+- avanza si ya es primer grado;
+- espera si existe una invitación pendiente;
+- respeta el límite diario y horario de la cuenta;
+- registra una reserva durable antes del efecto externo;
+- exige `invitation_id` como confirmación;
+- bloquea reintentos ambiguos para evitar duplicados;
+- espera `new_relation` o la reconciliación periódica del perfil.
+
+### Enviar mensaje
+
+`message`:
+
+- exige primer grado;
+- respeta límites y horario;
+- usa el chat guardado o inicia uno nuevo;
+- exige `chat_id` y `message_id`;
+- registra una entrega durable por paso;
+- permite múltiples pasos de mensaje en el mismo workflow sin confundirlos con un único `message_sent_at`;
+- proyecta el mensaje confirmado al Inbox unificado.
+
+Los estados de provider/chat/conexión se guardan por combinación `(account_id, target_id)` en `linkedin_target_accounts`. Los campos históricos de `targets` se mantienen como proyección compatible para la UI.
+
+## Inbox unificado
+
+La sincronización manual usa:
+
+- `GET /api/v1/chats` con cursor;
+- `GET /api/v1/chats/{chat_id}/attendees`;
+- `GET /api/v1/chats/{chat_id}/messages` con cursor.
+
+Los mensajes se normalizan en `linkedin_inbox_messages`, se deduplican por cuenta/chat/mensaje y mantienen la atribución a cuenta, campaña y workflow. Los webhooks mantienen el Inbox actualizado; la sincronización manual sirve como backfill y recuperación.
+
+## Verificación segura
+
+```bash
+npm run typecheck
+npm run test:linkedin-runner
+npm run test:unipile-migrations
+npm run check:unipile
+npx next build
+```
+
+`test:linkedin-runner` usa SQLite en memoria y un cliente simulado: no envía invitaciones ni mensajes reales. `test:unipile-migrations` aplica las migraciones sobre una copia temporal de la base existente. `check:unipile` solo consulta estado y falla si faltan secretos, webhooks autenticados o una cuenta `OK`.
+
+Para crear o reparar de forma idempotente los tres webhooks v1 con token obligatorio:
+
+```bash
+npm run configure:unipile-webhooks
+```
+
+El script genera secretos locales si faltan, crea primero los webhooks seguros y solo después retira las variantes antiguas sin autenticación.
+
+No utilices pruebas de envío en vivo para validación automatizada. El primer envío real debe realizarse como canary autorizado con un único prospecto controlado.

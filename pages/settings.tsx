@@ -29,8 +29,8 @@ interface LiAccount {
   timezone: string; working_days: string;
   created_at: string;
   active_run_count: number;
-  extension_active?: number;
-  last_extension_ping_at?: string;
+  unipile_account_id?: string;
+  unipile_status?: string;
 }
 
 interface EmailAccount {
@@ -57,7 +57,7 @@ export const getServerSideProps: GetServerSideProps = async ({ query }) => {
     .prepare(
       `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
-              a.extension_active, a.last_extension_ping_at,
+              a.unipile_account_id, a.unipile_status,
               (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
        FROM accounts a ORDER BY a.created_at DESC`
     )
@@ -258,7 +258,6 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
   const [authModal, setAuthModal] = useState<string | null>(null);
-  const [authForm, setAuthForm] = useState({ li_at: "", document_cookie: "" });
   const [authLoading, setAuthLoading] = useState(false);
   const [showSuccessAdviceModal, setShowSuccessAdviceModal] = useState(false);
 
@@ -275,12 +274,10 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
   function openAuthModal(account: LiAccount) {
     setAuthModal(account.id);
-    setAuthForm({ li_at: "", document_cookie: "" });
   }
 
   function closeAuthModal() {
     setAuthModal(null);
-    setAuthForm({ li_at: "", document_cookie: "" });
   }
 
   async function refresh() {
@@ -368,35 +365,20 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     e.preventDefault();
     if (!authModal) return;
 
-    const cleanLiAt = authForm.li_at.trim();
-    if (!cleanLiAt) {
-      toast.error("Por favor ingresa el Código de Conexión");
-      return;
-    }
-
-    if (
-      cleanLiAt.includes("copy(") ||
-      cleanLiAt.includes("document.cookie") ||
-      cleanLiAt.includes("javascript:") ||
-      cleanLiAt.includes(" ") ||
-      cleanLiAt.length < 20
-    ) {
-      toast.error("⚠️ Has pegado texto de script. La cookie real es una clave larga que empieza por AQED... que obtienes con Cookie-Editor o en DevTools.");
-      return;
-    }
-
     setAuthLoading(true);
-    const res = await fetch(`/api/accounts/${authModal}/authenticate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(authForm),
-    });
-    setAuthLoading(false);
-    if (!res.ok) { toast.error((await res.json()).error ?? "Error al autenticar cuenta"); return; }
-    toast.success("¡Cuenta de LinkedIn conectada con éxito!");
-    closeAuthModal();
-    setShowSuccessAdviceModal(true);
-    refresh();
+    try {
+      const res = await fetch("/api/accounts/unipile-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: authModal }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo abrir la conexión de Unipile");
+      window.location.href = data.url;
+    } catch (error) {
+      setAuthLoading(false);
+      toast.error(error instanceof Error ? error.message : "No se pudo conectar la cuenta");
+    }
   }
 
   return (
@@ -468,13 +450,13 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${a.is_authenticated ? "bg-success/15 text-success" : "bg-base-300 text-base-content/40"}`}>
                   {a.is_authenticated ? <><RiCheckLine size={10} /> Auth</> : "Unauth"}
                 </span>
-                {a.extension_active ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-500" title={`Motor en segundo plano activo. Último reporte: ${a.last_extension_ping_at || 'Reciente'}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Motor PC Activo
+                {a.unipile_status === "OK" ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-500" title="Cuenta de LinkedIn sincronizada mediante Unipile">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Unipile OK
                   </span>
                 ) : (
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-base-300/60 text-base-content/50" title="Instala la extensión InHubFlow Connect para ejecutar tareas desde tu IP residencial">
-                    Extensión Inactiva
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-warning/15 text-warning" title="Conecta o reconecta esta cuenta mediante Unipile">
+                    {a.unipile_status || "Unipile sin conectar"}
                   </span>
                 )}
                 <button
@@ -648,103 +630,23 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </span>
             </div>
 
-            {/* Aviso indispensable de sesión activa en el mismo navegador */}
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs mb-3">
-              <span className="text-base shrink-0 mt-0.5">📌</span>
-              <div className="space-y-0.5">
-                <p className="font-bold">Requisito previo importante:</p>
-                <p className="text-amber-800/90 dark:text-amber-300/90">
-                  Debes tener tu sesión de <strong>LinkedIn abierta e iniciada</strong> en otra pestaña de <strong>este mismo navegador</strong> donde estás usando InHubFlow.
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-brand-500/10 border border-brand-500/25 text-xs mb-4">
+              <span className="text-base shrink-0 mt-0.5">☁️</span>
+              <div className="space-y-1">
+                <p className="font-bold text-gray-900 dark:text-white">Conexión cloud mediante Unipile</p>
+                <p className="text-base-content/70">
+                  Se abrirá el asistente seguro de Unipile. No necesitas instalar extensiones ni copiar cookies de LinkedIn.
                 </p>
               </div>
             </div>
 
-            {/* Tarjeta InHubFlow Connect */}
-            <div className="bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 rounded-xl p-3.5 mb-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <span>🚀</span> Extensión Oficial: InHubFlow Connect
-                  </p>
-                  <p className="text-[11px] text-base-content/60 mt-0.5">
-                    Sincroniza tu sesión profesional en 1 solo clic de forma 100% segura.
-                  </p>
-                </div>
-                <a
-                  href="/extension/inhubflow-connect.zip"
-                  download="inhubflow-connect.zip"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm shrink-0 cursor-pointer"
-                >
-                  <RiDownloadLine size={13} />
-                  <span>Descargar Extensión</span>
-                </a>
-              </div>
-
-              <div className="bg-base-100 dark:bg-base-300/50 rounded-lg p-2.5 border border-base-300 text-[11.5px] space-y-1 text-base-content/80">
-                <p className="font-semibold text-gray-900 dark:text-white">Pasos en 1 clic:</p>
-                <ol className="list-decimal list-inside space-y-1 pl-0.5 text-base-content/75">
-                  <li>Abre tu pestaña de <strong>LinkedIn</strong> con tu sesión iniciada.</li>
-                  <li>Haz clic en el ícono de <strong>InHubFlow Connect</strong> en la barra de extensiones de tu navegador.</li>
-                  <li>Pulsa el botón <strong>&quot;Copiar Código de Conexión&quot;</strong>.</li>
-                  <li>Vuelve aquí y haz clic en <strong>&quot;📋 Pegar portapapeles&quot;</strong> abajo.</li>
-                </ol>
-              </div>
-
-              <details className="text-[11px] text-base-content/60 pt-0.5">
-                <summary className="cursor-pointer hover:text-base-content font-medium select-none">
-                  Otras opciones (Cookie-Editor o Inspeccionar F12)
-                </summary>
-                <div className="pt-2 space-y-1.5 pl-0.5 text-base-content/75">
-                  <p>
-                    • También puedes usar la extensión <a href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm" target="_blank" rel="noreferrer" className="text-primary underline">Cookie-Editor</a> y copiar la cookie <code>li_at</code>.
-                  </p>
-                  <p>
-                    • O con <strong>F12</strong>: Ve a <strong>Application</strong> → <strong>Cookies</strong> → copia el valor de <code>li_at</code>.
-                  </p>
-                </div>
-              </details>
-            </div>
-
-            <form onSubmit={submitAuth} className="flex flex-col gap-3">
-              <div>
-                <div className="flex items-center justify-between pb-1">
-                  <label className="label text-xs text-base-content/70 font-semibold uppercase tracking-wide p-0">
-                    CÓDIGO DE CONEXIÓN <span className="text-error">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const text = await navigator.clipboard.readText();
-                        if (text) {
-                          setAuthForm({ ...authForm, li_at: text.trim() });
-                          toast.success("¡Código pegado desde el portapapeles!");
-                        }
-                      } catch {
-                        toast.error("Por favor presiona Ctrl + V en el campo");
-                      }
-                    }}
-                    className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                  >
-                    📋 Pegar portapapeles
-                  </button>
-                </div>
-                <input
-                  className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
-                  placeholder="AQEDATxxxxxx..."
-                  value={authForm.li_at}
-                  onChange={(e) => setAuthForm({ ...authForm, li_at: e.target.value })}
-                  required
-                />
-              </div>
-
-
+            <form onSubmit={submitAuth}>
               <div className="modal-action mt-2">
                 <button type="button" className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors cursor-pointer" onClick={closeAuthModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm disabled:opacity-50 cursor-pointer" disabled={authLoading}>
-                  {authLoading ? <span className="loading loading-spinner loading-xs" /> : "Conectar LinkedIn"}
+                  {authLoading ? <span className="loading loading-spinner loading-xs" /> : "Continuar con Unipile"}
                 </button>
               </div>
             </form>

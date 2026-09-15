@@ -1,7 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { recordSdrAuditEvent } from "@/lib/audit";
 import { unipile } from "@/lib/unipile/client";
+import { resolveUnipileAccount } from "@/lib/unipile/account";
+import { ensureLinkedInTargetAccountState, markLinkedInTargetState } from "@/lib/linkedin/account-state";
 import { sendEmail } from "@/lib/email/sender";
 import { decryptSecret } from "@/lib/crypto";
 import { getSdrThread } from "./repository";
@@ -95,6 +97,7 @@ export async function dispatchApprovedSdrAction(
   const channel = thread.channel;
 
   let externalMessageId = `sdr-msg-${Date.now()}`;
+  let externalThreadId = thread.external_thread_id || target.unipile_chat_id || `thread-${target.id}`;
 
   if (channel === "linkedin") {
     // 1. Resolve LinkedIn Account
@@ -110,48 +113,46 @@ export async function dispatchApprovedSdrAction(
     if (!account) {
       throw new Error(`La cuenta de LinkedIn ${accountId} no existe.`);
     }
+    const linkedInState = ensureLinkedInTargetAccountState(db, accountId, target);
+    target.unipile_provider_id = linkedInState.unipile_provider_id;
+    target.unipile_chat_id = linkedInState.unipile_chat_id;
 
     try {
-      if (unipile.isConfigured()) {
-        const unipileAccId = account.unipile_account_id || account.id;
-        const threadId = thread.external_thread_id || target.unipile_chat_id;
-
-        if (threadId && !threadId.startsWith("thread-")) {
-          const sent = await unipile.sendMessage({
-            chat_id: threadId,
-            text: textToSend,
-          });
-          if (sent?.id) externalMessageId = sent.id;
-        } else {
-          let providerId = target.unipile_provider_id;
-          if (!providerId && target.linkedin_url) {
-            try {
-              const profile = await unipile.resolveProfile(target.linkedin_url, unipileAccId);
-              providerId = profile.provider_id;
-              if (providerId) {
-                db.prepare("UPDATE targets SET unipile_provider_id = ? WHERE id = ?").run(providerId, target.id);
-              }
-            } catch (err) {
-              console.warn("[sdr-dispatcher] No se pudo resolver profile en Unipile:", err);
-            }
-          }
-
+      if (!unipile.isConfigured()) {
+        throw new Error("Unipile no está configurado");
+      }
+      const resolved = await resolveUnipileAccount(db, accountId, unipile);
+      if (externalThreadId && !externalThreadId.startsWith("thread-")) {
+        const sent = await unipile.sendMessage({
+          chat_id: externalThreadId,
+          text: textToSend,
+        });
+        if (!sent?.message_id) throw new Error("Unipile no confirmó message_id");
+        externalMessageId = sent.message_id;
+      } else {
+        let providerId = target.unipile_provider_id;
+        if (!providerId && target.linkedin_url) {
+          const profile = await unipile.resolveProfile(target.linkedin_url, resolved.unipileAccountId);
+          providerId = profile.provider_id;
           if (providerId) {
-            const newChat = await unipile.startChat({
-              account_id: unipileAccId,
-              attendees_ids: [providerId],
-              text: textToSend,
-            });
-            if (newChat?.id) {
-              externalMessageId = newChat.id;
-              db.prepare("UPDATE targets SET unipile_chat_id = ? WHERE id = ?").run(newChat.id, target.id);
-            }
-          } else {
-            throw new Error("No se pudo resolver el identificador de LinkedIn del contacto en Unipile.");
+            markLinkedInTargetState(db, accountId, target.id, { unipile_provider_id: providerId });
           }
         }
-      } else {
-        console.warn("[sdr-dispatcher] Unipile no configurado, guardando respuesta en modo simulación local");
+
+        if (!providerId) {
+          throw new Error("No se pudo resolver el identificador de LinkedIn del contacto en Unipile.");
+        }
+        const newChat = await unipile.startChat({
+          account_id: resolved.unipileAccountId,
+          attendees_ids: [providerId],
+          text: textToSend,
+        });
+        if (!newChat?.chat_id || !newChat.message_id) {
+          throw new Error("Unipile no confirmó chat_id y message_id");
+        }
+        externalMessageId = newChat.message_id;
+        externalThreadId = newChat.chat_id;
+        markLinkedInTargetState(db, accountId, target.id, { unipile_chat_id: newChat.chat_id });
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -168,30 +169,34 @@ export async function dispatchApprovedSdrAction(
       db.prepare(`
         INSERT INTO linkedin_inbox_messages (
           id, account_id, target_id, external_thread_id, external_message_id,
-          direction, body, sent_at, raw_json
-        ) VALUES (?, ?, ?, ?, ?, 'outbound', ?, datetime('now'), ?)
-        ON CONFLICT(account_id, external_message_id) DO NOTHING
+          direction, sender_name, body, sent_at, identity_mode, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, 'outbound', ?, ?, datetime('now'), 'profile_url', ?)
+        ON CONFLICT(account_id, external_thread_id, external_message_id) DO NOTHING
       `).run(
         randomUUID(),
         accountId,
         target.id,
-        thread.external_thread_id || `thread-${target.id}`,
+        externalThreadId,
         externalMessageId,
+        account.name || "Me",
         textToSend,
         JSON.stringify({ sentVia: "sdr_action_dispatch", actionId: action.id }),
       );
 
       db.prepare(`
         INSERT INTO sdr_messages (
-          id, thread_id, direction, external_message_id, sender_type,
-          body, sent_at, delivery_status
-        ) VALUES (?, ?, 'outbound', ?, 'agent', ?, datetime('now'), 'delivered')
-        ON CONFLICT(external_message_id) DO NOTHING
+          id, thread_id, direction, external_message_id, sender_name,
+          body, content_hash, sent_at, delivery_status, metadata_json
+        ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, datetime('now'), 'delivered', ?)
+        ON CONFLICT(thread_id, external_message_id) DO NOTHING
       `).run(
         randomUUID(),
         thread.id,
         externalMessageId,
+        account.name || "Me",
         textToSend,
+        createHash("sha256").update(textToSend, "utf8").digest("hex"),
+        JSON.stringify({ sentVia: "sdr_action_dispatch", actionId: action.id }),
       );
 
       db.prepare(`
@@ -206,9 +211,11 @@ export async function dispatchApprovedSdrAction(
 
       db.prepare(`
         UPDATE sdr_threads
-        SET state = 'WAITING_LEAD', latest_processed_message_id = ?, updated_at = datetime('now')
+        SET state = 'WAITING_LEAD', latest_processed_message_id = ?,
+          external_thread_id = CASE WHEN external_thread_id IS NULL OR external_thread_id LIKE 'thread-%' THEN ? ELSE external_thread_id END,
+          updated_at = datetime('now')
         WHERE id = ?
-      `).run(action.message_id || externalMessageId, thread.id);
+      `).run(action.message_id || externalMessageId, externalThreadId, thread.id);
     })();
   } else {
     // 2. Email Channel

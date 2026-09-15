@@ -5,8 +5,11 @@ import {
   UnipileSendInvitationParams,
   UnipileSendInvitationResponse,
   UnipileSendMessageParams,
+  UnipileSendMessageResponse,
   UnipileStartChatParams,
+  UnipileStartChatResponse,
   UnipileChat,
+  UnipileChatAttendee,
   UnipileMessage,
   UnipilePostComment,
   UnipilePostReaction,
@@ -32,11 +35,11 @@ export class UnipileClient {
     return Boolean(this.dsn && this.apiKey);
   }
 
-  private getHeaders(): Record<string, string> {
+  private getHeaders(includeJsonContentType = true): Record<string, string> {
     return {
       'X-API-KEY': this.apiKey,
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
+      ...(includeJsonContentType ? { 'Content-Type': 'application/json' } : {}),
     };
   }
 
@@ -48,8 +51,9 @@ export class UnipileClient {
     }
 
     const url = `${this.dsn}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers = {
-      ...this.getHeaders(),
+      ...this.getHeaders(!isMultipart),
       ...(options.headers || {}),
     };
 
@@ -65,9 +69,13 @@ export class UnipileClient {
       } catch {
         // ignore
       }
-      throw new Error(
+      const error = new Error(
         `Error Unipile [${res.status} ${res.statusText}] en ${endpoint}: ${errorBody || 'Sin detalle'}`
-      );
+      ) as Error & { status?: number; body?: string; endpoint?: string };
+      error.status = res.status;
+      error.body = errorBody;
+      error.endpoint = endpoint;
+      throw error;
     }
 
     return (await res.json()) as T;
@@ -78,15 +86,19 @@ export class UnipileClient {
    */
   async getHostedAuthLink(params: {
     type?: 'create' | 'reconnect';
+    reconnect_account?: string;
     providers?: string[];
     success_redirect_url?: string;
     failure_redirect_url?: string;
     notify_url?: string;
     name?: string;
   } = {}): Promise<UnipileHostedAuthResponse> {
+    const type = params.type || 'create';
     const payload = {
-      type: params.type || 'create',
-      providers: params.providers || ['LINKEDIN'],
+      type,
+      ...(type === 'reconnect'
+        ? { reconnect_account: params.reconnect_account }
+        : { providers: params.providers || ['LINKEDIN'] }),
       api_url: this.dsn,
       expiresOn: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       ...(params.success_redirect_url ? { success_redirect_url: params.success_redirect_url } : {}),
@@ -129,13 +141,26 @@ export class UnipileClient {
    * Ejemplo: para linkedin.com/in/satyanadella -> identifier = 'satyanadella'
    */
   async resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile> {
-    const cleanId = identifier
-      .replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, '')
-      .replace(/\/.*$/, '')
-      .trim();
+    const rawIdentifier = identifier.trim();
+    let cleanId = rawIdentifier;
+    try {
+      const url = new URL(rawIdentifier);
+      const match = url.pathname.match(/\/in\/([^/]+)/i);
+      cleanId = match?.[1] || url.pathname.split("/").filter(Boolean).pop() || rawIdentifier;
+    } catch {
+      cleanId = rawIdentifier
+        .replace(/^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/in\//i, '')
+        .split(/[/?#]/)[0];
+    }
+    cleanId = decodeURIComponent(cleanId).trim();
+    if (!cleanId) throw new Error('La URL o identificador de LinkedIn no es válido');
 
+    const query = new URLSearchParams({
+      account_id: accountId,
+      linkedin_sections: '*',
+    });
     return this.request<UnipileProfile>(
-      `/api/v1/users/${encodeURIComponent(cleanId)}?account_id=${encodeURIComponent(accountId)}`
+      `/api/v1/users/${encodeURIComponent(cleanId)}?${query.toString()}`
     );
   }
 
@@ -153,49 +178,68 @@ export class UnipileClient {
     });
   }
 
-  /**
-   * Inicia un nuevo chat 1 a 1 con un contacto
-   */
-  async startChat(params: UnipileStartChatParams): Promise<UnipileChat> {
-    return this.request<UnipileChat>('/api/v1/chats', {
+  async startChat(params: UnipileStartChatParams): Promise<UnipileStartChatResponse> {
+    const body = new FormData();
+    body.append('account_id', params.account_id);
+    for (const attendeeId of params.attendees_ids) {
+      body.append('attendees_ids[]', attendeeId);
+    }
+    if (params.text) body.append('text', params.text);
+
+    return this.request<UnipileStartChatResponse>('/api/v1/chats', {
       method: 'POST',
-      body: JSON.stringify({
-        account_id: params.account_id,
-        attendees_ids: params.attendees_ids,
-        text: params.text,
-      }),
+      body,
     });
   }
 
   /**
-   * Envía un mensaje en un chat existente
+   * Envía un mensaje en un chat existente. Unipile responde con message_id.
    */
-  async sendMessage(params: UnipileSendMessageParams): Promise<UnipileMessage> {
-    return this.request<UnipileMessage>(`/api/v1/chats/${encodeURIComponent(params.chat_id)}/messages`, {
+  async sendMessage(params: UnipileSendMessageParams): Promise<UnipileSendMessageResponse> {
+    const body = new FormData();
+    body.append('text', params.text);
+    for (const attachment of params.attachments || []) {
+      if (typeof attachment.file === 'string') {
+        body.append('attachments', attachment.file);
+      } else {
+        body.append('attachments', attachment.file as Blob, attachment.filename);
+      }
+    }
+
+    return this.request<UnipileSendMessageResponse>(`/api/v1/chats/${encodeURIComponent(params.chat_id)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({
-        text: params.text,
-      }),
+      body,
     });
   }
 
   /**
-   * Lista los chats de la cuenta
+   * Lista chats con paginación por cursor. accountId acepta una o varias cuentas.
    */
-  async listChats(accountId?: string, limit: number = 20): Promise<{ items: UnipileChat[] }> {
+  async listChats(accountId?: string | string[], limit: number = 100, cursor?: string): Promise<{ items: UnipileChat[]; cursor?: string | null }> {
     const query = new URLSearchParams();
-    if (accountId) query.set('account_id', accountId);
-    query.set('limit', String(limit));
+    if (accountId) query.set('account_id', Array.isArray(accountId) ? accountId.join(',') : accountId);
+    query.set('limit', String(Math.min(250, Math.max(1, limit))));
+    if (cursor) query.set('cursor', cursor);
 
-    return this.request<{ items: UnipileChat[] }>(`/api/v1/chats?${query.toString()}`);
+    return this.request<{ items: UnipileChat[]; cursor?: string | null }>(`/api/v1/chats?${query.toString()}`);
   }
 
   /**
-   * Lista los mensajes de un chat específico
+   * Lista los mensajes de un chat específico con paginación por cursor.
    */
-  async listMessages(chatId: string, limit: number = 50): Promise<{ items: UnipileMessage[] }> {
-    return this.request<{ items: UnipileMessage[] }>(
-      `/api/v1/chats/${encodeURIComponent(chatId)}/messages?limit=${limit}`
+  async listMessages(chatId: string, limit: number = 100, cursor?: string): Promise<{ items: UnipileMessage[]; cursor?: string | null }> {
+    const query = new URLSearchParams();
+    query.set('limit', String(Math.min(250, Math.max(1, limit))));
+    if (cursor) query.set('cursor', cursor);
+
+    return this.request<{ items: UnipileMessage[]; cursor?: string | null }>(
+      `/api/v1/chats/${encodeURIComponent(chatId)}/messages?${query.toString()}`
+    );
+  }
+
+  async listChatAttendees(chatId: string): Promise<{ items: UnipileChatAttendee[]; cursor?: string | null }> {
+    return this.request<{ items: UnipileChatAttendee[]; cursor?: string | null }>(
+      `/api/v1/chats/${encodeURIComponent(chatId)}/attendees`
     );
   }
 

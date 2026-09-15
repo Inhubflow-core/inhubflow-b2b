@@ -715,8 +715,47 @@ function runMigrations(db: Database.Database) {
     // Unipile API Integration
     "ALTER TABLE accounts ADD COLUMN unipile_account_id TEXT",
     "ALTER TABLE accounts ADD COLUMN unipile_status TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_unipile_account_id ON accounts(unipile_account_id) WHERE unipile_account_id IS NOT NULL",
     "ALTER TABLE targets ADD COLUMN unipile_provider_id TEXT",
     "ALTER TABLE targets ADD COLUMN unipile_chat_id TEXT",
+    // Account-scoped LinkedIn identity and relationship state. The legacy target
+    // columns remain as backwards-compatible projections for single-account data.
+    `CREATE TABLE IF NOT EXISTS linkedin_target_accounts (
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      target_id TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+      unipile_provider_id TEXT,
+      unipile_chat_id TEXT,
+      degree INTEGER,
+      connection_requested_at TEXT,
+      connected_at TEXT,
+      message_sent_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (account_id, target_id)
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_target_accounts_provider ON linkedin_target_accounts(account_id, unipile_provider_id)",
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_target_accounts_chat ON linkedin_target_accounts(account_id, unipile_chat_id)",
+    // One row per workflow action prevents duplicate sends after process restarts
+    // while allowing multiple message steps for the same target.
+    `CREATE TABLE IF NOT EXISTS linkedin_step_deliveries (
+      id TEXT PRIMARY KEY,
+      track_id TEXT NOT NULL REFERENCES run_profile_tracks(id) ON DELETE CASCADE,
+      step_id TEXT NOT NULL REFERENCES workflow_steps(id) ON DELETE CASCADE,
+      run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+      target_id TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      action_type TEXT NOT NULL CHECK(action_type IN ('connect', 'message')),
+      state TEXT NOT NULL DEFAULT 'prepared' CHECK(state IN ('prepared', 'confirmed', 'uncertain', 'failed')),
+      external_id TEXT,
+      external_thread_id TEXT,
+      payload_hash TEXT,
+      error_message TEXT,
+      attempted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      confirmed_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(track_id, step_id)
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_linkedin_step_deliveries_account_time ON linkedin_step_deliveries(account_id, attempted_at)",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
@@ -956,7 +995,6 @@ function runMigrations(db: Database.Database) {
 
   cleanExistingMessyTargetsMigration(db);
   encryptLegacySecretsMigration(db);
-  healPendingMessageTracksMigration(db);
 
   // Optional SDR module: additive tables only. Applying the schema does not
   // initialize a provider, start a worker, or alter existing core behavior.
@@ -970,100 +1008,6 @@ function runMigrations(db: Database.Database) {
 
   // Signal Radar module: Intent-based signal monitors, hot leads, and events
   applySignalSchema(db);
-}
-
-// Unblocks any tracks in a 'message' step that were rescheduled due to transient profile render delays
-function healPendingMessageTracksMigration(db: Database.Database) {
-  // 1. Unblock any LinkedIn tracks that are currently in_progress or pending and scheduled in the future
-  try {
-    db.prepare(`
-      UPDATE run_profile_tracks
-      SET next_step_at = datetime('now', '-1 minute'),
-          force_run_once = 1
-      WHERE state IN ('pending', 'in_progress')
-        AND next_step_at > datetime('now')
-        AND track = 'linkedin'
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] unblock tracks:", err instanceof Error ? err.message : err);
-  }
-
-  // 2. Set degree = 1 for any target that was already verified or connected
-  try {
-    db.prepare(`
-      UPDATE targets
-      SET degree = 1,
-          connected_at = COALESCE(connected_at, datetime('now'))
-      WHERE connected_at IS NOT NULL
-        AND (degree IS NULL OR degree != 1)
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] update connected targets:", err instanceof Error ? err.message : err);
-  }
-
-  // 3. For More Fernández (explicit target for test/sequence verification):
-  // Ensure messaging_urn, degree=1, connected_at, and unblock the track
-  try {
-    db.prepare(`
-      UPDATE targets
-      SET messaging_urn = 'urn:li:fsd_profile:ACoAAF3s9yQBTuwpHkDcgtzOzlxI2R49PBMEE4U',
-          degree = 1,
-          connected_at = COALESCE(connected_at, datetime('now')),
-          message_sent_at = NULL
-      WHERE (id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d' OR linkedin_url LIKE '%more-fern%' OR full_name LIKE '%MOre fergo%')
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] update More target:", err instanceof Error ? err.message : err);
-  }
-
-  try {
-    db.prepare(`
-      UPDATE run_profile_tracks
-      SET state = 'pending',
-          next_step_at = datetime('now', '-1 minute'),
-          force_run_once = 1,
-          error_message = NULL
-      WHERE run_profile_id IN (
-        SELECT rp.id FROM run_profiles rp
-        JOIN targets t ON t.id = rp.target_id
-        WHERE (t.id IN ('2e428bfe-2aab-4e20-9b6c-a1f55033c12d', '2d73a154-fca2-4d9a-ae82-0e80a30b1c1f')
-           OR t.linkedin_url LIKE '%more-fern%'
-           OR t.full_name LIKE '%MOre fergo%'
-           OR t.full_name LIKE '%Gaby Reina%')
-      )
-      AND track = 'linkedin'
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] reset test tracks:", err instanceof Error ? err.message : err);
-  }
-
-  // 4. Unpause runs or reactivate runs containing test targets
-  try {
-    db.prepare(`
-      UPDATE runs
-      SET status = 'running'
-      WHERE status = 'paused'
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] unpause runs:", err instanceof Error ? err.message : err);
-  }
-
-  try {
-    db.prepare(`
-      UPDATE runs
-      SET status = 'running'
-      WHERE status = 'completed'
-        AND id IN (
-          SELECT rp.run_id FROM run_profiles rp
-          JOIN targets t ON t.id = rp.target_id
-          WHERE t.id = '2e428bfe-2aab-4e20-9b6c-a1f55033c12d'
-             OR t.linkedin_url LIKE '%more-fern%'
-             OR t.full_name LIKE '%MOre fergo%'
-        )
-    `).run();
-  } catch (err) {
-    console.warn("[heal-migration] reactivate test run:", err instanceof Error ? err.message : err);
-  }
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

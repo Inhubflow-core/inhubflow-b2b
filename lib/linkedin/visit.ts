@@ -159,8 +159,8 @@ export async function visitProfile(page: Page, linkedinUrl: string): Promise<Pro
     const el = candidateElements.nth(i);
     const [rawText, rawAria, rawHref] = await Promise.all([
       el.innerText().catch(() => ""),
-      el.getAttribute("aria-label").then((v) => v ?? "").catch(() => ""),
-      el.getAttribute("href").then((v) => v ?? "").catch(() => ""),
+      el.getAttribute("aria-label").then((v: string | null) => v ?? "").catch(() => ""),
+      el.getAttribute("href").then((v: string | null) => v ?? "").catch(() => ""),
     ]);
     const text = rawText.replace(/\s+/g, " ").trim();
     const aria = rawAria.replace(/\s+/g, " ").trim();

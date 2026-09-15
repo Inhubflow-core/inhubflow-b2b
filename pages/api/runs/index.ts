@@ -99,7 +99,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Assign email accounts: company-grouped round-robin
     // All targets at the same company get the same sender; companies cycle through the pool
-    let emailAssignment: Map<string, string | null> = new Map();
+    const emailAssignment: Map<string, string | null> = new Map();
     if (emailAccountPool.length > 0) {
       // Load company_id for each candidate target
       const targetIds = targets.map(t => t.target_id);
@@ -133,11 +133,24 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // If no track column exists yet (old DB), default to linkedin-only
     if (workflowTracks.length === 0) workflowTracks.push("linkedin");
 
+    const firstStepByTrack = new Map(
+      (db.prepare(`
+        SELECT ws.track, ws.step_type, ws.delay_seconds
+        FROM workflow_steps ws
+        WHERE ws.workflow_id = ? AND ws.enabled = 1
+          AND ws.step_order = (
+            SELECT MIN(inner_ws.step_order) FROM workflow_steps inner_ws
+            WHERE inner_ws.workflow_id = ws.workflow_id
+              AND inner_ws.track = ws.track AND inner_ws.enabled = 1
+          )
+      `).all(workflow_id) as Array<{ track: string; step_type: string; delay_seconds: number }>).map((step) => [step.track, step]),
+    );
+
     const insertProfile = db.prepare(
       "INSERT INTO run_profiles (id, run_id, target_id, email_account_id) VALUES (?, ?, ?, ?)"
     );
     const insertTrack = db.prepare(
-      "INSERT INTO run_profile_tracks (id, run_profile_id, track, state, current_step) VALUES (?, ?, ?, 'pending', 0)"
+      "INSERT INTO run_profile_tracks (id, run_profile_id, track, state, current_step, next_step_at) VALUES (?, ?, ?, 'pending', 0, ?)"
     );
     const insertMany = db.transaction((ts: { target_id: string }[]) => {
       for (const t of ts) {
@@ -147,7 +160,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         for (const track of workflowTracks) {
           // Skip email track if no email account is configured on this run
           if (track === "email" && !assignedEmailAccountId) continue;
-          insertTrack.run(randomUUID(), rpId, track);
+          const firstStep = firstStepByTrack.get(track);
+          const nextStepAt = firstStep?.step_type === "delay" && firstStep.delay_seconds > 0
+            ? new Date(Date.now() + firstStep.delay_seconds * 1000).toISOString()
+            : null;
+          insertTrack.run(randomUUID(), rpId, track, nextStepAt);
         }
       }
     });

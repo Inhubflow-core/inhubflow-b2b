@@ -203,7 +203,7 @@ async function openComposeFromProfilePage(page: Page): Promise<boolean> {
 
     const [btnText, btnAria] = await Promise.all([
       msgBtn.innerText().catch(() => ""),
-      msgBtn.getAttribute("aria-label").then(v => v ?? "").catch(() => ""),
+      msgBtn.getAttribute("aria-label").then((v: string | null) => v ?? "").catch(() => ""),
     ]);
     console.log(`[message] openComposeFromProfilePage: clicking "${btnText.trim()}" (aria: "${btnAria.trim()}")`);
 

@@ -43,13 +43,20 @@ export function updateLinkedInConnectionAttempt(
 
 export function countLinkedInConnectionAttemptsToday(
   db: Database.Database,
-  accountId: string
+  accountId: string,
+  bounds?: { start: string; end: string },
 ): number {
-  const row = db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM linkedin_connection_attempts
-    WHERE account_id = ? AND date(attempted_at) = date('now')
-  `).get(accountId) as { count: number };
+  const row = bounds
+    ? db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM linkedin_connection_attempts
+        WHERE account_id = ? AND datetime(attempted_at) >= datetime(?) AND datetime(attempted_at) < datetime(?)
+      `).get(accountId, bounds.start, bounds.end) as { count: number }
+    : db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM linkedin_connection_attempts
+        WHERE account_id = ? AND date(attempted_at) = date('now')
+      `).get(accountId) as { count: number };
   return row.count;
 }
 

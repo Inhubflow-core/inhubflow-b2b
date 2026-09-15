@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { unipile } from "@/lib/unipile/client";
+import { resolveUnipileAccount } from "@/lib/unipile/account";
+import { markLinkedInTargetState } from "@/lib/linkedin/account-state";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -27,15 +29,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(503).json({ error: "Unipile is not configured" });
     }
 
-    const unipileAccId = account.unipile_account_id || account.id;
-    const profile = await unipile.resolveProfile(target.linkedin_url, unipileAccId);
+    const resolved = await resolveUnipileAccount(db, account.id, unipile);
+    const profile = await unipile.resolveProfile(target.linkedin_url, resolved.unipileAccountId);
 
     db.prepare(`
-      UPDATE targets SET
-        unipile_provider_id = COALESCE(?, unipile_provider_id),
-        headline            = COALESCE(?, headline)
-      WHERE id = ?
-    `).run(profile.provider_id, profile.headline, id);
+      UPDATE targets SET headline = COALESCE(?, headline) WHERE id = ?
+    `).run(profile.headline, id);
+    markLinkedInTargetState(db, account.id, id, {
+      unipile_provider_id: profile.provider_id,
+    });
 
     return res.json({ contact_id: id, account_id: account.id, profile });
   } catch (err) {

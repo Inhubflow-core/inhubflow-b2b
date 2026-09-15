@@ -4,14 +4,6 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { LinkedInAuthenticationError } from "./auth-wall";
 import { linkedInDefaultUserAgent } from "./cookie-state";
 
-// Playwright / chromium is deprecated in favor of Unipile API
-const chromium: any = {
-  use: () => {},
-  launch: async () => {
-    throw new Error("El navegador headless local ha sido retirado. Usa la API oficial de Unipile.");
-  },
-};
-
 let browser: Browser | null = null;
 const contexts: Map<string, BrowserContext> = new Map();
 
@@ -58,22 +50,8 @@ function contextOptions(storageState?: PersistedStorageState, accountTimezone?: 
   };
 }
 
-async function getBrowser(headless = HEADLESS): Promise<Browser> {
-  // B1: if the cached browser is disconnected, CLOSE it before relaunching.
-  // Without this, a dead-but-not-reaped chromium process tree is orphaned on
-  // every relaunch (the leak behind the Jun 2026 zombie pile-up).
-  if (browser && !browser.isConnected()) {
-    try { await browser.close(); } catch { /* already gone */ }
-    browser = null;
-  }
-  if (!browser) {
-    browser = await chromium.launch({
-      headless,
-      executablePath: CHROMIUM_PATH,
-      args: LAUNCH_ARGS,
-    });
-  }
-  return browser;
+async function getBrowser(_headless = HEADLESS): Promise<Browser> {
+  throw new Error("El navegador local fue retirado. Usa la API de Unipile.");
 }
 
 async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
@@ -130,9 +108,7 @@ async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
           // A syntactically valid storage state without li_at cannot authenticate
           // LinkedIn. Do not leave the account looking connected while the
           // runner repeatedly creates empty contexts.
-          if ((account as any).extension_active !== 1) {
-            db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
-          }
+          db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
         }
       } catch {
         // Invalid storage state — require re-authentication rather than keeping
@@ -245,9 +221,9 @@ export async function saveSessionState(accountId: string): Promise<void> {
   const db = getDb();
   const state = await ctx.storageState();
   const cleanCookies = (state.cookies || []).filter(
-    (c) => c.name !== "__cf_bm" && c.name !== "cf_clearance" && !c.name.startsWith("_cf")
+    (c: { name: string; value: string }) => c.name !== "__cf_bm" && c.name !== "cf_clearance" && !c.name.startsWith("_cf")
   );
-  const hasLiAt = cleanCookies.some((cookie) =>
+  const hasLiAt = cleanCookies.some((cookie: { name: string; value: string }) =>
     cookie.name === "li_at" && typeof cookie.value === "string" && cookie.value.length > 20
   );
   if (!hasLiAt) {
@@ -301,16 +277,9 @@ export async function closeSession(accountId: string): Promise<void> {
  */
 export async function markNeedsReauth(accountId: string): Promise<void> {
   const db = getDb();
-  try {
-    const acc = db.prepare("SELECT extension_active, cookies_json FROM accounts WHERE id = ?").get(accountId) as { extension_active?: number; cookies_json?: string } | undefined;
-    if (acc?.extension_active === 1 || (acc?.cookies_json && acc.cookies_json.length > 50)) {
-      console.warn(`[session] account ${accountId} opera mediante extensión residencial / cookies preservadas; manteniendo is_authenticated = 1.`);
-      return;
-    }
-  } catch { /* ignore */ }
   db.prepare("UPDATE accounts SET is_authenticated = 0 WHERE id = ?").run(accountId);
   try { await closeSession(accountId); } catch { /* ignore */ }
-  console.warn(`[session] account ${accountId} flagged needs-reauth (session logged out)`);
+  console.warn(`[session] account ${accountId} flagged needs-reauth`);
 }
 
 /**
@@ -318,57 +287,8 @@ export async function markNeedsReauth(accountId: string): Promise<void> {
  * to complete login manually. Returns when the user reaches /feed.
  * Saves the full storage state to DB and marks account as authenticated.
  */
-export async function authenticateAccount(accountId: string): Promise<void> {
-  const db = getDb();
-  const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(accountId) as
-    | { email: string; timezone?: string }
-    | undefined;
-  if (!account) throw new Error(`Account ${accountId} not found`);
-
-  // Close any existing context for this account — start fresh
-  await closeSession(accountId);
-
-  // Always launch a VISIBLE browser for manual login. LAUNCH_ARGS (not a
-  // hand-rolled subset) so the login browser matches the runtime one.
-  const visibleBrowser = await chromium.launch({
-    headless: false,
-    executablePath: CHROMIUM_PATH,
-    args: LAUNCH_ARGS,
-  });
-
-  try {
-    // The session MUST be born under the same fingerprint the runner will use
-    // later — UA, locale and timezone included. A hand-built context here is
-    // what silently causes LinkedIn to revoke the cookie days after connecting.
-    const ctx = await visibleBrowser.newContext(contextOptions(undefined, account.timezone));
-
-    const page = await ctx.newPage();
-    await page.goto("https://www.linkedin.com/login");
-
-    // Pre-fill email to save the user a step
-    try {
-      await page.waitForSelector("input#username", { timeout: 5000 });
-      await page.fill("input#username", account.email);
-    } catch {
-      // Input not found — page may have redirected already
-    }
-
-    // Wait up to 3 minutes for the user to complete login and reach /feed
-    await page.waitForURL("**/feed/**", { timeout: 180_000 });
-
-    // Save full storage state (cookies + localStorage) to DB, pinning the UA
-    // this session was born under (see saveSessionState).
-    const state = await ctx.storageState();
-    const persisted: PersistedStorageState = { ...state, userAgent: DEFAULT_USER_AGENT };
-    db.prepare("UPDATE accounts SET cookies_json = ?, is_authenticated = 1 WHERE id = ?").run(
-      encryptSecret(JSON.stringify(persisted)),
-      accountId
-    );
-
-    await ctx.close();
-  } finally {
-    await visibleBrowser.close();
-  }
+export async function authenticateAccount(_accountId: string): Promise<void> {
+  throw new Error("La autenticación local fue retirada. Conecta la cuenta mediante Hosted Auth de Unipile.");
 }
 
 // ─── Server-side headless login ───────────────────────────────────────────────
