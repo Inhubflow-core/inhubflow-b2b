@@ -20,8 +20,12 @@ export class UnipileClient {
 
   constructor(dsn?: string, apiKey?: string) {
     // Tomar de variables de entorno o parámetros
-    this.dsn = (dsn || process.env.UNIPILE_DSN || '').replace(/\/$/, '');
-    this.apiKey = apiKey || process.env.UNIPILE_API_KEY || '';
+    let rawDsn = (dsn || process.env.UNIPILE_DSN || '').trim().replace(/\/$/, '');
+    if (rawDsn && !rawDsn.startsWith('http://') && !rawDsn.startsWith('https://')) {
+      rawDsn = `https://${rawDsn}`;
+    }
+    this.dsn = rawDsn;
+    this.apiKey = (apiKey || process.env.UNIPILE_API_KEY || '').trim();
   }
 
   public isConfigured(): boolean {

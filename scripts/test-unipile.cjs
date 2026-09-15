@@ -28,8 +28,11 @@ if (fs.existsSync(envLocalPath)) {
   }
 }
 
-const dsn = (process.env.UNIPILE_DSN || "").replace(/\/$/, "");
-const apiKey = process.env.UNIPILE_API_KEY || "";
+let dsn = (process.env.UNIPILE_DSN || "").trim().replace(/\/$/, "");
+if (dsn && !dsn.startsWith("http://") && !dsn.startsWith("https://")) {
+  dsn = "https://" + dsn;
+}
+const apiKey = (process.env.UNIPILE_API_KEY || "").trim();
 
 console.log("==========================================");
 console.log("  InHubFlow - Unipile Integration Checker ");
