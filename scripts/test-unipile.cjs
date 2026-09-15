@@ -74,8 +74,8 @@ async function testConnection() {
     if (accounts.length > 0) {
       accounts.forEach((acc, i) => {
         console.log(`  [${i + 1}] ID: ${acc.id}`);
-        console.log(`      Proveedor: ${acc.provider}`);
-        console.log(`      Estado: ${acc.status}`);
+        console.log(`      Proveedor: ${acc.type || acc.provider || "LINKEDIN"}`);
+        console.log(`      Estado: ${acc.sources?.[0]?.status || acc.status || "OK"}`);
         console.log(`      Nombre: ${acc.name || "Sin nombre"}\n`);
       });
     } else {
