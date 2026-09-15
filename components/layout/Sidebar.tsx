@@ -36,7 +36,7 @@ import { useTheme } from "@/lib/context/ThemeContext";
 const mainNav = [
   { href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
   { href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#465fff", tour: "nav-lead-finder" },
-  { href: "/signals", labelKey: "nav.signalRadar", icon: RiRadarLine, color: "#f04438", tour: "nav-signals" },
+  { href: "/signals", labelKey: "nav.signalRadar", icon: RiRadarLine, color: "#465fff", tour: "nav-signals" },
   { href: "/lists", labelKey: "nav.lists", icon: RiFileList3Line, color: "#12b76a", tour: "nav-lists" },
   { href: "/contacts", labelKey: "nav.contacts", icon: RiContactsLine, color: "#0ba5ec", tour: "nav-contacts" },
   { href: "/pipeline", labelKey: "nav.pipeline", icon: RiKanbanView, color: "#ec4899", tour: "nav-pipeline" },
