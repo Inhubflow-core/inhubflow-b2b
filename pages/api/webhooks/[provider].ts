@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const secrets = configuredSecrets();
   const expectedToken = process.env.UNIPILE_WEBHOOK_TOKEN?.trim() || "";
   if (secrets.length === 0 && !expectedToken) {
-    return res.status(503).json({ error: "No hay autenticación de webhooks de Unipile configurada" });
+    return res.status(503).json({ error: "No hay autenticación de webhooks configurada" });
   }
 
   try {
@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await handleUnipileWebhook(payload);
     return res.status(result.handled ? 200 : 202).json({ received: true, result });
   } catch (error) {
-    console.error("[pages/api/webhooks/unipile] Error procesando webhook:", error);
+    console.error("[linkedin-webhook] Error procesando webhook:", error);
     return res.status(400).json({ error: "Payload de webhook inválido" });
   }
 }

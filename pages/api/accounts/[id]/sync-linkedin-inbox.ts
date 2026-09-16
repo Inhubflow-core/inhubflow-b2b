@@ -16,14 +16,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getDb();
   if (!canAccessLinkedInAccount(db, actor, accountId)) return res.status(404).json({ error: "LinkedIn account not found" });
-  if (!unipile.isConfigured()) return res.status(503).json({ error: "Unipile no está configurado" });
+  if (!unipile.isConfigured()) return res.status(503).json({ error: "El motor de LinkedIn no está configurado" });
 
   try {
     const result = await syncLinkedInInbox(db, accountId, unipile);
-    return res.status(200).json({ ok: true, ...result, source: "unipile" });
+    return res.status(200).json({ ok: true, ...result, source: "linkedin-cloud" });
   } catch (error) {
     markInboxSyncError(db, accountId, error);
-    console.error("[sync-linkedin-inbox] Error sincronizando con Unipile:", error);
+    console.error("[sync-linkedin-inbox] Error sincronizando el inbox cloud:", error);
     return res.status(502).json({ error: error instanceof Error ? error.message : "Error sincronizando el inbox de LinkedIn" });
   }
 }

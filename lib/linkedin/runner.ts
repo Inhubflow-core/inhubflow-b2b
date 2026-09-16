@@ -250,7 +250,7 @@ function recordOutboundMessage(db: ReturnType<typeof getDb>, runId: string, work
     SELECT ?, r.account_id, ?, ?, ?, ?, ?, 'outbound', '', 'Me', ?, datetime('now'), 'profile_url', ?
     FROM runs r WHERE r.id = ?
     ON CONFLICT(account_id, external_thread_id, external_message_id) DO NOTHING
-  `).run(randomUUID(), target.id, runId, workflowId, chatId, messageId, text, JSON.stringify({ source: "campaign-runner-unipile" }), runId);
+  `).run(randomUUID(), target.id, runId, workflowId, chatId, messageId, text, JSON.stringify({ source: "campaign-runner-linkedin" }), runId);
 }
 
 async function resolveRemoteAccount(db: ReturnType<typeof getDb>, localAccountId: string, client: RunnerUnipileClient, deps: RunnerDependencies) {
@@ -320,7 +320,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
   }
 
   if (!client.isConfigured()) {
-    const message = "Unipile no está configurado; el paso no se ejecutó";
+    const message = "El motor de LinkedIn no está configurado; el paso no se ejecutó";
     log(db, runProfile.run_id, target.id, "error", message);
     trDefer(db, tr, message, 1, now());
     return;
@@ -354,7 +354,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
     remoteAccount = await resolveRemoteAccount(db, runProfile.account_id, client, deps);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log(db, runProfile.run_id, target.id, "error", `Cuenta Unipile no disponible: ${message}`);
+    log(db, runProfile.run_id, target.id, "error", `Cuenta de LinkedIn no disponible: ${message}`);
     trDefer(db, tr, message, 1, now());
     return;
   }
@@ -364,7 +364,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
   const resolveProfile = async (): Promise<UnipileProfile> => {
     if (!target.linkedin_url) throw new Error("El prospecto no tiene URL de LinkedIn");
     const profile = await client.resolveProfile(target.linkedin_url, accountId);
-    if (!profile?.provider_id) throw new Error("Unipile no devolvió provider_id");
+    if (!profile?.provider_id) throw new Error("El motor de LinkedIn no devolvió un identificador de perfil");
     providerId = profile.provider_id;
     return profile;
   };
@@ -373,7 +373,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
     try {
       const profile = await resolveProfile();
       enrichTarget(db, runProfile.account_id, target, profile);
-      log(db, runProfile.run_id, target.id, "info", `Perfil visitado/sincronizado vía Unipile para ${name}`);
+      log(db, runProfile.run_id, target.id, "info", `Perfil de ${name} visitado y sincronizado con éxito!`);
       trAdvance(db, tr, steps);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -415,7 +415,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
           unipile_provider_id: profile.provider_id,
         });
         target.connection_requested_at = null;
-        log(db, runProfile.run_id, target.id, "warn", `Se eliminó un marcador local obsoleto para ${name}: Unipile confirma que no hay invitación pendiente`);
+        log(db, runProfile.run_id, target.id, "warn", `Se eliminó un marcador local obsoleto para ${name}: LinkedIn confirma que no hay invitación pendiente`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         log(db, runProfile.run_id, target.id, "warn", `No se pudo reconciliar la invitación pendiente de ${name}: ${message}`);
@@ -426,7 +426,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
 
     if (priorDelivery?.state === "prepared") {
       updateLinkedInStepDelivery(db, priorDelivery.id, "uncertain", {
-        errorMessage: "Ejecución interrumpida antes de confirmar la respuesta de Unipile",
+        errorMessage: "Ejecución interrumpida antes de confirmar la respuesta del motor de LinkedIn",
       });
     }
     if (priorDelivery?.state === "confirmed" || priorDelivery?.state === "uncertain" || priorDelivery?.state === "prepared") {
@@ -447,7 +447,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         const profile = await resolveProfile();
         enrichTarget(db, runProfile.account_id, target, profile);
         if (profileIsConnected(profile)) {
-          log(db, runProfile.run_id, target.id, "info", `${name} ya está conectado según Unipile; continuando la secuencia`);
+          log(db, runProfile.run_id, target.id, "info", `${name} ya está conectado en LinkedIn; continuando la secuencia`);
           trAdvance(db, tr, steps);
           return;
         }
@@ -484,9 +484,9 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
 
       const response = await client.sendInvitation({ account_id: accountId, provider_id: providerId, message: note || undefined });
       if (response?.status === "failed" || !response?.invitation_id) {
-        updateLinkedInConnectionAttempt(db, attemptId, "rejected", "Unipile no confirmó la invitación");
-        updateLinkedInStepDelivery(db, deliveryId, "failed", { errorMessage: "Unipile no confirmó la invitación" });
-        trFail(db, tr, "Unipile no confirmó la invitación");
+        updateLinkedInConnectionAttempt(db, attemptId, "rejected", "El motor de LinkedIn no confirmó la invitación");
+        updateLinkedInStepDelivery(db, deliveryId, "failed", { errorMessage: "El motor de LinkedIn no confirmó la invitación" });
+        trFail(db, tr, "El motor de LinkedIn no confirmó la invitación");
         return;
       }
       updateLinkedInConnectionAttempt(db, attemptId, "submitted");
@@ -495,7 +495,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         connection_requested_at: nowIso(now()),
         unipile_provider_id: providerId,
       });
-      log(db, runProfile.run_id, target.id, "info", `Solicitud de conexión enviada a ${name} vía Unipile`);
+      log(db, runProfile.run_id, target.id, "info", `Solicitud de conexión enviada a ${name} con éxito!`);
       trWait(db, tr, 6, now());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -535,7 +535,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       if (attemptId && providerLimit) {
         updateLinkedInConnectionAttempt(db, attemptId, "rejected", message);
         if (deliveryId) updateLinkedInStepDelivery(db, deliveryId, "failed", { errorMessage: message });
-        log(db, runProfile.run_id, target.id, "warn", `Unipile/LinkedIn informó un límite temporal: ${message}`);
+        log(db, runProfile.run_id, target.id, "warn", `LinkedIn informó un límite temporal: ${message}`);
         trWait(db, tr, 24, now());
         return;
       }
@@ -574,7 +574,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
     }
     if (priorDelivery?.state === "prepared") {
       updateLinkedInStepDelivery(db, priorDelivery.id, "uncertain", {
-        errorMessage: "Ejecución interrumpida antes de confirmar la respuesta de Unipile",
+        errorMessage: "Ejecución interrumpida antes de confirmar la respuesta del motor de LinkedIn",
       });
     }
     if (priorDelivery?.state === "uncertain" || priorDelivery?.state === "prepared") {
@@ -652,7 +652,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         chatId = started?.chat_id || null;
         messageId = started?.message_id || null;
       }
-      if (!chatId || !messageId) throw new Error("Unipile no confirmó chat_id y message_id del mensaje");
+      if (!chatId || !messageId) throw new Error("El motor de LinkedIn no confirmó el envío del mensaje");
 
       db.transaction(() => {
         updateLinkedInStepDelivery(db, deliveryId, "confirmed", {
@@ -667,7 +667,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         recordOutboundMessage(db, runProfile.run_id, runProfile.workflow_id, target, chatId, messageId, text);
         trAdvance(db, tr, steps);
       })();
-      log(db, runProfile.run_id, target.id, "info", `Mensaje enviado a ${name} vía Unipile`);
+      log(db, runProfile.run_id, target.id, "info", `Mensaje enviado a ${name} con éxito!`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("ya está reservada")) {
@@ -740,7 +740,7 @@ export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<
 
 export function ensureGlobalRunnerStarted(): void {
   if (globalRunnerTimer) return;
-  console.log("[campaign-runner] Iniciando bucle de ejecución de campañas (Unipile Engine)...");
+  console.log("[campaign-runner] Iniciando motor de ejecución de campañas de LinkedIn...");
   globalRunnerTimer = setInterval(() => { enqueueTick().catch((error) => console.error("[campaign-runner] Error en timer tick:", error)); }, 30_000);
 }
 
@@ -757,5 +757,5 @@ export async function forceRunStep(runId: string, targetId?: string): Promise<{ 
   db.prepare(`UPDATE run_profile_tracks SET state = 'in_progress', next_step_at = datetime('now'), force_run_once = 1, error_message = NULL WHERE run_profile_id IN (SELECT rp.id FROM run_profiles rp WHERE rp.run_id = ? ${predicate}) AND state NOT IN ('completed')`).run(...params);
   db.prepare("UPDATE runs SET status = 'running', started_at = COALESCE(started_at, datetime('now')) WHERE id = ?").run(runId);
   enqueueTick(db).catch((error) => console.error("[campaign-runner] Error en forceRunStep:", error));
-  return { success: true, message: "Paso de campaña ejecutado vía Unipile" };
+  return { success: true, message: "Paso de campaña enviado a ejecución" };
 }

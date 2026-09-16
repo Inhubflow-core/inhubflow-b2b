@@ -41,7 +41,7 @@ export async function resolveUnipileAccount(
   } | undefined;
 
   if (!local) throw new Error("Cuenta local de LinkedIn no encontrada");
-  if (!client.isConfigured()) throw new Error("Unipile no está configurado");
+  if (!client.isConfigured()) throw new Error("El motor de LinkedIn no está configurado");
 
   if (local.unipile_account_id) {
     const remote = await client.getAccount(local.unipile_account_id);
@@ -49,7 +49,7 @@ export async function resolveUnipileAccount(
     db.prepare("UPDATE accounts SET unipile_status = ?, is_authenticated = ? WHERE id = ?")
       .run(status || "UNKNOWN", isUsableLinkedInAccount(remote) ? 1 : 0, local.id);
     if (!isUsableLinkedInAccount(remote)) {
-      throw new Error(`La cuenta de LinkedIn de Unipile no está lista (estado ${status || "UNKNOWN"})`);
+      throw new Error(`La cuenta de LinkedIn no está lista (estado ${status || "UNKNOWN"})`);
     }
     return {
       localAccountId: local.id,
@@ -69,7 +69,7 @@ export async function resolveUnipileAccount(
     (account) => isUsableLinkedInAccount(account) && !mappedIds.has(account.id),
   );
   if (usable.length === 0) {
-    throw new Error("No hay una cuenta de LinkedIn de Unipile conectada y lista (estado OK)");
+    throw new Error("No hay una cuenta de LinkedIn conectada y lista (estado OK)");
   }
 
   // The local account is unbound. The first deterministic usable LinkedIn account

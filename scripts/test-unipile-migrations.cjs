@@ -36,6 +36,17 @@ async function run() {
     await source.backup(tempPath);
     source.close();
   }
+  if (fs.existsSync(tempPath)) {
+    const fixture = new Database(tempPath);
+    try {
+      fixture.prepare(`
+        INSERT OR REPLACE INTO logs (id, run_id, target_id, level, message)
+        VALUES ('provider-branding-test', NULL, NULL, 'info', '[INFO] Mensaje enviado a Prueba vía Unipile')
+      `).run();
+    } finally {
+      fixture.close();
+    }
+  }
   process.env.INHUBFLOW_DB_PATH = tempPath;
   try {
     const { getDb } = require("../lib/db.ts");
@@ -51,6 +62,9 @@ async function run() {
     const targetColumns = new Set(db.prepare("PRAGMA table_info(targets)").all().map((row) => row.name));
     assert.ok(targetColumns.has("unipile_provider_id"));
     assert.ok(targetColumns.has("unipile_chat_id"));
+    const sanitizedLog = db.prepare("SELECT message FROM logs WHERE id = 'provider-branding-test'").get();
+    assert.equal(sanitizedLog.message, "[INFO] Mensaje enviado a Prueba con éxito!");
+    assert.equal(sanitizedLog.message.includes("Unipile"), false);
     db.close();
     console.log("✅ MIGRACIONES UNIPILE VALIDADAS SOBRE UNA COPIA DE LA BASE EXISTENTE");
   } finally {

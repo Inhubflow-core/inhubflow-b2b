@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 
 // Excludes cookies_json — the frontend never uses the raw session blob, only
 // is_authenticated, so there's no reason to ship it (even encrypted) to the client.
-const ACCOUNT_COLUMNS = `id, name, email, is_authenticated, unipile_account_id, unipile_status, daily_connection_limit, daily_message_limit, daily_inmail_limit,
+const ACCOUNT_COLUMNS = `id, name, email, is_authenticated, unipile_status AS linkedin_connection_status, daily_connection_limit, daily_message_limit, daily_inmail_limit,
   active_hours_start, active_hours_end, timezone, working_days, created_at,
   inbox_synced_at, accepted_sync_at, li_connections, li_pending, li_profile_views,
   li_stats_synced_at, connections_synced_through_ms`;
@@ -93,7 +93,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       import("@/lib/unipile/client")
         .then(({ unipile }) => unipile.deleteAccount(account.unipile_account_id!))
         .catch((err) => {
-          console.warn("[deleteAccount] No se pudo dar de baja la cuenta en Unipile:", err?.message || err);
+          console.warn("[deleteAccount] No se pudo dar de baja la cuenta del motor cloud:", err?.message || err);
         });
     }
 

@@ -1008,6 +1008,58 @@ function runMigrations(db: Database.Database) {
 
   // Signal Radar module: Intent-based signal monitors, hot leads, and events
   applySignalSchema(db);
+
+  // Keep provider implementation details out of customer-facing activity and
+  // diagnostics, including historical rows written by older releases.
+  sanitizePublicProviderBrandingMigration(db);
+}
+
+function sanitizePublicProviderBrandingMigration(db: Database.Database) {
+  const textColumns = [
+    ["logs", "message"],
+    ["run_profile_tracks", "error_message"],
+    ["linkedin_connection_attempts", "error_message"],
+    ["linkedin_step_deliveries", "error_message"],
+    ["accounts", "linkedin_inbox_sync_error"],
+  ] as const;
+
+  for (const [table, column] of textColumns) {
+    try {
+      db.exec(`
+        UPDATE ${table}
+        SET ${column} = replace(
+          replace(
+            replace(
+              replace(${column},
+                'Perfil visitado/sincronizado vía Unipile para ',
+                'Perfil visitado y sincronizado con éxito para '
+              ),
+              ' vía Unipile',
+              ' con éxito!'
+            ),
+            'Unipile/LinkedIn',
+            'LinkedIn'
+          ),
+          'Unipile',
+          'motor de LinkedIn'
+        )
+        WHERE ${column} LIKE '%Unipile%'
+      `);
+    } catch { /* optional/legacy table or column */ }
+  }
+
+  for (const table of ["linkedin_inbox_messages", "sdr_messages"]) {
+    try {
+      db.exec(`
+        UPDATE ${table}
+        SET metadata_json = replace(
+          replace(metadata_json, 'unipile-webhook', 'linkedin-webhook'),
+          'unipile-backfill', 'linkedin-backfill'
+        )
+        WHERE metadata_json LIKE '%unipile%'
+      `);
+    } catch { /* optional module */ }
+  }
 }
 
 // Cleanup migration for previously inserted targets that had concatenated DOM card strings

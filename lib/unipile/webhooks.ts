@@ -41,7 +41,7 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
   const localAccount = localAccountForRemote(db, remoteAccountId);
 
   if (event === "message_received") {
-    if (!localAccount) return { handled: false, event, message: "Cuenta Unipile no asociada a una cuenta local" };
+    if (!localAccount) return { handled: false, event, message: "Cuenta de LinkedIn no asociada a una cuenta local" };
     const fields = getMessageFields(payload);
     if (!fields.messageId || !fields.chatId) return { handled: false, event, message: "Payload incompleto: falta message_id o chat_id" };
     const isSender = fields.accountUserId ? fields.accountUserId === fields.senderId : Boolean(payload.data?.is_sender);
@@ -64,7 +64,7 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
         profileUrl: fields.senderProfileUrl,
         memberUrn: fields.senderId || null,
       },
-      source: "unipile-webhook",
+      source: "linkedin-webhook",
     });
     return { handled: true, event, message: "Mensaje procesado correctamente", details: { ...result, messageId: fields.messageId, chatId: fields.chatId } };
   }
@@ -145,7 +145,7 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
     const accountId = accountStatus.account_id || remoteAccountId;
     const account = localAccountForRemote(db, accountId);
     if (!account) {
-      return { handled: false, event, message: "Cuenta Unipile no asociada a una cuenta local" };
+      return { handled: false, event, message: "Cuenta de LinkedIn no asociada a una cuenta local" };
     }
     const isAuthenticated = status === "OK" ? 1 : 0;
 

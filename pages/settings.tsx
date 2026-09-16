@@ -29,8 +29,7 @@ interface LiAccount {
   timezone: string; working_days: string;
   created_at: string;
   active_run_count: number;
-  unipile_account_id?: string;
-  unipile_status?: string;
+  linkedin_connection_status?: string;
 }
 
 interface EmailAccount {
@@ -57,7 +56,7 @@ export const getServerSideProps: GetServerSideProps = async ({ query }) => {
     .prepare(
       `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
-              a.unipile_account_id, a.unipile_status,
+              a.unipile_status AS linkedin_connection_status,
               (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
        FROM accounts a ORDER BY a.created_at DESC`
     )
@@ -627,11 +626,11 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${a.is_authenticated ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-base-300 text-base-content/40"}`}>
                   {a.is_authenticated ? <><RiCheckLine size={10} /> Activo</> : "Inactivo"}
                 </span>
-                {a.unipile_status === "OK" ? (
+                {a.linkedin_connection_status === "OK" ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Cuenta de LinkedIn sincronizada y lista para prospección">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Conectado
                   </span>
-                ) : a.unipile_status === "CREDENTIALS" ? (
+                ) : a.linkedin_connection_status === "CREDENTIALS" ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Inicia sesión para renovar la conexión con LinkedIn">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Reconexión requerida
                   </span>
@@ -644,7 +643,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-all cursor-pointer"
                   onClick={() => startAuthFlow(a.id)}
                 >
-                  <RiShieldKeyholeLine size={13} /> {a.unipile_status === "OK" ? "Reconectar" : "Conectar LinkedIn"}
+                  <RiShieldKeyholeLine size={13} /> {a.linkedin_connection_status === "OK" ? "Reconectar" : "Conectar LinkedIn"}
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"

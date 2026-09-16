@@ -49,7 +49,7 @@ export class UnipileClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     if (!this.isConfigured()) {
       throw new Error(
-        'Unipile no está configurado. Asegúrate de definir UNIPILE_DSN y UNIPILE_API_KEY en tu archivo de entorno.'
+        'El motor de LinkedIn no está configurado. Revisa la configuración del servicio.'
       );
     }
 
@@ -73,7 +73,7 @@ export class UnipileClient {
         // ignore
       }
       const error = new Error(
-        `Error Unipile [${res.status} ${res.statusText}] en ${endpoint}: ${errorBody || 'Sin detalle'}`
+        `Error del motor de LinkedIn [${res.status} ${res.statusText}]: ${errorBody || 'Sin detalle'}`
       ) as Error & { status?: number; body?: string; endpoint?: string };
       error.status = res.status;
       error.body = errorBody;

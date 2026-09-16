@@ -51,7 +51,7 @@ function contextOptions(storageState?: PersistedStorageState, accountTimezone?: 
 }
 
 async function getBrowser(_headless = HEADLESS): Promise<Browser> {
-  throw new Error("El navegador local fue retirado. Usa la API de Unipile.");
+  throw new Error("El navegador local fue retirado. Usa la conexión cloud de LinkedIn.");
 }
 
 async function getOrCreateContext(accountId: string): Promise<BrowserContext> {
@@ -288,7 +288,7 @@ export async function markNeedsReauth(accountId: string): Promise<void> {
  * Saves the full storage state to DB and marks account as authenticated.
  */
 export async function authenticateAccount(_accountId: string): Promise<void> {
-  throw new Error("La autenticación local fue retirada. Conecta la cuenta mediante Hosted Auth de Unipile.");
+  throw new Error("La autenticación local fue retirada. Conecta la cuenta mediante el acceso seguro de LinkedIn.");
 }
 
 // ─── Server-side headless login ───────────────────────────────────────────────

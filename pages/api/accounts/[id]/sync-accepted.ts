@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stamped: 0,
       connectionsRead: connectedTargets,
       newly_accepted: 0,
-      message: "Sincronización gestionada en tiempo real vía Webhooks de Unipile",
+      message: "Sincronización gestionada en tiempo real por el motor de LinkedIn",
     });
   } catch (err) {
     console.error("[sync-accepted]", err);

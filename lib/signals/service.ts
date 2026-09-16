@@ -377,7 +377,7 @@ export class SignalRadarService {
             found = discovered.length;
             newLeads = this.saveDiscoveredLeads(monitor, discovered.length > 0 ? discovered : this.generateSampleLeads(monitor));
           } catch (unipileErr) {
-            console.warn("[SignalRadar] Error al consultar Unipile para post, recurriendo a simulación contextual:", unipileErr);
+            console.warn("[SignalRadar] Error al consultar el motor de datos para post, recurriendo a simulación contextual:", unipileErr);
             const fallbackLeads = this.generateSampleLeads(monitor);
             found = fallbackLeads.length;
             newLeads = this.saveDiscoveredLeads(monitor, fallbackLeads);

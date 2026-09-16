@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       updated: 0,
       total: listConnected,
-      message: "Sincronizado vía Unipile",
+      message: "Sincronizado con éxito",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

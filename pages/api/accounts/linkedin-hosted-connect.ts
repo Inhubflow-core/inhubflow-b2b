@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!unipile.isConfigured()) {
     return res.status(503).json({
-      error: "Unipile no está configurado en el servidor. Por favor define UNIPILE_DSN y UNIPILE_API_KEY.",
+      error: "El motor de conexión de LinkedIn no está configurado en el servidor.",
     });
   }
 
@@ -34,9 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const protocol = req.headers["x-forwarded-proto"] || "http";
     const baseUrl = `${protocol}://${host}`;
     const secret = (process.env.UNIPILE_CALLBACK_SECRET || process.env.UNIPILE_WEBHOOK_SECRET)?.trim();
-    if (!secret) return res.status(503).json({ error: "UNIPILE_CALLBACK_SECRET no está configurado" });
+    if (!secret) return res.status(503).json({ error: "La conexión segura de LinkedIn no está configurada" });
     const state = createHostedAuthState(accountId, secret);
-    const callbackUrl = `${baseUrl}/api/accounts/unipile-callback?state=${encodeURIComponent(state)}`;
+    const callbackUrl = `${baseUrl}/api/accounts/linkedin-hosted-callback?state=${encodeURIComponent(state)}`;
     const linkResponse = await unipile.getHostedAuthLink({
       type: localAccount.unipile_account_id ? "reconnect" : "create",
       reconnect_account: localAccount.unipile_account_id || undefined,
@@ -49,9 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ url: linkResponse.url, accountId, displayName: name || null });
   } catch (error) {
-    console.error("[pages/api/accounts/unipile-link] Error generando link de Unipile:", error);
+    console.error("[linkedin-connect] Error generando enlace seguro:", error);
     return res.status(500).json({
-      error: "No se pudo generar el enlace de conexión de Unipile",
+      error: "No se pudo generar el enlace seguro de conexión con LinkedIn",
       message: error instanceof Error ? error.message : String(error),
     });
   }

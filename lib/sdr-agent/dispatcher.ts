@@ -119,7 +119,7 @@ export async function dispatchApprovedSdrAction(
 
     try {
       if (!unipile.isConfigured()) {
-        throw new Error("Unipile no está configurado");
+        throw new Error("El motor de LinkedIn no está configurado");
       }
       const resolved = await resolveUnipileAccount(db, accountId, unipile);
       if (externalThreadId && !externalThreadId.startsWith("thread-")) {
@@ -127,7 +127,7 @@ export async function dispatchApprovedSdrAction(
           chat_id: externalThreadId,
           text: textToSend,
         });
-        if (!sent?.message_id) throw new Error("Unipile no confirmó message_id");
+        if (!sent?.message_id) throw new Error("El motor de LinkedIn no confirmó el envío");
         externalMessageId = sent.message_id;
       } else {
         let providerId = target.unipile_provider_id;
@@ -140,7 +140,7 @@ export async function dispatchApprovedSdrAction(
         }
 
         if (!providerId) {
-          throw new Error("No se pudo resolver el identificador de LinkedIn del contacto en Unipile.");
+          throw new Error("No se pudo identificar el contacto de LinkedIn.");
         }
         const newChat = await unipile.startChat({
           account_id: resolved.unipileAccountId,
@@ -148,7 +148,7 @@ export async function dispatchApprovedSdrAction(
           text: textToSend,
         });
         if (!newChat?.chat_id || !newChat.message_id) {
-          throw new Error("Unipile no confirmó chat_id y message_id");
+          throw new Error("El motor de LinkedIn no confirmó el envío");
         }
         externalMessageId = newChat.message_id;
         externalThreadId = newChat.chat_id;
@@ -161,7 +161,7 @@ export async function dispatchApprovedSdrAction(
         SET state = 'failed', delivery_status = 'failed', updated_at = datetime('now')
         WHERE id = ?
       `).run(action.id);
-      throw new Error(`Error al enviar mensaje por LinkedIn vía Unipile: ${errorMsg}`);
+      throw new Error(`No se pudo enviar el mensaje por LinkedIn: ${errorMsg}`);
     }
 
     // Persist outbound in LinkedIn inbox table and SDR messages table

@@ -15,7 +15,7 @@ export interface InboxSyncResult {
   duplicates: number;
   createdTargets: number;
   accountId: string;
-  unipileAccountId: string;
+  providerAccountId: string;
 }
 
 interface LocalTarget {
@@ -157,7 +157,7 @@ export async function ingestUnipileMessage(
   const message = input.message;
   const messageId = String(message.message_id || message.id || "").trim();
   const chatId = String(message.chat_id || "").trim();
-  if (!messageId || !chatId) throw new Error("Evento de mensaje de Unipile incompleto");
+  if (!messageId || !chatId) throw new Error("Evento de mensaje de LinkedIn incompleto");
   const direction = message.is_sender === true || message.is_sender === 1 ? "outbound" : "inbound";
   const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null };
   let target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId);
@@ -173,7 +173,7 @@ export async function ingestUnipileMessage(
   const text = String(message.text || "").trim();
   if (!text && (!message.attachments || message.attachments.length === 0)) return { captured: false, targetId: target.id, direction };
   const body = text || "[Archivo adjunto]";
-  const metadata = JSON.stringify({ source: input.source || "unipile", createdTarget: created, attachments: message.attachments || [] });
+  const metadata = JSON.stringify({ source: input.source || "linkedin-cloud", createdTarget: created, attachments: message.attachments || [] });
   const runId = target.run_id || null;
   const workflowId = target.workflow_id || null;
   const result = db.prepare(`
@@ -205,7 +205,7 @@ export async function ingestUnipileMessage(
     `).run(target.id, input.localAccountId);
     try {
       captureSdrInboundMessage(db, {
-        eventId: `unipile:${input.localAccountId}:${messageId}`,
+        eventId: `linkedin-cloud:${input.localAccountId}:${messageId}`,
         channel: "linkedin",
         targetId: target.id,
         accountId: input.localAccountId,
@@ -215,9 +215,9 @@ export async function ingestUnipileMessage(
         senderName: profile.name || target.full_name || "Contacto",
         body,
         receivedAt: sentAt,
-        metadata: { source: input.source || "unipile" },
+        metadata: { source: input.source || "linkedin-cloud" },
       });
-    } catch (error) { console.warn("[unipile-inbox] SDR capture failed:", error); }
+    } catch (error) { console.warn("[linkedin-inbox] SDR capture failed:", error); }
   }
   return { captured: true, targetId: target.id, direction };
 }
@@ -265,13 +265,13 @@ export async function syncLinkedInInbox(
     const messages = await syncAllPages((cursor) => client.listMessages(chat.id, 100, cursor), 100);
     for (const message of messages as UnipileMessage[]) {
       const before = db.prepare("SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?").get(localAccountId, chat.id, message.id || message.message_id);
-      const result = await ingestUnipileMessage(db, { localAccountId, message: { ...message, chat_id: chat.id }, profile, source: "unipile-backfill" });
+      const result = await ingestUnipileMessage(db, { localAccountId, message: { ...message, chat_id: chat.id }, profile, source: "linkedin-backfill" });
       if (result.captured) captured++;
       else if (before) duplicates++;
     }
   }
   db.prepare("UPDATE accounts SET linkedin_inbox_synced_at = datetime('now'), linkedin_inbox_sync_error = NULL, unipile_status = COALESCE(unipile_status, 'OK') WHERE id = ?").run(localAccountId);
-  return { chats: chats.length, messages: captured, duplicates, createdTargets, accountId: localAccountId, unipileAccountId: resolved.unipileAccountId };
+  return { chats: chats.length, messages: captured, duplicates, createdTargets, accountId: localAccountId, providerAccountId: resolved.unipileAccountId };
 }
 
 export function markInboxSyncError(db: Database.Database, accountId: string, error: unknown): void {

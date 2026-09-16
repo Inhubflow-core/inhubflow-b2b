@@ -28,6 +28,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } | undefined;
   if (!account) return res.status(404).json({ error: "LinkedIn account not found" });
 
+  const publicAccount = {
+    name: account.name,
+    email: account.email,
+    is_authenticated: account.is_authenticated,
+    linkedin_connection_status: account.unipile_status,
+    linkedin_inbox_synced_at: account.linkedin_inbox_synced_at,
+    linkedin_inbox_sync_error: account.linkedin_inbox_sync_error,
+  };
+
   let remote = null;
   if (unipile.isConfigured() && account.unipile_account_id) {
     try {
@@ -35,9 +44,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const status = accountStatus(remote);
       db.prepare("UPDATE accounts SET unipile_status = ?, is_authenticated = ? WHERE id = ?").run(status, status === "OK" ? 1 : 0, accountId);
     } catch (error) {
-      return res.status(502).json({ ok: false, account, error: error instanceof Error ? error.message : String(error) });
+      console.error("[diagnose-linkedin-inbox] Error consultando el motor de LinkedIn:", error);
+      return res.status(502).json({ ok: false, account: publicAccount, error: "No se pudo consultar el estado de la cuenta de LinkedIn" });
     }
   }
 
-  return res.status(200).json({ ok: true, account, unipile: remote ? { id: remote.id, name: remote.name, type: remote.type || remote.provider, status: accountStatus(remote) } : null });
+  return res.status(200).json({
+    ok: true,
+    account: publicAccount,
+    connection: remote ? { name: remote.name, status: accountStatus(remote) } : null,
+  });
 }

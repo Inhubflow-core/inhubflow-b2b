@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (!unipile.isConfigured()) {
-      return res.status(503).json({ error: "Unipile is not configured" });
+      return res.status(503).json({ error: "LinkedIn engine is not configured" });
     }
 
     const resolved = await resolveUnipileAccount(db, account.id, unipile);

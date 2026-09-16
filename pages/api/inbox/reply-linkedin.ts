@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!targetId || !accountId || (!messageText?.trim() && !attachment)) {
     return res.status(400).json({ error: "Missing required fields (targetId, accountId, and messageText or attachment)" });
   }
-  if (attachment) return res.status(400).json({ error: "Los adjuntos del Inbox de LinkedIn aún no están habilitados vía Unipile" });
+  if (attachment) return res.status(400).json({ error: "Los adjuntos del Inbox de LinkedIn aún no están habilitados" });
 
   const db = getDb();
   if (!canAccessLinkedInAccount(db, actor, accountId)) return res.status(404).json({ error: "Account not found" });
@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const linkedInState = ensureLinkedInTargetAccountState(db, accountId, target);
   target.unipile_provider_id = linkedInState.unipile_provider_id;
   target.unipile_chat_id = linkedInState.unipile_chat_id;
-  if (!unipile.isConfigured()) return res.status(503).json({ error: "Unipile no está configurado" });
+  if (!unipile.isConfigured()) return res.status(503).json({ error: "El motor de LinkedIn no está configurado" });
 
   const runProfile = db.prepare(`
     SELECT rp.run_id, r.workflow_id FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
@@ -90,12 +90,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         providerId = profile.provider_id;
         if (providerId) markLinkedInTargetState(db, accountId, target.id, { unipile_provider_id: providerId });
       }
-      if (!providerId) throw new Error("No se pudo obtener el identificador de LinkedIn del contacto en Unipile");
+      if (!providerId) throw new Error("No se pudo identificar el contacto de LinkedIn");
       const newChat = await unipile.startChat({ account_id: resolved.unipileAccountId, attendees_ids: [providerId], text: finalBody });
       externalThreadId = newChat?.chat_id || "";
       externalMessageId = newChat?.message_id || "";
     }
-    if (!externalThreadId || !externalMessageId) throw new Error("Unipile no confirmó chat_id y message_id del mensaje");
+    if (!externalThreadId || !externalMessageId) throw new Error("El motor de LinkedIn no confirmó el envío del mensaje");
     if (!target.unipile_chat_id) markLinkedInTargetState(db, accountId, target.id, { unipile_chat_id: externalThreadId });
 
     const messageId = `outbound-${crypto.randomUUID()}`;
@@ -105,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         external_message_id, direction, sender_external_id, sender_name, body,
         sent_at, identity_mode, metadata_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'outbound', ?, ?, ?, ?, 'messaging_urn', ?)
-    `).run(messageId, accountId, targetId, runProfile?.run_id ?? null, runProfile?.workflow_id ?? null, externalThreadId, externalMessageId, target.linkedin_url || "", account.name || "Me", finalBody, sentAt, JSON.stringify({ source: "inbox-unipile-reply" }));
+    `).run(messageId, accountId, targetId, runProfile?.run_id ?? null, runProfile?.workflow_id ?? null, externalThreadId, externalMessageId, target.linkedin_url || "", account.name || "Me", finalBody, sentAt, JSON.stringify({ source: "inbox-linkedin-reply" }));
 
     if (sdrThread) {
       db.transaction(() => {
@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         db.prepare("UPDATE sdr_threads SET last_outbound_at = ?, updated_at = datetime('now') WHERE id = ?").run(sentAt, sdrThread.id);
       })();
     }
-    if (runProfile?.run_id) db.prepare("INSERT INTO logs (id, run_id, target_id, level, message) VALUES (?, ?, ?, 'info', ?)").run(crypto.randomUUID(), runProfile.run_id, targetId, `Mensaje de LinkedIn enviado a ${target.full_name} vía Unipile`);
+    if (runProfile?.run_id) db.prepare("INSERT INTO logs (id, run_id, target_id, level, message) VALUES (?, ?, ?, 'info', ?)").run(crypto.randomUUID(), runProfile.run_id, targetId, `Mensaje enviado a ${target.full_name} con éxito!`);
     return res.status(200).json({ ok: true, messageId, sentAt, body: finalBody, threadId: externalThreadId });
   } catch (error) {
     console.error("[reply-linkedin] Error enviando mensaje:", error);

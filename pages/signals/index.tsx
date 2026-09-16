@@ -80,7 +80,6 @@ interface SignalsPageProps {
   initialMonitors: SignalMonitor[];
   lists: ListOption[];
   workflows: WorkflowOption[];
-  hasUnipileConfig: boolean;
 }
 
 export const getServerSideProps: GetServerSideProps = async () => {
@@ -117,14 +116,11 @@ export const getServerSideProps: GetServerSideProps = async () => {
     .prepare("SELECT id, name FROM workflows ORDER BY created_at DESC")
     .all() as WorkflowOption[];
 
-  const hasUnipileConfig = Boolean(process.env.UNIPILE_DSN && process.env.UNIPILE_API_KEY);
-
   return {
     props: {
       initialMonitors,
       lists,
       workflows,
-      hasUnipileConfig,
     },
   };
 };
@@ -264,7 +260,6 @@ export default function SignalsPage({
   initialMonitors,
   lists,
   workflows,
-  hasUnipileConfig,
 }: SignalsPageProps) {
   const router = useRouter();
   const { t } = useTranslation();

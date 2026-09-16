@@ -31,7 +31,7 @@ async function run() {
   if (!listResponse.ok) throw new Error(`No se pudieron listar webhooks: HTTP ${listResponse.status}`);
   const payload = await listResponse.json();
   const existing = payload.items || payload || [];
-  const requestUrl = "https://b2b.inhubflow.online/api/webhooks/unipile";
+  const requestUrl = "https://b2b.inhubflow.online/api/webhooks/linkedin-events";
   const desired = [
     { source: "messaging", events: ["message_received"], name: "InHubFlow Seguro - Mensajes LinkedIn" },
     { source: "users", events: ["new_relation"], name: "InHubFlow Seguro - Nuevas relaciones" },
