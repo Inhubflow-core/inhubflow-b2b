@@ -114,6 +114,7 @@ function makeDb() {
       updated_at TEXT DEFAULT (datetime('now')), UNIQUE(track_id, step_id)
     );
     CREATE TABLE runtime_leases (lease_key TEXT PRIMARY KEY, owner_id TEXT, expires_at_ms INTEGER, updated_at TEXT);
+    CREATE TABLE run_profile_step_messages (run_profile_id TEXT NOT NULL, step_id TEXT NOT NULL, body TEXT NOT NULL, source TEXT DEFAULT 'signal_radar', metadata_json TEXT DEFAULT '{}', created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (run_profile_id, step_id));
   `);
   return db;
 }
@@ -395,6 +396,11 @@ async function run() {
   {
     const db = makeDb();
     db.prepare("INSERT INTO accounts (id,name,email,unipile_account_id,unipile_status) VALUES ('a1','Cuenta','a@example.com','remote-1','OK')").run();
+    db.prepare("INSERT INTO workflows (id) VALUES ('w1')").run();
+    db.prepare("INSERT INTO runs (id, account_id, workflow_id, status) VALUES ('r1', 'a1', 'w1', 'running')").run();
+    db.prepare("INSERT INTO targets (id, full_name, linkedin_url) VALUES ('t1', 'Contacto chat-1', 'https://www.linkedin.com/in/chat-1')").run();
+    db.prepare("INSERT INTO targets (id, full_name, linkedin_url) VALUES ('t2', 'Contacto chat-2', 'https://www.linkedin.com/in/chat-2')").run();
+    db.prepare("INSERT INTO run_profiles (id, run_id, target_id) VALUES ('rp1', 'r1', 't1'), ('rp2', 'r1', 't2')").run();
     const calls = { chats: 0, messages: 0 };
     const mock = {
       isConfigured: () => true,
@@ -403,10 +409,10 @@ async function run() {
       listChats: async (_account, _limit, cursor) => {
         calls.chats++;
         return cursor
-          ? { items: [{ id: "chat-2", account_id: "remote-1" }], cursor: null }
+          ? { items: [{ id: "chat-2", account_id: "remote-1" }, { id: "chat-uber", account_id: "remote-1" }], cursor: null }
           : { items: [{ id: "chat-1", account_id: "remote-1" }], cursor: "next" };
       },
-      listChatAttendees: async (chatId) => ({ items: [{ id: `att-${chatId}`, account_id: "remote-1", provider_id: `provider-${chatId}`, name: `Contacto ${chatId}`, is_self: 0, profile_url: `https://www.linkedin.com/in/${chatId}` }], cursor: null }),
+      listChatAttendees: async (chatId) => ({ items: [{ id: `att-${chatId}`, account_id: "remote-1", provider_id: `provider-${chatId}`, name: chatId === 'chat-uber' ? 'Uber para Empresas' : `Contacto ${chatId}`, is_self: 0, profile_url: `https://www.linkedin.com/in/${chatId}` }], cursor: null }),
       listMessages: async (chatId, _limit, cursor) => {
         calls.messages++;
         if (cursor) return { items: [{ id: `${chatId}-m2`, chat_id: chatId, account_id: "remote-1", sender_id: `provider-${chatId}`, text: "Segundo", timestamp: "2026-09-15T11:00:00Z", is_sender: 1 }], cursor: null };
@@ -414,7 +420,7 @@ async function run() {
       },
     };
     const first = await syncLinkedInInbox(db, "a1", mock);
-    assert.equal(first.chats, 2); assert.equal(first.messages, 4); assert.equal(calls.chats, 2);
+    assert.equal(first.chats, 3); assert.equal(first.messages, 4); assert.equal(calls.chats, 2);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM targets").get().c, 2);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM linkedin_inbox_messages").get().c, 4);
     const second = await syncLinkedInInbox(db, "a1", mock);

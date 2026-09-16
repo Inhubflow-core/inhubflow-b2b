@@ -1,3 +1,4 @@
+import type { WebSearchClient } from "@/lib/serper/client";
 import type {
   UnipileLinkedInSearchParams,
   UnipileLinkedInSearchResponse,
@@ -12,6 +13,7 @@ import type {
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
 import { canonicalLinkedInProfileUrl, evidenceFingerprint } from "./scoring";
+import { scanWebSignals } from "./web";
 
 export interface SignalScannerClient {
   searchLinkedIn(params: UnipileLinkedInSearchParams): Promise<UnipileLinkedInSearchResponse>;
@@ -184,7 +186,8 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
 async function scanPosts(client: SignalScannerClient, context: SignalScannerContext, activeOnly: boolean): Promise<SignalScanResult> {
   const keywords = context.keywords.filter(Boolean);
-  const query = keywords.join(" OR ") || context.monitor.competitor_name || context.icp.titles?.join(" OR ") || "B2B";
+  const targetIndustries = [context.icp.company, ...(context.icp.industries || [])].filter(Boolean) as string[];
+  const query = keywords.join(" OR ") || targetIndustries.join(" OR ") || context.monitor.competitor_name || context.icp.titles?.join(" OR ") || "B2B";
   const { posts, cursor } = await postSearch(client, context, {
     keywords: query,
     sort_by: "date",
@@ -375,13 +378,18 @@ async function scanCompanies(client: SignalScannerClient, context: SignalScanner
     throw new SignalScanError("La señal de crecimiento requiere una cuenta con Sales Navigator", "unsupported_capability", false);
   }
   const locationIds = await resolveLocationIds(client, context);
+  const companyKeywords = [
+    ...context.keywords,
+    ...(context.icp.company ? [context.icp.company] : []),
+    ...(context.icp.industries || []),
+  ].filter(Boolean);
   const response = await client.searchLinkedIn({
     account_id: context.remoteAccountId,
     api: growth ? "sales_navigator" : "classic",
     category: "companies",
     limit: Math.min(25, context.limit),
     cursor: context.cursor?.cursor || undefined,
-    ...(context.keywords.length ? { keywords: context.keywords.join(" OR ") } : {}),
+    ...(companyKeywords.length ? { keywords: companyKeywords.join(" OR ") } : {}),
     ...(locationIds.length ? (growth ? { location: { include: locationIds } } : { location: locationIds }) : {}),
     ...(growth ? { headcount_growth: { min: 20 } } : { has_job_offers: true }),
   });
@@ -409,7 +417,53 @@ async function scanSalesNavigatorPeople(client: SignalScannerClient, context: Si
   return { leads, cursor: { cursor: response.cursor }, capability: "sales_navigator" };
 }
 
-export async function scanRealSignals(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
+function mergeScanResults(results: SignalScanResult[], limit: number): SignalScanResult {
+  const leads: DiscoveredSignalLead[] = [];
+  const evidenceSeen = new Set<string>();
+  for (const result of results) {
+    for (const lead of result.leads) {
+      if (evidenceSeen.has(lead.evidence.fingerprint)) continue;
+      evidenceSeen.add(lead.evidence.fingerprint);
+      leads.push(lead);
+      if (leads.length >= limit) break;
+    }
+    if (leads.length >= limit) break;
+  }
+  return {
+    leads,
+    cursor: results.find((result) => result.cursor)?.cursor || null,
+    capability: results.map((result) => result.capability).filter(Boolean).join("+") || undefined,
+  };
+}
+
+export async function scanRealSignals(
+  client: SignalScannerClient,
+  context: SignalScannerContext,
+  webClient?: WebSearchClient,
+): Promise<SignalScanResult> {
+  const webTypes = ["funding_round", "company_news", "acquisition_event", "industry_event"];
+  if (webTypes.includes(context.monitor.type)) {
+    if (!webClient) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);
+    return scanWebSignals(webClient, client, context);
+  }
+
+  if (context.monitor.type === "keyword_intent" && context.icp.source_strategy === "web") {
+    if (!webClient) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);
+    return scanWebSignals(webClient, client, context);
+  }
+  if (context.monitor.type === "keyword_intent" && context.icp.source_strategy === "hybrid" && webClient) {
+    const [linkedInResult, webResult] = await Promise.allSettled([
+      scanPosts(client, context, false),
+      scanWebSignals(webClient, client, context),
+    ]);
+    const successful = [linkedInResult, webResult]
+      .filter((result): result is PromiseFulfilledResult<SignalScanResult> => result.status === "fulfilled")
+      .map((result) => result.value);
+    if (successful.length > 0) return mergeScanResults(successful, context.limit);
+    const reason = linkedInResult.status === "rejected" ? linkedInResult.reason : webResult.status === "rejected" ? webResult.reason : null;
+    throw reason instanceof Error ? reason : new SignalScanError("Las fuentes híbridas no respondieron", "provider_error", true);
+  }
+
   switch (context.monitor.type) {
     case "competitor_reactions":
     case "high_intent_comments":

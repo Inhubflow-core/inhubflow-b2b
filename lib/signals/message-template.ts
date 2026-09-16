@@ -55,6 +55,16 @@ export function deterministicAntiStalkerMessage(
     if (objective === "demo") message = `Olá ${firstName}, equipes como a ${company} costumam buscar formas práticas de melhorar ${topic}. Faria sentido ver uma demonstração breve de 10 minutos?`;
     else if (objective === "resource") message = `Olá ${firstName}, ${topic} parece relevante para sua área. Preparamos um guia B2B prático. Posso compartilhar por aqui?`;
     else message = `Olá ${firstName}, como a ${company} está trabalhando ${topic} atualmente? Gostaria de conectar e trocar ideias práticas.`;
+  } else if (monitor.type === "funding_round") {
+    message = objective === "demo"
+      ? `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. En etapas de expansión suele ser clave escalar el pipeline comercial sin aumentar la carga operativa. ¿Te gustaría ver un enfoque práctico en 10 minutos?`
+      : `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. ¿Cómo están pensando escalar la generación de oportunidades en esta nueva etapa? Me gustaría conectar.`;
+  } else if (monitor.type === "acquisition_event") {
+    message = `Hola ${firstName}, felicidades por el reciente movimiento estratégico de ${company}. En procesos de integración suele ser importante alinear rápido el desarrollo comercial. Me gustaría conectar e intercambiar ideas.`;
+  } else if (monitor.type === "industry_event") {
+    message = `Hola ${firstName}, veo que ${company} está participando activamente en conversaciones del sector. ¿Qué prioridades comerciales están explorando actualmente? Me gustaría conectar.`;
+  } else if (monitor.type === "company_news") {
+    message = `Hola ${firstName}, felicidades por las novedades recientes de ${company}. En momentos de expansión suele ser útil revisar cómo escalar la prospección. Me gustaría conectar e intercambiar ideas.`;
   } else if (isRole) {
     message = objective === "demo"
       ? `Hola ${firstName}, felicidades por tu nueva etapa en ${company}. En los primeros meses suele ser clave acelerar resultados comerciales. ¿Te gustaría ver en 10 minutos un enfoque práctico para hacerlo?`

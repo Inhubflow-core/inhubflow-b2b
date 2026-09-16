@@ -71,12 +71,17 @@ function targetForMessage(
         WHERE m.account_id = ? AND m.target_id = t.id
         ORDER BY datetime(m.sent_at) DESC, m.id DESC LIMIT 1
       )
-    WHERE lta.unipile_chat_id = ?
-       OR scoped_message.external_thread_id = ?
-       OR (? IS NOT NULL AND (
-         lta.unipile_provider_id = ? OR t.unipile_provider_id = ? OR t.messaging_urn = ?
-       ))
-       OR (? IS NOT NULL AND lower(t.linkedin_url) = lower(?))
+    WHERE (
+      EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
+    )
+    AND (
+      lta.unipile_chat_id = ?
+      OR scoped_message.external_thread_id = ?
+      OR (? IS NOT NULL AND (
+        lta.unipile_provider_id = ? OR t.unipile_provider_id = ? OR t.messaging_urn = ?
+      ))
+      OR (? IS NOT NULL AND lower(t.linkedin_url) = lower(?))
+    )
     ORDER BY CASE
       WHEN lta.unipile_chat_id = ? OR scoped_message.external_thread_id = ? THEN 0
       WHEN lta.unipile_provider_id = ? THEN 1 ELSE 2 END,
@@ -89,51 +94,6 @@ function targetForMessage(
     profileUrl, profileUrl,
     chatId, chatId, providerId || senderId,
   ) as LocalTarget | undefined;
-}
-
-function createTarget(
-  db: Database.Database,
-  accountId: string,
-  profile: { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null },
-): { target: LocalTarget; created: boolean } | null {
-  if (!profile.name && !profile.profileUrl && !profile.providerId) return null;
-  const existing = targetForMessage(db, accountId, `__none__`, profile.providerId, profile.profileUrl, profile.providerId);
-  if (existing) return { target: existing, created: false };
-  const id = randomUUID();
-  const fullName = profile.name || "Contacto LinkedIn";
-  const firstName = fullName.split(/\s+/)[0] || null;
-  const lastName = fullName.split(/\s+/).slice(1).join(" ") || null;
-  const context = db.prepare(`
-    SELECT r.id AS run_id, r.workflow_id
-    FROM runs r WHERE r.account_id = ? ORDER BY datetime(r.created_at) DESC LIMIT 1
-  `).get(accountId) as { run_id?: string; workflow_id?: string } | undefined;
-  try {
-    db.prepare(`
-      INSERT INTO targets (
-        id, full_name, first_name, last_name, linkedin_url, messaging_urn,
-        unipile_provider_id, linkedin_member_urn, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(id, fullName, firstName, lastName, profile.profileUrl, profile.memberUrn || profile.providerId, profile.providerId, profile.memberUrn,);
-  } catch {
-    const retry = targetForMessage(db, accountId, `__none__`, profile.providerId, profile.profileUrl, profile.providerId);
-    if (!retry) return null;
-    return { target: retry, created: false };
-  }
-  return {
-    created: true,
-    target: {
-      id,
-      full_name: fullName,
-      first_name: firstName,
-      last_name: lastName,
-      linkedin_url: profile.profileUrl,
-      messaging_urn: profile.memberUrn || profile.providerId,
-      unipile_provider_id: profile.providerId,
-      unipile_chat_id: null,
-      run_id: context?.run_id || null,
-      workflow_id: context?.workflow_id || null,
-    },
-  };
 }
 
 export async function ingestUnipileMessage(
@@ -160,20 +120,14 @@ export async function ingestUnipileMessage(
   if (!messageId || !chatId) throw new Error("Evento de mensaje de LinkedIn incompleto");
   const direction = message.is_sender === true || message.is_sender === 1 ? "outbound" : "inbound";
   const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null };
-  let target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId);
-  let created = false;
-  if (!target && direction === "inbound") {
-    const result = createTarget(db, input.localAccountId, profile);
-    target = result?.target;
-    created = Boolean(result?.created);
-  }
+  const target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId);
   if (!target) return { captured: false, targetId: null, direction };
 
   const sentAt = message.timestamp && !Number.isNaN(Date.parse(message.timestamp)) ? new Date(message.timestamp).toISOString() : new Date().toISOString();
   const text = String(message.text || "").trim();
   if (!text && (!message.attachments || message.attachments.length === 0)) return { captured: false, targetId: target.id, direction };
   const body = text || "[Archivo adjunto]";
-  const metadata = JSON.stringify({ source: input.source || "linkedin-cloud", createdTarget: created, attachments: message.attachments || [] });
+  const metadata = JSON.stringify({ source: input.source || "linkedin-cloud", attachments: message.attachments || [] });
   const runId = target.run_id || null;
   const workflowId = target.workflow_id || null;
   const result = db.prepare(`
@@ -248,13 +202,12 @@ export async function syncLinkedInInbox(
     const attendeesResponse = await client.listChatAttendees(chat.id);
     const other = (attendeesResponse.items || []).find((attendee) => !attendee.is_self);
     const profile = attendeeProfile(other);
-    let target = targetForMessage(db, localAccountId, chat.id, profile.providerId, profile.profileUrl, profile.providerId);
-    if (!target && (profile.providerId || profile.profileUrl || profile.name)) {
-      const created = createTarget(db, localAccountId, profile);
-      target = created?.target;
-      if (created?.created) createdTargets++;
+    const target = targetForMessage(db, localAccountId, chat.id, profile.providerId, profile.profileUrl, profile.providerId);
+    if (!target) {
+      // Omitir chats personales o externos que no pertenecen a ninguna campana de InHubFlow
+      continue;
     }
-    if (target && target.unipile_chat_id !== chat.id) {
+    if (target.unipile_chat_id !== chat.id) {
       ensureLinkedInTargetAccountState(db, localAccountId, target);
       markLinkedInTargetState(db, localAccountId, target.id, {
         unipile_chat_id: chat.id,

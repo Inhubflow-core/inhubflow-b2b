@@ -8,6 +8,13 @@ import { getDb } from "@/lib/db";
 import { previewSignalMessage } from "@/lib/signals/message-template";
 import { toast } from "sonner";
 import {
+  COUNTRIES_LIST,
+  SAMPLE_TITLES,
+  SAMPLE_INDUSTRIES,
+  toggleOrAppendPill,
+  isPillActive,
+} from "@/lib/lead-finder/constants";
+import {
   RiRadarLine,
   RiSearchLine,
   RiSparklingLine,
@@ -276,6 +283,34 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
     badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
     inputKind: "roles_or_industry",
   },
+  {
+    id: "funding_round",
+    title: "Rondas de Inversión Anunciadas",
+    badge: "Capital Fresco",
+    level: 2,
+    levelTitle: "⚡ Nivel 2: Momento de Compra",
+    group: "D",
+    groupTitle: "Crecimiento de Empresa",
+    description: "Anuncios públicos reales de funding, verificados después contra el CEO o fundador actual en LinkedIn.",
+    icon: RiLineChartLine,
+    color: "text-emerald-500",
+    badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+    inputKind: "keywords",
+  },
+  {
+    id: "acquisition_event",
+    title: "Adquisiciones y Fusiones",
+    badge: "Cambio Estratégico",
+    level: 2,
+    levelTitle: "⚡ Nivel 2: Momento de Compra",
+    group: "D",
+    groupTitle: "Crecimiento de Empresa",
+    description: "Movimientos corporativos publicados en fuentes web, vinculados con decisores verificados en LinkedIn.",
+    icon: RiExchangeLine,
+    color: "text-violet-500",
+    badgeBg: "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300",
+    inputKind: "keywords",
+  },
 
   // Nivel 3: Actividad Reciente & Búsquedas Personalizadas
   {
@@ -304,6 +339,34 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
     icon: RiSearchLine,
     color: "text-teal-500",
     badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+    inputKind: "keywords",
+  },
+  {
+    id: "company_news",
+    title: "Noticias y Anuncios Empresariales",
+    badge: "Contexto Público",
+    level: 3,
+    levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
+    group: "C",
+    groupTitle: "Actividad & Búsqueda",
+    description: "Lanzamientos, expansión y noticias públicas; cada evidencia conserva fuente y fecha.",
+    icon: RiBuildingLine,
+    color: "text-blue-500",
+    badgeBg: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
+    inputKind: "keywords",
+  },
+  {
+    id: "industry_event",
+    title: "Eventos y Conferencias del Sector",
+    badge: "Timing Público",
+    level: 3,
+    levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
+    group: "C",
+    groupTitle: "Actividad & Búsqueda",
+    description: "Participación pública en conferencias, ferias y eventos, validada con el perfil profesional.",
+    icon: RiRadarLine,
+    color: "text-indigo-500",
+    badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
     inputKind: "keywords",
   },
   {
@@ -347,17 +410,29 @@ export default function SignalsPage({
   const [showNewModal, setShowNewModal] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Paso 1: Audiencia y Cliente Ideal (ICP)
-  const [icpTitles, setIcpTitles] = useState<string[]>([
-    "CEO",
-    "Founder",
-    "VP of Sales",
-    "Director Comercial",
-  ]);
-  const [customTitleInput, setCustomTitleInput] = useState("");
-  const [icpCountries, setIcpCountries] = useState<string[]>(["España", "México", "Colombia"]);
-  const [customCountryInput, setCustomCountryInput] = useState("");
+  // Paso 1: Criterios de Prospección / Audiencia (ICP) - Formato Lead Finder
+  const [icpTitle, setIcpTitle] = useState("CEO, Director de Marketing");
+  const [icpCountry, setIcpCountry] = useState("Chile");
+  const [icpCity, setIcpCity] = useState("");
+  const [icpCompany, setIcpCompany] = useState("");
   const [icpSizes, setIcpSizes] = useState<string[]>(["11-50", "51-200"]);
+
+  const selectedCountryOption = COUNTRIES_LIST.find((c) => c.name === icpCountry) || COUNTRIES_LIST[0];
+
+  const icpTitles = icpTitle
+    .split(/[,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const icpLocations = (() => {
+    const locs: string[] = [];
+    if (icpCity.trim() && icpCountry !== "Global / Todos") {
+      locs.push(`${icpCity.trim()}, ${icpCountry}`);
+    } else if (icpCountry !== "Global / Todos") {
+      locs.push(icpCountry);
+    }
+    return locs;
+  })();
 
   // Paso 2: Señales de Intención (3 Niveles)
   const [newType, setNewType] = useState<string>("competitor_reactions");
@@ -372,6 +447,7 @@ export default function SignalsPage({
   ]);
   const [customKeywordInput, setCustomKeywordInput] = useState("");
   const [timeWindowDays, setTimeWindowDays] = useState<number>(90);
+  const [sourceStrategy, setSourceStrategy] = useState<"linkedin" | "web" | "hybrid">("linkedin");
 
   // Paso 3: Mensaje IA Anti-Stalker
   const [msgObjective, setMsgObjective] = useState<"conversation" | "demo" | "resource">("conversation");
@@ -387,7 +463,7 @@ export default function SignalsPage({
   const [newTargetList, setNewTargetList] = useState(lists[0]?.id || "");
   const [newTargetWorkflow, setNewTargetWorkflow] = useState("");
   const [scanIntervalMinutes, setScanIntervalMinutes] = useState(360);
-  const [accountCapabilities, setAccountCapabilities] = useState<{ accountReady: boolean; salesNavigator: boolean; supportedSignals: string[] } | null>(null);
+  const [accountCapabilities, setAccountCapabilities] = useState<{ accountReady: boolean; salesNavigator: boolean; webEvidence: boolean; supportedSignals: string[] } | null>(null);
   const [autopilotReadiness, setAutopilotReadiness] = useState<{ ready: boolean; blockers: string[] } | null>(null);
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState("");
@@ -415,28 +491,13 @@ export default function SignalsPage({
   };
 
   // Helpers para manipulación de chips
-  const handleAddTitle = (title: string) => {
-    const t = title.trim();
-    if (t && !icpTitles.includes(t)) {
-      setIcpTitles([...icpTitles, t]);
+  const handleSelectSignalType = (type: string) => {
+    setNewType(type);
+    if (["funding_round", "company_news", "acquisition_event", "industry_event"].includes(type)) {
+      setSourceStrategy("hybrid");
+      return;
     }
-    setCustomTitleInput("");
-  };
-
-  const handleRemoveTitle = (t: string) => {
-    setIcpTitles(icpTitles.filter((item) => item !== t));
-  };
-
-  const handleAddCountry = (country: string) => {
-    const c = country.trim();
-    if (c && !icpCountries.includes(c)) {
-      setIcpCountries([...icpCountries, c]);
-    }
-    setCustomCountryInput("");
-  };
-
-  const handleRemoveCountry = (c: string) => {
-    setIcpCountries(icpCountries.filter((item) => item !== c));
+    if (type !== "keyword_intent") setSourceStrategy("linkedin");
   };
 
   const handleToggleSize = (size: string) => {
@@ -532,7 +593,7 @@ export default function SignalsPage({
     fetch(`/api/signals/capabilities?account_id=${encodeURIComponent(selectedAccountId)}`)
       .then((response) => response.json())
       .then((data) => setAccountCapabilities(data))
-      .catch(() => setAccountCapabilities({ accountReady: false, salesNavigator: false, supportedSignals: [] }));
+      .catch(() => setAccountCapabilities({ accountReady: false, salesNavigator: false, webEvidence: false, supportedSignals: [] }));
   }, [selectedAccountId]);
 
   useEffect(() => {
@@ -610,9 +671,13 @@ export default function SignalsPage({
           keywords: keywordsList,
           icp_filters: {
             titles: icpTitles,
-            locations: icpCountries,
+            locations: icpLocations,
             company_sizes: icpSizes,
+            company: icpCompany.trim() || undefined,
+            industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
             time_window_days: timeWindowDays,
+            source_strategy: sourceStrategy,
+            event_kinds: [newType],
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
@@ -1686,174 +1751,163 @@ export default function SignalsPage({
                 {/* =========================================================
                     PASO 1: DEFINIR AUDIENCIA Y CLIENTE IDEAL (ICP)
                    ========================================================= */}
+                {/* =========================================================
+                    PASO 1: DEFINIR AUDIENCIA Y CLIENTE IDEAL (ICP) - ESTILO LEAD FINDER
+                   ========================================================= */}
                 {wizardStep === 1 && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
-                        <RiUserSearchLine size={13} /> Paso 1 de 4: Audiencia Objetivo
-                      </div>
-                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
-                        ¿A quién deseas encontrar con este monitor?
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Filtra cargos, países y tamaños de empresa para que el radar capture únicamente a tus decisores clave.
-                      </p>
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <RiSearchLine className="text-brand-500" /> Criterios de Prospección (ICP)
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 1 de 4</span>
                     </div>
 
-                    {/* 1. Cargos y Títulos de Decisores */}
-                    <div className="space-y-2.5">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
-                        1. Cargos y Títulos Objetivo (ICP Titles)
+                    {/* Cargo / Título Profesional */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Cargo o Título Profesional <span className="text-brand-500">*</span>
                       </label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 min-h-[44px]">
-                        {icpTitles.map((title) => (
-                          <span
-                            key={title}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/60 shadow-2xs"
-                          >
-                            {title}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTitle(title)}
-                              className="hover:text-red-500 transition-colors"
-                            >
-                              <RiCloseLine size={14} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Input para escribir cargo */}
-                      <div className="flex gap-2">
+                      <div className="relative">
+                        <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                         <input
                           type="text"
-                          value={customTitleInput}
-                          onChange={(e) => setCustomTitleInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleAddTitle(customTitleInput);
-                            }
-                          }}
-                          placeholder="Escribe un cargo y pulsa Enter (ej: Head of Outbound, CMO...)"
-                          className="flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          value={icpTitle}
+                          onChange={(e) => setIcpTitle(e.target.value)}
+                          placeholder="ej: CEO, Director de Marketing, Dentista, Abogado..."
+                          className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         />
-                        <button
-                          type="button"
-                          onClick={() => handleAddTitle(customTitleInput)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors shrink-0"
-                        >
-                          + Añadir
-                        </button>
                       </div>
-
-                      {/* Sugerencias Rápidas de Cargos */}
-                      <div className="space-y-1">
-                        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
-                          Sugerencias rápidas:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            "CEO",
-                            "Founder",
-                            "VP Sales",
-                            "Director Comercial",
-                            "Head of Growth",
-                            "Director de Marketing",
-                            "COO",
-                            "Gerente General",
-                          ].map((sugg) => {
-                            const isAdded = icpTitles.includes(sugg);
-                            return (
-                              <button
-                                key={sugg}
-                                type="button"
-                                onClick={() => (isAdded ? handleRemoveTitle(sugg) : handleAddTitle(sugg))}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                                  isAdded
-                                    ? "bg-brand-500 text-white shadow-2xs"
-                                    : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                }`}
-                              >
-                                {isAdded ? `✓ ${sugg}` : `+ ${sugg}`}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 2. Ubicación / Países */}
-                    <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-gray-800">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
-                        2. Ubicación Geográfica / Países
-                      </label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 min-h-[44px]">
-                        {icpCountries.map((country) => (
-                          <span
-                            key={country}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 shadow-2xs"
-                          >
-                            <RiMapPinLine size={12} /> {country}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCountry(country)}
-                              className="hover:text-red-500 transition-colors"
-                            >
-                              <RiCloseLine size={14} />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={customCountryInput}
-                          onChange={(e) => setCustomCountryInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleAddCountry(customCountryInput);
-                            }
-                          }}
-                          placeholder="Añadir país o región y pulsa Enter..."
-                          className="flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddCountry(customCountryInput)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 transition-colors shrink-0"
-                        >
-                          + Añadir
-                        </button>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {["España", "México", "Colombia", "Argentina", "Chile", "Perú", "Estados Unidos"].map((c) => {
-                          const isAdded = icpCountries.includes(c);
+                      {/* Sugerencias de cargos (Pills idénticos a Lead Finder) */}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {SAMPLE_TITLES.map((st) => {
+                          const active = isPillActive(icpTitle, st);
                           return (
                             <button
-                              key={c}
+                              key={st}
                               type="button"
-                              onClick={() => (isAdded ? handleRemoveCountry(c) : handleAddCountry(c))}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                                isAdded
-                                  ? "bg-emerald-500 text-white shadow-2xs"
-                                  : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                              onClick={() => setIcpTitle(toggleOrAppendPill(icpTitle, st))}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                active
+                                  ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                               }`}
                             >
-                              {isAdded ? `✓ ${c}` : `+ ${c}`}
+                              {active ? `✓ ${st}` : `+${st}`}
                             </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* 3. Tamaño de Empresa */}
-                    <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-gray-800">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
-                        3. Tamaño de Empresa (Empleados)
+                    {/* Ubicación: País y Ciudad */}
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Selector de País */}
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                            País
+                          </label>
+                          <select
+                            value={icpCountry}
+                            onChange={(e) => {
+                              setIcpCountry(e.target.value);
+                              setIcpCity("");
+                            }}
+                            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                          >
+                            {COUNTRIES_LIST.map((c) => (
+                              <option key={c.name} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Input de Ciudad */}
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                            Ciudad <span className="text-gray-400 font-normal">(Opcional)</span>
+                          </label>
+                          <div className="relative">
+                            <RiMapPinLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
+                            <input
+                              type="text"
+                              value={icpCity}
+                              onChange={(e) => setIcpCity(e.target.value)}
+                              placeholder="Ej: Santiago, Antofagasta..."
+                              className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ciudades clave sugeridas */}
+                      {selectedCountryOption && selectedCountryOption.popularCities.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500 mr-1 font-medium">Ciudades clave:</span>
+                          {selectedCountryOption.popularCities.map((cName) => {
+                            const active = icpCity.toLowerCase() === cName.toLowerCase();
+                            return (
+                              <button
+                                key={cName}
+                                type="button"
+                                onClick={() => setIcpCity(active ? "" : cName)}
+                                className={`px-2.5 py-0.5 rounded-lg text-xs font-medium border transition-all ${
+                                  active
+                                    ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                                }`}
+                              >
+                                {active ? `✓ ${cName}` : `+${cName}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Empresa o Industria (Opcional) */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Empresa o Industria <span className="text-gray-400 font-normal">(Opcional)</span>
+                      </label>
+                      <div className="relative">
+                        <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          value={icpCompany}
+                          onChange={(e) => setIcpCompany(e.target.value)}
+                          placeholder="ej: Salud, SaaS, Inmobiliaria, Google..."
+                          className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                        />
+                      </div>
+                      {/* Sugerencias de Industrias */}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {SAMPLE_INDUSTRIES.map((si) => {
+                          const active = isPillActive(icpCompany, si);
+                          return (
+                            <button
+                              key={si}
+                              type="button"
+                              onClick={() => setIcpCompany(toggleOrAppendPill(icpCompany, si))}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                                active
+                                  ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                              }`}
+                            >
+                              {active ? `✓ ${si}` : `+${si}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Tamaño de Empresa (Empleados) */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Tamaño de Empresa (Empleados)
                       </label>
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                         {[
@@ -1869,10 +1923,10 @@ export default function SignalsPage({
                               key={sz.id}
                               type="button"
                               onClick={() => handleToggleSize(sz.id)}
-                              className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all ${
+                              className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
                                 isSelected
-                                  ? "border-brand-500 bg-brand-500 text-white shadow-2xs"
-                                  : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                  ? "bg-brand-500 border-brand-500 !text-white shadow-xs"
+                                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                               }`}
                             >
                               {sz.label}
@@ -1887,8 +1941,9 @@ export default function SignalsPage({
                       <div className="flex items-center gap-2 text-brand-900 dark:text-brand-200">
                         <RiShieldCheckLine size={18} className="text-brand-500 shrink-0" />
                         <span>
-                          <strong>ICP Calificado:</strong> {icpTitles.length} cargos seleccionados en{" "}
-                          {icpCountries.length} países y {icpSizes.length} rangos de tamaño.
+                          <strong>ICP Configurado:</strong> {icpTitles.length > 0 ? `${icpTitles.length} cargo(s) (${icpTitles.slice(0, 3).join(", ")}${icpTitles.length > 3 ? "..." : ""})` : "Sin cargos definidos"} en{" "}
+                          {icpLocations.length > 0 ? icpLocations.join(" · ") : icpCountry} · {icpSizes.length} rango(s) de tamaño
+                          {icpCompany.trim() ? ` · Sector: ${icpCompany.trim()}` : ""}.
                         </span>
                       </div>
                     </div>
@@ -1973,7 +2028,7 @@ export default function SignalsPage({
                             key={sig.id}
                             type="button"
                             disabled={unsupported}
-                            onClick={() => !unsupported && setNewType(sig.id)}
+                            onClick={() => !unsupported && handleSelectSignalType(sig.id)}
                             className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${unsupported ? "opacity-50 cursor-not-allowed" : ""} ${
                               isSelected
                                 ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/20"
@@ -2013,6 +2068,30 @@ export default function SignalsPage({
                       })}
                     </div>
 
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">Fuentes de evidencia</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {[
+                          { id: "linkedin", label: "LinkedIn", description: "Actividad y datos profesionales" },
+                          { id: "hybrid", label: "Automática (recomendado)", description: "Web pública + verificación en LinkedIn" },
+                          { id: "web", label: "Web + LinkedIn", description: "Descubrimiento web con identidad verificada" },
+                        ].map((source) => (
+                          <button
+                            key={source.id}
+                            type="button"
+                            onClick={() => setSourceStrategy(source.id as "linkedin" | "web" | "hybrid")}
+                            className={`p-2.5 rounded-xl border text-left text-xs ${sourceStrategy === source.id
+                              ? "border-brand-500 bg-brand-50 dark:bg-brand-950/30"
+                              : "border-gray-200 dark:border-gray-700"}`}
+                          >
+                            <strong className="block">{source.label}</strong>
+                            <span className="text-[10px] text-gray-500">{source.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-gray-400">Las fuentes web aportan noticias públicas; todo prospecto se verifica después contra su perfil profesional.</p>
+                    </div>
+
                     {/* Parámetros Contextuales según la señal seleccionada */}
                     <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 space-y-3">
                       <div className="flex items-center justify-between">
@@ -2023,6 +2102,12 @@ export default function SignalsPage({
                           </span>
                         </span>
                       </div>
+
+                      {(["funding_round", "acquisition_event", "company_news", "industry_event"] as string[]).includes(newType) && (
+                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-200">
+                          Se buscarán fuentes públicas reales y se verificará la identidad profesional antes de crear cualquier lead. La fuente, fecha y contexto quedarán guardados para revisión.
+                        </div>
+                      )}
 
                       {/* Si es engagement con competidores o comentarios */}
                       {(newType === "competitor_reactions" || newType === "high_intent_comments") && (
@@ -2561,7 +2646,7 @@ export default function SignalsPage({
                         <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Audiencia (ICP)</span>
                           <strong className="text-gray-800 dark:text-gray-200">
-                            {icpTitles.length} cargos · {icpCountries.length} países
+                            {icpTitles.length} cargos · {icpLocations.length > 0 ? icpLocations[0] : icpCountry}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">

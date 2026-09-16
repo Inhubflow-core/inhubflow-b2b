@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { getDb } from "@/lib/db";
+import { webSearchClient, WebSearchClient } from "@/lib/serper/client";
 import { unipile, UnipileClient } from "@/lib/unipile/client";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
 import type { ApiActor } from "@/lib/authz";
@@ -55,6 +56,7 @@ export interface ListLeadsQuery {
 export interface SignalRadarServiceOptions {
   getDatabase?: () => Database.Database;
   client?: SignalScannerClient & Pick<UnipileClient, "isConfigured" | "listAccounts" | "getAccount">;
+  webClient?: WebSearchClient;
   generateMessage?: typeof generateSignalMessage;
   now?: () => number;
 }
@@ -95,12 +97,14 @@ function fullName(profile: { first_name?: string | null; last_name?: string | nu
 export class SignalRadarService {
   private readonly database: () => Database.Database;
   private readonly client: SignalRadarServiceOptions["client"];
+  private readonly webClient: WebSearchClient;
   private readonly messageGenerator: typeof generateSignalMessage;
   private readonly now: () => number;
 
   constructor(options: SignalRadarServiceOptions = {}) {
     this.database = options.getDatabase || getDb;
     this.client = options.client || unipile;
+    this.webClient = options.webClient || webSearchClient;
     this.messageGenerator = options.generateMessage || generateSignalMessage;
     this.now = options.now || Date.now;
   }
@@ -158,9 +162,13 @@ export class SignalRadarService {
         titles: normalizeArray(input.icp_filters?.titles),
         locations: normalizeArray(input.icp_filters?.locations),
         company_sizes: normalizeArray(input.icp_filters?.company_sizes),
+        company: input.icp_filters?.company?.trim() || undefined,
+        industries: normalizeArray(input.icp_filters?.industries),
         exclusions: normalizeArray(input.icp_filters?.exclusions),
         time_window_days: Math.max(1, Math.min(input.icp_filters?.time_window_days || 90, 365)),
         result_limit: Math.max(1, Math.min(input.icp_filters?.result_limit || 50, 100)),
+        source_strategy: input.icp_filters?.source_strategy || "linkedin",
+        event_kinds: normalizeArray(input.icp_filters?.event_kinds),
       }),
       mode: input.mode || "review",
       status: "active",
@@ -351,7 +359,10 @@ export class SignalRadarService {
       if (!this.client?.isConfigured()) throw new SignalScanError("El motor de búsqueda de LinkedIn no está configurado", "provider_error", true);
       const resolved = await resolveUnipileAccount(db, monitor.account_id, this.client as UnipileClient);
       const account = resolved.account || await this.client.getAccount(resolved.unipileAccountId);
-      const capabilities = { salesNavigator: accountHasSalesNavigator(account.connection_params) };
+      const capabilities = {
+        salesNavigator: accountHasSalesNavigator(account.connection_params),
+        webEvidence: this.webClient.isConfigured(),
+      };
       const icp = parseJson<SignalIcpFilters>(monitor.icp_filters_json, {});
       const keywords = parseJson<string[]>(monitor.keywords_json, []);
       const cursor = parseJson<SignalScanCursor | null>(monitor.cursor_json, null);
@@ -364,7 +375,7 @@ export class SignalRadarService {
         cursor,
         limit: requestedLimit,
         hasSalesNavigator: capabilities.salesNavigator,
-      });
+      }, this.webClient);
       const enriched: DiscoveredSignalLead[] = [];
       for (const candidate of raw.leads.slice(0, requestedLimit)) {
         const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId);
@@ -471,7 +482,17 @@ export class SignalRadarService {
           discovered.evidence.snippet || null, score.total,
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
-          JSON.stringify({ score: score.breakdown, matches: score.matches, scanRunId }),
+          JSON.stringify({
+            score: score.breakdown,
+            matches: score.matches,
+            scanRunId,
+            latestEvidence: {
+              sourceType: discovered.evidence.sourceType,
+              sourceUrl: discovered.evidence.sourceUrl || null,
+              occurredAt: discovered.evidence.occurredAt || null,
+              ...discovered.evidence.metadata,
+            },
+          }),
           new Date(this.now()).toISOString(), new Date(this.now()).toISOString(),
         );
         lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(id) as SignalLead;
@@ -488,7 +509,17 @@ export class SignalRadarService {
           discovered.company || null, discovered.location || null, discovered.signalType,
           discovered.evidence.snippet || null, score.total,
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
-          JSON.stringify({ score: score.breakdown, matches: score.matches, scanRunId }), lead.id);
+          JSON.stringify({
+            score: score.breakdown,
+            matches: score.matches,
+            scanRunId,
+            latestEvidence: {
+              sourceType: discovered.evidence.sourceType,
+              sourceUrl: discovered.evidence.sourceUrl || null,
+              occurredAt: discovered.evidence.occurredAt || null,
+              ...discovered.evidence.metadata,
+            },
+          }), lead.id);
         lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(lead.id) as SignalLead;
       }
       if (!observationExists) {
@@ -545,6 +576,8 @@ export class SignalRadarService {
         exclusions: plan.exclusions,
         time_window_days: plan.timeWindowDays,
         result_limit: plan.resultLimit,
+        source_strategy: plan.sourceStrategy,
+        event_kinds: plan.eventKinds,
       },
       mode: "review",
       account_id: input.accountId,

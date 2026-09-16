@@ -26,6 +26,8 @@ const { SignalRadarService } = require("../lib/signals/service.ts");
 const { scanRealSignals } = require("../lib/signals/scanners/index.ts");
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
+const { scanWebSignals } = require("../lib/signals/scanners/web.ts");
+const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
   const db = new Database(":memory:");

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SignalType } from "./schema";
 
 const PlanSchema = z.object({
-  signal_type: z.enum(["keyword_intent", "active_poster", "new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers"]),
+  signal_type: z.enum(["keyword_intent", "active_poster", "new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers", "funding_round", "company_news", "acquisition_event", "industry_event"]),
   monitor_name: z.string().min(1).max(120),
   keywords: z.array(z.string().min(1).max(100)).min(1).max(10),
   titles: z.array(z.string().min(1).max(100)).max(15),
@@ -12,12 +12,14 @@ const PlanSchema = z.object({
   exclusions: z.array(z.string().min(1).max(100)).max(10),
   time_window_days: z.number().int().min(1).max(365),
   result_limit: z.number().int().min(1).max(100),
+  source_strategy: z.enum(["linkedin", "web", "hybrid"]),
+  event_kinds: z.array(z.string().min(1).max(80)).max(10),
 });
 
 const RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
-    signal_type: { type: Type.STRING, enum: ["keyword_intent", "active_poster", "new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers"] },
+    signal_type: { type: Type.STRING, enum: ["keyword_intent", "active_poster", "new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers", "funding_round", "company_news", "acquisition_event", "industry_event"] },
     monitor_name: { type: Type.STRING },
     keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
     titles: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -26,8 +28,10 @@ const RESPONSE_SCHEMA: Schema = {
     exclusions: { type: Type.ARRAY, items: { type: Type.STRING } },
     time_window_days: { type: Type.NUMBER },
     result_limit: { type: Type.NUMBER },
+    source_strategy: { type: Type.STRING, enum: ["linkedin", "web", "hybrid"] },
+    event_kinds: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
-  required: ["signal_type", "monitor_name", "keywords", "titles", "locations", "company_sizes", "exclusions", "time_window_days", "result_limit"],
+  required: ["signal_type", "monitor_name", "keywords", "titles", "locations", "company_sizes", "exclusions", "time_window_days", "result_limit", "source_strategy", "event_kinds"],
 };
 
 export interface SignalResearchPlan {
@@ -40,6 +44,8 @@ export interface SignalResearchPlan {
   exclusions: string[];
   timeWindowDays: number;
   resultLimit: number;
+  sourceStrategy: "linkedin" | "web" | "hybrid";
+  eventKinds: string[];
   model: string;
 }
 
@@ -64,6 +70,8 @@ export function deterministicSignalResearchPlan(query: string): SignalResearchPl
   let signalType: SignalType = "keyword_intent";
   let keywords: string[] = [];
   let window = 30;
+  let sourceStrategy: "linkedin" | "web" | "hybrid" = "linkedin";
+  let eventKinds: string[] = [];
 
   if (/ascen(?:d|s)|promov(?:id|er)|promotion/i.test(normalized)) {
     signalType = "internal_promotion";
@@ -89,9 +97,29 @@ export function deterministicSignalResearchPlan(query: string): SignalResearchPl
     signalType = "active_poster";
     keywords = ["actividad reciente"];
     window = 2;
+  } else if (/adquiri|adquisici[oó]n|compr[oó] (?:a|la empresa)|acquisition|acquired/i.test(normalized)) {
+    signalType = "acquisition_event";
+    keywords = ["adquisición", "acquired", "acquisition"];
+    eventKinds = ["acquisition"];
+    sourceStrategy = "hybrid";
+    window = 90;
+  } else if (/evento|conferencia|feria|summit|conference|trade show/i.test(normalized)) {
+    signalType = "industry_event";
+    keywords = ["evento", "conferencia", "summit"];
+    eventKinds = ["industry_event"];
+    sourceStrategy = "hybrid";
+    window = 60;
+  } else if (/noticias?|anunci[oó]|lanzamiento|expansi[oó]n|company news/i.test(normalized)) {
+    signalType = "company_news";
+    keywords = ["anuncio", "lanzamiento", "expansión"];
+    eventKinds = ["company_news"];
+    sourceStrategy = "hybrid";
+    window = 30;
   } else if (/fondos?|inversi[oó]n|ronda|funding|capital/i.test(normalized)) {
-    signalType = "keyword_intent";
+    signalType = "funding_round";
     keywords = ["levantó inversión", "ronda de inversión", "funding round", "capital levantado"];
+    eventKinds = ["funding_round"];
+    sourceStrategy = "hybrid";
     window = 30;
   }
 
@@ -112,6 +140,8 @@ export function deterministicSignalResearchPlan(query: string): SignalResearchPl
     exclusions: [],
     timeWindowDays: window,
     resultLimit,
+    sourceStrategy,
+    eventKinds,
     model: "deterministic-fallback",
   };
 }
@@ -146,6 +176,8 @@ function mapPlan(parsed: z.infer<typeof PlanSchema>, model: string): SignalResea
     exclusions: unique(parsed.exclusions),
     timeWindowDays: parsed.time_window_days,
     resultLimit: parsed.result_limit,
+    sourceStrategy: parsed.source_strategy,
+    eventKinds: unique(parsed.event_kinds),
     model,
   };
 }
@@ -165,8 +197,9 @@ export async function planSignalResearch(query: string): Promise<SignalResearchP
         config: {
           systemInstruction: `Convierte la consulta del usuario en un plan de búsqueda real de señales de LinkedIn.
 No inventes resultados ni nombres de personas. Sólo define filtros.
-Elige keyword_intent para publicaciones con dolor, inversión o compra; active_poster para autores recientes; new_in_role/internal_promotion para cambios profesionales; hiring_spree/company_growth para empresas; profile_viewers sólo si se solicita explícitamente.
-Conserva el número máximo solicitado por el usuario en result_limit (1-100), las keywords útiles y separa cargos, ubicaciones, tamaños y exclusiones.`,
+Elige keyword_intent para publicaciones con dolor o compra; funding_round para inversión/rondas; company_news para anuncios/lanzamientos; acquisition_event para adquisiciones; industry_event para eventos; active_poster para autores recientes; new_in_role/internal_promotion para cambios profesionales; hiring_spree/company_growth para empresas; profile_viewers sólo si se solicita explícitamente.
+Usa source_strategy=hybrid para funding/noticias/adquisiciones/eventos, linkedin para señales sociales, y web sólo si el usuario pide expresamente investigación exclusivamente web.
+Conserva el número máximo solicitado por el usuario en result_limit (1-100), event_kinds, keywords útiles y separa cargos, ubicaciones, tamaños y exclusiones.`,
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,
           temperature: 0.1,

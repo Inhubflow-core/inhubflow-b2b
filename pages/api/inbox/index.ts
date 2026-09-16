@@ -268,6 +268,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     WHERE 1=1
       ${channelFilter}
       ${accountFilter}
+      AND EXISTS (
+        SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id
+      )
     ORDER BY replied_at DESC
   `).all(...params) as Array<InboxReply & { classification_json: string | null }>;
 

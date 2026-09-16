@@ -1,3 +1,4 @@
+import { WebSearchClient, WebSearchProviderError } from "@/lib/serper/client";
 import { SearchLead, SearchProgressCallback } from "./search";
 
 export type XRayErrorCode =
@@ -336,6 +337,8 @@ export async function searchLinkedInWithSerper(
     message: `Iniciando Google X-Ray con Serper.dev para ${countryName}...`,
   });
 
+  const webClient = new WebSearchClient({ apiKey: serperKey });
+
   for (let pageIdx = 1; pageIdx <= maxPages; pageIdx++) {
     if (collectedLeads.length >= limit) break;
 
@@ -347,52 +350,26 @@ export async function searchLinkedInWithSerper(
       message: `Consultando prospectos en Google X-Ray (Página ${pageIdx} de ${maxPages})...`,
     });
 
-    let res: Response;
+    let organic: Array<{ title: string; link: string; snippet: string | null }>;
     try {
-      res = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": serperKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          q: query,
-          gl,
-          hl,
-          num: pageSize,
-          page: pageIdx,
-        }),
+      const result = await webClient.search({
+        query,
+        country: gl,
+        language: hl,
+        limit: pageSize,
+        page: pageIdx,
       });
-    } catch (err: any) {
-      throw new XRaySearchError(
-        `Fallo al conectar con Serper.dev: ${err?.message || "error de red"}`,
-        "provider_error"
-      );
-    }
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      const msg = errJson?.message || `HTTP ${res.status}`;
-      if (res.status === 403 || msg.toLowerCase().includes("unauthorized")) {
-        throw new XRaySearchError(
-          "La API key de Serper.dev no es válida o fue revocada. Revisa SERPER_API_KEY.",
-          "provider_error"
-        );
+      organic = result.items;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "error de red";
+      if (error instanceof WebSearchProviderError && error.code === "invalid_credentials") {
+        throw new XRaySearchError("La credencial del buscador web no es válida o fue revocada.", "provider_error");
       }
-      if (msg.toLowerCase().includes("credit")) {
-        throw new XRaySearchError(
-          "Se han agotado los créditos de búsqueda en tu cuenta de Serper.dev.",
-          "provider_error"
-        );
+      if (error instanceof WebSearchProviderError && error.code === "rate_limited") {
+        throw new XRaySearchError("El buscador web alcanzó temporalmente su límite de consultas.", "provider_error");
       }
-      throw new XRaySearchError(
-        `Error de Serper.dev: ${msg}`,
-        "provider_error"
-      );
+      throw new XRaySearchError(`Fallo al consultar el buscador web: ${message}`, "provider_error");
     }
-
-    const data: any = await res.json();
-    const organic = data.organic || [];
 
     if (organic.length === 0 && pageIdx === 1) {
       break;

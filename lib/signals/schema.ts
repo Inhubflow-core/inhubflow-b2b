@@ -11,6 +11,10 @@ export const SIGNAL_TYPES = [
   "keyword_intent",
   "hiring_spree",
   "company_growth",
+  "funding_round",
+  "company_news",
+  "acquisition_event",
+  "industry_event",
   "ask_query",
 ] as const;
 
@@ -29,9 +33,13 @@ export interface SignalIcpFilters {
   titles?: string[];
   locations?: string[];
   company_sizes?: string[];
+  company?: string;
+  industries?: string[];
   exclusions?: string[];
   time_window_days?: number;
   result_limit?: number;
+  source_strategy?: "linkedin" | "web" | "hybrid";
+  event_kinds?: string[];
 }
 
 export interface SignalMessageConfig {

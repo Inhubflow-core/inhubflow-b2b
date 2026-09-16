@@ -61,6 +61,7 @@ export interface SignalScore {
     location: number;
     companySize: number;
     recency: number;
+    evidenceQuality: number;
   };
   matches: {
     title: boolean | null;
@@ -80,6 +81,10 @@ const SIGNAL_BASE: Record<string, number> = {
   hiring_spree: 34,
   company_growth: 32,
   active_poster: 24,
+  funding_round: 42,
+  acquisition_event: 40,
+  company_news: 30,
+  industry_event: 28,
   ask_query: 28,
 };
 
@@ -100,6 +105,7 @@ export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilter
     location: locationMatch === true ? 14 : locationMatch === false ? 0 : 5,
     companySize: companySizeMatch === true ? 11 : companySizeMatch === false ? 0 : 5,
     recency,
+    evidenceQuality: lead.evidence.metadata?.identityVerified === true ? 10 : 0,
   };
   return {
     total: Math.max(0, Math.min(100, Object.values(breakdown).reduce((sum, value) => sum + value, 0))),
@@ -117,5 +123,12 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
   if (icp.titles?.length && lead.headline && !containsAny(lead.headline, icp.titles)) return false;
   if (icp.locations?.length && lead.location && !containsAny(lead.location, icp.locations)) return false;
   if (icp.company_sizes?.length && lead.companySize != null && !containsAny(String(lead.companySize), icp.company_sizes)) return false;
+  const targetIndustries = [icp.company, ...(icp.industries || [])].filter(Boolean) as string[];
+  if (targetIndustries.length > 0) {
+    const matchesIndustry = containsAny(lead.company, targetIndustries)
+      || containsAny(lead.headline, targetIndustries)
+      || containsAny(lead.evidence.snippet, targetIndustries);
+    if (!matchesIndustry && (lead.company || lead.headline)) return false;
+  }
   return true;
 }

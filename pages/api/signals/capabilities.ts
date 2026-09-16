@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
 import { unipile } from "@/lib/unipile/client";
 import { accountHasSalesNavigator } from "@/lib/signals/scanners";
+import { webSearchClient } from "@/lib/serper/client";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
@@ -17,16 +18,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const resolved = await resolveUnipileAccount(db, accountId, unipile);
     const account = resolved.account || await unipile.getAccount(resolved.unipileAccountId);
     const salesNavigator = accountHasSalesNavigator(account.connection_params);
+    const webEvidence = webSearchClient.isConfigured();
     return res.status(200).json({
       accountReady: true,
       salesNavigator,
+      webEvidence,
       supportedSignals: [
         "competitor_reactions", "high_intent_comments", "competitor_audience",
         "new_in_role", "internal_promotion", "active_poster", "keyword_intent", "hiring_spree",
+        ...(webEvidence ? ["funding_round", "company_news", "acquisition_event", "industry_event"] : []),
         ...(salesNavigator ? ["company_growth", "profile_viewers"] : []),
       ],
     });
   } catch (error) {
-    return res.status(502).json({ accountReady: false, salesNavigator: false, supportedSignals: [], error: error instanceof Error ? error.message : "Cuenta no disponible" });
+    return res.status(502).json({ accountReady: false, salesNavigator: false, webEvidence: webSearchClient.isConfigured(), supportedSignals: [], error: error instanceof Error ? error.message : "Cuenta no disponible" });
   }
 }
