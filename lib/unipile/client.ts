@@ -15,6 +15,8 @@ import {
   UnipilePostReaction,
   UnipileLinkedInSearchParams,
   UnipileSearchResultItem,
+  UnipileCredentialsAuthResponse,
+  UnipileSolveCheckpointResponse,
 } from './types';
 
 export class UnipileClient {
@@ -108,6 +110,47 @@ export class UnipileClient {
     };
 
     return this.request<UnipileHostedAuthResponse>('/api/v1/hosted/accounts/link', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Conecta una cuenta de LinkedIn usando credenciales directas (Native Auth)
+   * Puede retornar una Account creada (201) o un Checkpoint (202) requiriendo código 2FA.
+   */
+  async startCredentialsAuth(params: {
+    username: string;
+    password: string;
+    name?: string;
+  }): Promise<UnipileCredentialsAuthResponse> {
+    const payload = {
+      provider: 'LINKEDIN',
+      username: params.username,
+      password: params.password,
+      ...(params.name ? { name: params.name } : {}),
+    };
+
+    return this.request<UnipileCredentialsAuthResponse>('/api/v1/accounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Resuelve el checkpoint de verificación (2FA / SMS / Authenticator) para una cuenta de LinkedIn
+   */
+  async solveCheckpoint(params: {
+    accountId: string;
+    code: string;
+  }): Promise<UnipileSolveCheckpointResponse> {
+    const payload = {
+      provider: 'LINKEDIN',
+      account_id: params.accountId,
+      code: params.code.trim(),
+    };
+
+    return this.request<UnipileSolveCheckpointResponse>('/api/v1/accounts/checkpoint', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

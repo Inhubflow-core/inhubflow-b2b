@@ -27,6 +27,24 @@ export interface UnipileHostedAuthCallback {
   name?: string;
 }
 
+export interface UnipileCredentialsAuthResponse {
+  object?: 'Account' | 'Checkpoint' | string;
+  id?: string;
+  account_id?: string;
+  checkpoint?: {
+    type?: '2FA' | string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface UnipileSolveCheckpointResponse {
+  object?: string;
+  id?: string;
+  account_id?: string;
+  [key: string]: unknown;
+}
+
 export interface UnipileProfileWorkExperience {
   id?: string;
   position?: string;

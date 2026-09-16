@@ -11,7 +11,7 @@ import {
   RiLockPasswordLine, RiPlugLine, RiArrowLeftLine, RiArrowRightLine,
   RiLinkedinBoxLine, RiMessage2Line, RiSettings3Line, RiFileCopyLine,
   RiLockLine, RiLockUnlockLine, RiFlashlightLine, RiArrowDownSLine, RiCompassLine, RiGlobalLine,
-  RiExternalLinkLine,
+  RiExternalLinkLine, RiEyeLine, RiEyeOffLine,
 } from "react-icons/ri";
 import { ALL_TOUR_PAGES, TOUR_PAGE_LABELS, replayPageTour, type TourPage } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -260,9 +260,19 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
 
+  // Estados de Autenticación 100% Nativa de LinkedIn
   const [authAccountId, setAuthAccountId] = useState<string | null>(null);
-  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
-  const [iframeLoading, setIframeLoading] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Estados para Verificación en Dos Pasos (2FA / Checkpoint)
+  const [isCheckpoint, setIsCheckpoint] = useState(false);
+  const [checkpointCode, setCheckpointCode] = useState("");
+  const [checkpointRemoteAccountId, setCheckpointRemoteAccountId] = useState<string | null>(null);
+  const [checkpointLoading, setCheckpointLoading] = useState(false);
   const [showSuccessAdviceModal, setShowSuccessAdviceModal] = useState(false);
 
   useEffect(() => {
@@ -284,81 +294,32 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     }
   }
 
-  // Escuchar mensaje del iframe de callback para cerrar y confirmar automáticamente
-  useEffect(() => {
-    function handleAuthMessage(event: MessageEvent) {
-      if (event.data?.type === "LINKEDIN_AUTH_SUCCESS") {
-        setUnifiedModalOpen(false);
-        setIframeUrl(null);
-        setAuthAccountId(null);
-        setIframeLoading(false);
-        setModalStep(1);
-        refresh();
-        setShowSuccessAdviceModal(true);
-        toast.success("¡Cuenta de LinkedIn conectada con éxito!");
-      }
-    }
-    window.addEventListener("message", handleAuthMessage);
-    return () => window.removeEventListener("message", handleAuthMessage);
-  }, []);
-
-  // Polling de respaldo para detectar autenticación en segundo plano
-  useEffect(() => {
-    if (!unifiedModalOpen || modalStep !== 2 || !authAccountId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/accounts/${authAccountId}`);
-        if (res.ok) {
-          const acc = await res.json();
-          if (acc.is_authenticated === 1 || acc.unipile_status === "OK") {
-            clearInterval(interval);
-            setUnifiedModalOpen(false);
-            setIframeUrl(null);
-            setAuthAccountId(null);
-            setIframeLoading(false);
-            setModalStep(1);
-            refresh();
-            setShowSuccessAdviceModal(true);
-            toast.success("¡Cuenta de LinkedIn conectada con éxito!");
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [unifiedModalOpen, modalStep, authAccountId]);
-
-  async function startAuthFlow(accountId: string) {
+  function startAuthFlow(accountId: string) {
+    const acc = accounts.find((a) => a.id === accountId);
     setEditingAccount(null);
     setAuthAccountId(accountId);
+    setAuthEmail(acc?.email || "");
+    setAuthPassword("");
+    setShowAuthPassword(false);
+    setAuthError(null);
+    setIsCheckpoint(false);
+    setCheckpointCode("");
+    setCheckpointRemoteAccountId(null);
     setModalStep(2);
-    setIframeUrl(null);
-    setIframeLoading(true);
     setUnifiedModalOpen(true);
-
-    try {
-      const res = await fetch("/api/accounts/unipile-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo iniciar la conexión segura con LinkedIn");
-      setIframeUrl(data.url);
-    } catch (error) {
-      setIframeLoading(false);
-      toast.error(error instanceof Error ? error.message : "Error al conectar la cuenta");
-      setUnifiedModalOpen(false);
-    }
   }
 
   function closeUnifiedModal() {
     setUnifiedModalOpen(false);
     setModalStep(1);
-    setIframeUrl(null);
     setAuthAccountId(null);
-    setIframeLoading(false);
+    setAuthEmail("");
+    setAuthPassword("");
+    setShowAuthPassword(false);
+    setAuthError(null);
+    setIsCheckpoint(false);
+    setCheckpointCode("");
+    setCheckpointRemoteAccountId(null);
     setEditingAccount(null);
     refresh();
   }
@@ -367,8 +328,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     setEditingAccount(null);
     setForm(BLANK_LI_FORM);
     setModalStep(1);
-    setIframeUrl(null);
     setAuthAccountId(null);
+    setAuthEmail("");
+    setAuthPassword("");
+    setShowAuthPassword(false);
+    setAuthError(null);
+    setIsCheckpoint(false);
+    setCheckpointCode("");
+    setCheckpointRemoteAccountId(null);
     setUnifiedModalOpen(true);
   }
 
@@ -385,8 +352,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       working_days: a.working_days ?? "1,2,3,4,5",
     });
     setModalStep(1);
-    setIframeUrl(null);
     setAuthAccountId(null);
+    setAuthEmail("");
+    setAuthPassword("");
+    setShowAuthPassword(false);
+    setAuthError(null);
+    setIsCheckpoint(false);
+    setCheckpointCode("");
+    setCheckpointRemoteAccountId(null);
     setUnifiedModalOpen(true);
   }
 
@@ -426,31 +399,107 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
         setEditingAccount(null);
       } else {
         toast.success("Configuración guardada");
-        // Efecto Slider: Deslizar suavemente al Paso 2 dentro del mismo modal
+        // Deslizar suavemente al Paso 2 para conectar credenciales nativas de LinkedIn
         setAuthAccountId(data.id);
+        setAuthEmail(form.email);
+        setAuthPassword("");
+        setShowAuthPassword(false);
+        setAuthError(null);
+        setIsCheckpoint(false);
+        setCheckpointCode("");
+        setCheckpointRemoteAccountId(null);
         setModalStep(2);
-        setIframeLoading(true);
-        setIframeUrl(null);
-
-        try {
-          const linkRes = await fetch("/api/accounts/unipile-link", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ accountId: data.id }),
-          });
-          const linkData = await linkRes.json();
-          if (linkRes.ok && linkData.url) {
-            setIframeUrl(linkData.url);
-          } else {
-            toast.error("No se pudo cargar la ventana de conexión");
-          }
-        } catch {
-          toast.error("Error al conectar con LinkedIn");
-        }
       }
     } catch (err: any) {
       setLoading(false);
       toast.error(err?.message || "Error al comunicarse con el servidor");
+    }
+  }
+
+  async function handleNativeLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!authAccountId) return;
+    if (!authEmail.trim() || !authPassword) {
+      setAuthError("Por favor ingresa tu correo y contraseña de LinkedIn");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const res = await fetch("/api/accounts/auth-native", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: authAccountId,
+          username: authEmail.trim(),
+          password: authPassword,
+        }),
+      });
+
+      const data = await res.json();
+      setAuthLoading(false);
+
+      if (!res.ok) {
+        setAuthError(data.error || "No se pudo autenticar con LinkedIn");
+        return;
+      }
+
+      if (data.checkpoint) {
+        // LinkedIn requiere verificación de dos factores (2FA / SMS / Authenticator)
+        setIsCheckpoint(true);
+        setCheckpointRemoteAccountId(data.remoteAccountId);
+        setAuthError(null);
+        toast.info("LinkedIn requiere verificación de dos pasos (2FA)");
+        return;
+      }
+
+      // Conexión exitosa directa
+      toast.success("¡Cuenta de LinkedIn conectada con éxito!");
+      closeUnifiedModal();
+      setShowSuccessAdviceModal(true);
+    } catch (err: any) {
+      setAuthLoading(false);
+      setAuthError(err?.message || "Error al conectar con el servidor");
+    }
+  }
+
+  async function handleSolveCheckpoint(e: React.FormEvent) {
+    e.preventDefault();
+    if (!authAccountId || !checkpointRemoteAccountId) return;
+    if (!checkpointCode.trim()) {
+      setAuthError("Por favor ingresa el código de verificación");
+      return;
+    }
+
+    setCheckpointLoading(true);
+    setAuthError(null);
+
+    try {
+      const res = await fetch("/api/accounts/solve-checkpoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: authAccountId,
+          remoteAccountId: checkpointRemoteAccountId,
+          code: checkpointCode.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      setCheckpointLoading(false);
+
+      if (!res.ok) {
+        setAuthError(data.error || "Código incorrecto o expirado");
+        return;
+      }
+
+      toast.success("¡Verificación exitosa! Cuenta de LinkedIn conectada.");
+      closeUnifiedModal();
+      setShowSuccessAdviceModal(true);
+    } catch (err: any) {
+      setCheckpointLoading(false);
+      setAuthError(err?.message || "Error al verificar código con LinkedIn");
     }
   }
 
@@ -798,59 +847,209 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   </form>
                 </div>
 
-                {/* ─── SLIDE 2: Login Embebido de LinkedIn ─── */}
+                {/* ─── SLIDE 2: Autenticación 100% Nativa de LinkedIn ─── */}
                 <div className="w-1/2 shrink-0 flex flex-col justify-between">
-                  <div className="relative w-full h-[480px] bg-gray-50 dark:bg-gray-950">
-                    {iframeLoading && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-gray-900/95 z-10 transition-all p-6 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3 animate-spin">
-                          <RiShieldKeyholeLine size={24} />
+                  {!isCheckpoint ? (
+                    // ── Sub-vista 1: Formulario Nativo de Credenciales ──
+                    <form onSubmit={handleNativeLogin} className="flex flex-col justify-between h-full">
+                      <div className="px-6 py-5 flex flex-col gap-4 max-h-[480px] overflow-y-auto">
+                        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand-500/5 border border-brand-500/15">
+                          <div className="w-10 h-10 rounded-xl bg-[#0A66C2] text-white flex items-center justify-center font-bold text-xl shadow-sm shrink-0">
+                            in
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                              Conexión Directa con LinkedIn
+                            </h4>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                              Ingresa tus datos para habilitar la sincronización y prospección B2B.
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Estableciendo conexión segura con LinkedIn...
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
-                          Iniciando canal de autenticación encriptado punto a punto
-                        </p>
+
+                        {authError && (
+                          <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs flex items-start gap-2">
+                            <span className="font-bold shrink-0">⚠️</span>
+                            <span>{authError}</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            Correo o teléfono de LinkedIn
+                          </label>
+                          <input
+                            type="text"
+                            className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500"
+                            placeholder="ejemplo@empresa.com"
+                            value={authEmail}
+                            onChange={(e) => {
+                              setAuthEmail(e.target.value);
+                              setAuthError(null);
+                            }}
+                            disabled={authLoading}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            Contraseña de LinkedIn
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showAuthPassword ? "text" : "password"}
+                              className="input input-bordered input-sm w-full pr-9 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500"
+                              placeholder="••••••••••••"
+                              value={authPassword}
+                              onChange={(e) => {
+                                setAuthPassword(e.target.value);
+                                setAuthError(null);
+                              }}
+                              disabled={authLoading}
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAuthPassword(!showAuthPassword)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+                              tabIndex={-1}
+                            >
+                              {showAuthPassword ? <RiEyeOffLine size={15} /> : <RiEyeLine size={15} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 space-y-1 text-[11px] text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                            <RiShieldCheckLine size={14} />
+                            Canal cifrado y seguro
+                          </div>
+                          <p>
+                            Tus credenciales viajan encriptadas mediante SSL 256-bit y se procesan exclusivamente para establecer el canal seguro de prospección.
+                          </p>
+                        </div>
                       </div>
-                    )}
 
-                    {iframeUrl && (
-                      <iframe
-                        src={iframeUrl}
-                        className="w-full h-full border-0"
-                        onLoad={() => setIframeLoading(false)}
-                        title="LinkedIn Direct Connect"
-                        allow="clipboard-write"
-                      />
-                    )}
-                  </div>
+                      {/* Footer Slide 2 Credenciales */}
+                      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                        <button
+                          type="button"
+                          onClick={() => setModalStep(1)}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer inline-flex items-center gap-1"
+                          disabled={authLoading}
+                        >
+                          <RiArrowLeftLine size={14} /> Volver
+                        </button>
 
-                  {/* Footer Slide 2 */}
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-xs">
-                    <span className="text-gray-500 dark:text-gray-400 text-[11px]">
-                      Inicia sesión con tu cuenta de LinkedIn para sincronizar.
-                    </span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={closeUnifiedModal}
-                        className="px-4 py-2 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          closeUnifiedModal();
-                          toast.success("Verificando sincronización de cuenta...");
-                        }}
-                        className="px-5 py-2 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer"
-                      >
-                        Ya he iniciado sesión
-                      </button>
-                    </div>
-                  </div>
+                        <button
+                          type="submit"
+                          disabled={authLoading}
+                          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                          {authLoading ? (
+                            <>
+                              <span className="loading loading-spinner loading-xs" />
+                              <span>Conectando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Iniciar Sesión en LinkedIn</span>
+                              <RiShieldKeyholeLine size={16} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    // ── Sub-vista 2: Verificación 2FA Nativa ──
+                    <form onSubmit={handleSolveCheckpoint} className="flex flex-col justify-between h-full">
+                      <div className="px-6 py-6 flex flex-col gap-4 max-h-[480px] overflow-y-auto">
+                        <div className="text-center space-y-2 py-2">
+                          <div className="w-14 h-14 mx-auto rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center shadow-sm">
+                            <RiSmartphoneLine size={28} />
+                          </div>
+                          <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                            Verificación de Dos Pasos (2FA)
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+                            LinkedIn ha solicitado un código de verificación. Revisa tu aplicación autenticadora o tus mensajes SMS e introduce el código recibido.
+                          </p>
+                        </div>
+
+                        {authError && (
+                          <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs flex items-start gap-2">
+                            <span className="font-bold shrink-0">⚠️</span>
+                            <span>{authError}</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-1.5 max-w-xs mx-auto w-full">
+                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block text-center">
+                            Código de Verificación
+                          </label>
+                          <input
+                            type="text"
+                            className="input input-bordered w-full text-center text-xl font-mono font-bold tracking-widest bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500 py-3 h-auto"
+                            placeholder="123456"
+                            value={checkpointCode}
+                            onChange={(e) => {
+                              setCheckpointCode(e.target.value);
+                              setAuthError(null);
+                            }}
+                            disabled={checkpointLoading}
+                            autoFocus
+                            required
+                          />
+                        </div>
+
+                        <div className="text-center pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCheckpoint(false);
+                              setAuthError(null);
+                              setCheckpointCode("");
+                            }}
+                            className="text-xs text-brand-600 dark:text-brand-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-medium"
+                            disabled={checkpointLoading}
+                          >
+                            <RiArrowLeftLine size={13} /> Volver a ingresar credenciales
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Footer Slide 2 Checkpoint */}
+                      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                        <button
+                          type="button"
+                          onClick={closeUnifiedModal}
+                          className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                          disabled={checkpointLoading}
+                        >
+                          Cancelar
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={checkpointLoading}
+                          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-md cursor-pointer disabled:opacity-50"
+                        >
+                          {checkpointLoading ? (
+                            <>
+                              <span className="loading loading-spinner loading-xs" />
+                              <span>Verificando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Verificar y Conectar</span>
+                              <RiCheckLine size={16} />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>
