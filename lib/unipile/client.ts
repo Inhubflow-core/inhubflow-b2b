@@ -14,7 +14,8 @@ import {
   UnipilePostComment,
   UnipilePostReaction,
   UnipileLinkedInSearchParams,
-  UnipileSearchResultItem,
+  UnipileLinkedInSearchResponse,
+  UnipileSearchParameter,
   UnipileCredentialsAuthResponse,
   UnipileLinkedInAuthParams,
   UnipileSolveCheckpointResponse,
@@ -322,11 +323,34 @@ export class UnipileClient {
   /**
    * Realiza una búsqueda avanzada en LinkedIn (personas, publicaciones, filtros)
    */
-  async searchLinkedIn(params: UnipileLinkedInSearchParams): Promise<{ items: UnipileSearchResultItem[]; cursor?: string }> {
-    return this.request<{ items: UnipileSearchResultItem[]; cursor?: string }>('/api/v1/linkedin/search', {
-      method: 'POST',
-      body: JSON.stringify(params),
+  async searchLinkedIn(params: UnipileLinkedInSearchParams): Promise<UnipileLinkedInSearchResponse> {
+    const { account_id, cursor, limit = 25, api = 'classic', category = 'people', ...filters } = params;
+    const query = new URLSearchParams({
+      account_id,
+      limit: String(Math.min(100, Math.max(1, limit))),
     });
+    if (cursor) query.set('cursor', cursor);
+    return this.request<UnipileLinkedInSearchResponse>(`/api/v1/linkedin/search?${query.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify({ api, category, ...filters }),
+    });
+  }
+
+  async listLinkedInSearchParameters(params: {
+    account_id: string;
+    type: 'LOCATION' | 'INDUSTRY' | 'COMPANY' | 'SCHOOL' | 'SERVICE' | string;
+    keywords: string;
+    limit?: number;
+  }): Promise<{ items: UnipileSearchParameter[] }> {
+    const query = new URLSearchParams({
+      account_id: params.account_id,
+      type: params.type,
+      keywords: params.keywords,
+      limit: String(Math.min(100, Math.max(1, params.limit ?? 20))),
+    });
+    return this.request<{ items: UnipileSearchParameter[] }>(
+      `/api/v1/linkedin/search/parameters?${query.toString()}`,
+    );
   }
 }
 

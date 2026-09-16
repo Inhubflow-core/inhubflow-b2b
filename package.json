@@ -17,6 +17,8 @@
     "test:unipile": "node scripts/test-unipile.cjs",
     "check:unipile": "node scripts/check-unipile-readiness.cjs",
     "configure:unipile-webhooks": "node scripts/configure-unipile-webhooks.cjs",
+    "test:signal-radar": "node scripts/test-signal-radar.cjs",
+    "test:signal-migrations": "node scripts/test-signal-migrations.cjs",
     "test:linkedin-runner": "node scripts/test-linkedin-runner.cjs",
     "test:unipile-migrations": "node scripts/test-unipile-migrations.cjs",
     "typecheck": "tsc --noEmit",

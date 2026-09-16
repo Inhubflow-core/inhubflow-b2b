@@ -214,7 +214,18 @@ function renderTemplate(body: string, target: Target): string {
     .trim();
 }
 
-function stepText(db: ReturnType<typeof getDb>, step: WorkflowStep, target: Target, kind: "connect" | "message"): string {
+function stepText(db: ReturnType<typeof getDb>, step: WorkflowStep, target: Target, kind: "connect" | "message", runProfileId?: string): string {
+  if (kind === "message" && runProfileId) {
+    try {
+      const override = db.prepare(`
+        SELECT body FROM run_profile_step_messages
+        WHERE run_profile_id = ? AND step_id = ?
+      `).get(runProfileId, step.id) as { body: string } | undefined;
+      if (override?.body.trim()) return renderTemplate(override.body, target);
+    } catch {
+      // Compatibility with databases/tests that have not applied Signal Radar v2 yet.
+    }
+  }
   let body = kind === "connect" ? step.connect_note || "" : step.message_body || "";
   if (!body && step.template_id) {
     const template = db.prepare("SELECT body FROM templates WHERE id = ?").get(step.template_id) as { body?: string } | undefined;
@@ -477,7 +488,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       const account = db.prepare("SELECT daily_connection_limit, timezone FROM accounts WHERE id = ?").get(runProfile.account_id) as { daily_connection_limit?: number; timezone?: string | null } | undefined;
       const limit = Math.max(1, Number(account?.daily_connection_limit || 20));
       const dayBounds = linkedInDayBounds(account?.timezone || "UTC", now());
-      const note = stepText(db, step, target, "connect").slice(0, 300);
+      const note = stepText(db, step, target, "connect", runProfile.id).slice(0, 300);
       db.transaction(() => {
         if (countLinkedInConnectionAttemptsToday(db, runProfile.account_id, dayBounds) >= limit) throw new Error("Límite diario de conexiones alcanzado");
         const reservation = prepareLinkedInStepDelivery(db, {
@@ -628,7 +639,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
     let deliveryId = "";
     try {
       if (!target.unipile_chat_id && !providerId) providerId = (await resolveProfile()).provider_id;
-      const text = stepText(db, step, target, "message") || "Hola!";
+      const text = stepText(db, step, target, "message", runProfile.id) || "Hola!";
       const reservation = prepareLinkedInStepDelivery(db, {
         trackId: tr.id,
         stepId: step.id,

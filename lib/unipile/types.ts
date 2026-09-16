@@ -235,26 +235,100 @@ export interface UnipilePostReaction {
   };
 }
 
+export type UnipileLinkedInSearchApi = 'classic' | 'sales_navigator' | 'recruiter';
+export type UnipileLinkedInSearchCategory = 'people' | 'posts' | 'companies' | 'jobs';
+
 export interface UnipileLinkedInSearchParams {
   account_id: string;
-  category?: 'PEOPLE' | 'POSTS' | 'COMPANIES';
-  keywords?: string;
-  title?: string;
-  company?: string;
-  location?: string;
-  limit?: number;
+  api?: UnipileLinkedInSearchApi;
+  category?: UnipileLinkedInSearchCategory;
   cursor?: string;
+  limit?: number;
+  keywords?: string;
+  [key: string]: unknown;
 }
 
-export interface UnipileSearchResultItem {
+export interface UnipileSearchPersonPosition {
+  company?: string | null;
+  company_id?: string | null;
+  description?: string | null;
+  location?: string | null;
+  role?: string | null;
+  tenure_at_company?: { years?: number; months?: number };
+  tenure_at_role?: { years?: number; months?: number };
+}
+
+export interface UnipileSearchPerson {
+  type: 'PEOPLE';
   id: string;
   name: string;
-  headline?: string;
-  location?: string;
+  first_name?: string;
+  last_name?: string;
+  member_urn?: string;
   public_identifier?: string;
+  public_profile_url?: string;
   profile_url?: string;
-  picture_url?: string;
-  company?: string;
+  profile_picture_url?: string;
+  network_distance?: string;
+  location?: string;
+  headline?: string;
+  industry?: string | null;
+  pending_invitation?: boolean;
+  current_positions?: UnipileSearchPersonPosition[];
+}
+
+export interface UnipileSearchPostAuthor {
+  id?: string;
+  public_identifier?: string;
+  name?: string;
+  is_company?: boolean;
+  headline?: string;
+  profile_picture_url?: string;
+}
+
+export interface UnipileSearchPost {
+  type: 'POST';
+  id: string;
+  social_id?: string;
+  share_url?: string;
+  date?: string;
+  parsed_datetime?: string;
+  text?: string;
+  comment_counter?: number;
+  reaction_counter?: number;
+  repost_counter?: number;
+  author?: UnipileSearchPostAuthor;
+  is_repost?: boolean;
+}
+
+export interface UnipileSearchCompany {
+  type: 'COMPANY';
+  id: string;
+  name: string;
+  profile_url?: string;
+  summary?: string | null;
+  industry?: string;
+  location?: string;
+  followers_count?: number;
+  job_offers_count?: number;
+  headcount?: number;
+  headcount_growth?: number;
+}
+
+export type UnipileSearchResultItem = UnipileSearchPerson | UnipileSearchPost | UnipileSearchCompany | Record<string, unknown>;
+
+export interface UnipileLinkedInSearchResponse {
+  object?: 'LinkedinSearch' | string;
+  items: UnipileSearchResultItem[];
+  cursor?: string | null;
+  paging?: { start?: number; page_count?: number; total_count?: number };
+  config?: { params?: Record<string, unknown> };
+}
+
+export interface UnipileSearchParameter {
+  object?: 'LinkedinSearchParameter' | string;
+  id: string;
+  title: string;
 }
 
 export interface UnipileWebhookSender {

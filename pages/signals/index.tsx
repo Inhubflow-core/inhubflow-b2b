@@ -1,11 +1,12 @@
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GetServerSideProps } from "next";
-import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
+import { previewSignalMessage } from "@/lib/signals/message-template";
 import { toast } from "sonner";
-import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiRadarLine,
   RiSearchLine,
@@ -15,12 +16,9 @@ import {
   RiCheckLine,
   RiCloseLine,
   RiPlayLine,
-  RiPauseLine,
-  RiDeleteBinLine,
   RiFileList3Line,
   RiRobotLine,
   RiExternalLinkLine,
-  RiShareForwardLine,
   RiUserSearchLine,
   RiBuildingLine,
   RiMapPinLine,
@@ -29,18 +27,10 @@ import {
   RiThumbUpLine,
   RiExchangeLine,
   RiArrowRightLine,
-  RiInformationLine,
-  RiQuestionLine,
   RiGroupLine,
   RiLineChartLine,
   RiArrowLeftLine,
-  RiFireLine,
-  RiFlashlightLine,
   RiShieldCheckLine,
-  RiSendPlane2Line,
-  RiUserVoiceLine,
-  RiCheckboxCircleLine,
-  RiTimeLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -53,6 +43,13 @@ interface SignalMonitor {
   status: "active" | "paused";
   last_checked_at: string | null;
   created_at: string;
+  message_config_json?: string | null;
+  scan_interval_minutes: number;
+  next_scan_at: string | null;
+  scan_state: "idle" | "running" | "error";
+  last_success_at: string | null;
+  last_error: string | null;
+  capabilities_json?: string | null;
   total_leads?: number;
   pending_leads?: number;
 }
@@ -68,7 +65,10 @@ interface SignalLead {
   signal_type: string;
   signal_snippet: string | null;
   icebreaker_preview: string | null;
-  status: "pending" | "approved" | "rejected" | "imported";
+  status: "pending" | "approved" | "rejected" | "imported" | "enrolled" | "failed";
+  message_metadata_json?: string | null;
+  promotion_state?: "pending" | "promoting" | "imported" | "enrolled" | "blocked" | "failed";
+  promotion_error?: string | null;
   score: number;
   created_at: string;
 }
@@ -97,12 +97,17 @@ interface SignalsPageProps {
   accounts: AccountOption[];
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+  const session = await getServerSession(req, res, authOptions);
+  const user = session?.user as { id?: string; email?: string; role?: string; owner_id?: string | null; assigned_account_id?: string | null } | undefined;
+  if (!user?.id) return { redirect: { destination: "/login", permanent: false } };
   const db = getDb();
+  const workspaceOwnerId = user.owner_id || user.id;
+  const isSuperAdmin = user.email?.trim().toLowerCase() === "inhubflow@gmail.com";
 
   const monitorsRaw = db
-    .prepare("SELECT * FROM signal_monitors ORDER BY created_at DESC")
-    .all() as any[];
+    .prepare(`SELECT * FROM signal_monitors ${isSuperAdmin ? "" : "WHERE workspace_owner_id = ?"} ORDER BY created_at DESC`)
+    .all(...(isSuperAdmin ? [] : [workspaceOwnerId])) as SignalMonitor[];
 
   const initialMonitors = monitorsRaw.map((m) => {
     const stats = db
@@ -132,8 +137,16 @@ export const getServerSideProps: GetServerSideProps = async () => {
     .all() as WorkflowOption[];
 
   const accounts = db
-    .prepare("SELECT id, name, is_authenticated FROM accounts ORDER BY created_at DESC")
-    .all() as AccountOption[];
+    .prepare(`
+      SELECT id, name, is_authenticated FROM accounts
+      ${isSuperAdmin ? "" : user.owner_id
+        ? "WHERE assigned_user_id = ? OR id = ?"
+        : "WHERE owner_id = ? OR (owner_id IS NULL AND ? = 1)"}
+      ORDER BY created_at DESC
+    `)
+    .all(...(isSuperAdmin ? [] : user.owner_id
+      ? [user.id, user.assigned_account_id || ""]
+      : [workspaceOwnerId, 1])) as AccountOption[];
 
   return {
     props: {
@@ -154,7 +167,7 @@ export interface SignalDefinition {
   group: "A" | "B" | "C" | "D";
   groupTitle: string;
   description: string;
-  icon: any;
+  icon: React.ElementType;
   color: string;
   badgeBg: string;
   inputKind: "post_url" | "profile_or_company_url" | "keywords" | "roles_or_industry";
@@ -191,18 +204,32 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
     inputKind: "post_url",
   },
   {
-    id: "competitor_followers",
-    title: "Audiencia & Seguidores de Competidores",
+    id: "competitor_audience",
+    title: "Audiencia Activa de Competidores",
     badge: "Afinidad Directa",
     level: 1,
     levelTitle: "🔥 Nivel 1: Máxima Intención",
     group: "A",
     groupTitle: "Social & Competidores",
-    description: "Profesionales que siguen a empresas competidoras o a sus fundadores y líderes de opinión en LinkedIn.",
+    description: "Profesionales que comentan o reaccionan a contenido reciente relacionado con competidores y referentes. No afirma acceso a listas privadas de seguidores.",
     icon: RiGroupLine,
     color: "text-indigo-500",
     badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
     inputKind: "profile_or_company_url",
+  },
+  {
+    id: "profile_viewers",
+    title: "Visitantes Recientes del Perfil",
+    badge: "Interés Directo",
+    level: 1,
+    levelTitle: "🔥 Nivel 1: Máxima Intención",
+    group: "A",
+    groupTitle: "Social & Competidores",
+    description: "Personas que visitaron recientemente tu perfil. Requiere una cuenta con Sales Navigator.",
+    icon: RiUserSearchLine,
+    color: "text-fuchsia-500",
+    badgeBg: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
+    inputKind: "roles_or_industry",
   },
 
   // Nivel 2: Momento de Compra / Disparadores de Cambio (Triggers)
@@ -267,7 +294,7 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     id: "keyword_intent",
     title: "Búsqueda Personalizada por Palabras Clave",
-    badge: "Dolor Activo 24/7",
+    badge: "Dolor Activo",
     level: 3,
     levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
     group: "C",
@@ -294,85 +321,12 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
 ];
 
-export function getSimulatedMessage(
-  signalType: string,
-  objective: "conversation" | "demo" | "resource",
-  tone: "consultive" | "professional" | "direct",
-  competitor: string,
-  keywords: string[],
-  customTemplate?: string
-): string {
-  const firstName = "Martín";
-  const company = "Grupo Retail B2B";
-  const comp = competitor.trim() || "soluciones del sector";
-  const mainKw = keywords.length > 0 ? keywords[0] : "prospección B2B y automatización";
-
-  if (customTemplate && customTemplate.trim()) {
-    return customTemplate
-      .replace(/\{first_name\}/gi, firstName)
-      .replace(/\{company\}/gi, company)
-      .replace(/\{topic\}/gi, mainKw)
-      .replace(/\{competitor\}/gi, comp);
-  }
-
-  // 1. Competitor Engagement / Comments / Reactions
-  if (
-    signalType === "competitor_reactions" ||
-    signalType === "high_intent_comments" ||
-    signalType === "competitor_followers"
-  ) {
-    if (objective === "demo") {
-      return `Hola ${firstName}, vi que has estado explorando soluciones de ${mainKw}. En InHubFlow ayudamos a equipos como el de ${company} a multiplicar sus reuniones cualificadas sin fricción. ¿Tendrías 10 min esta semana para ver una demo breve?`;
-    }
-    if (objective === "resource") {
-      return `Hola ${firstName}, noté que te interesa el debate actual sobre ${mainKw}. Preparamos un playbook con los frameworks de prospección con mayor tasa de respuesta en B2B hoy en día. ¿Te gustaría que te lo comparta por aquí?`;
-    }
-    if (tone === "direct") {
-      return `Hola ${firstName}, veo que sigues de cerca la innovación en ${mainKw}. ¿Cómo están gestionando actualmente este proceso en ${company}? Sería un gusto conectar e intercambiar visiones.`;
-    }
-    if (tone === "professional") {
-      return `Hola ${firstName}, sigo tu trayectoria en ${company}. Dado el creciente interés por optimizar ${mainKw}, me gustaría conectar contigo y compartir algunas mejores prácticas del sector.`;
-    }
-    return `Hola ${firstName}, vi que has estado explorando temas de ${mainKw}. En ${company}, ¿cómo están abordando actualmente la optimización de este proceso? Me encantaría conectar.`;
-  }
-
-  // 2. Job Changes / Just Hired (<90 days)
-  if (signalType === "new_in_role" || signalType === "internal_promotion") {
-    if (objective === "demo") {
-      return `Hola ${firstName}, ¡muchas felicidades por tu nueva posición en ${company}! Durante los primeros 90 días la prioridad suele ser acelerar resultados rápido. ¿Te gustaría que te muestre en 10 min cómo apoyamos a directores en esta fase?`;
-    }
-    if (objective === "resource") {
-      return `Hola ${firstName}, felicitaciones por tu rol en ${company}. Te comparto un checklist práctico para estructurar el stack de prospección en los primeros 90 días. ¿Te interesaría revisarlo?`;
-    }
-    return `Hola ${firstName}, felicitaciones por tu nueva etapa en ${company}. En estos primeros meses al frente del equipo, ¿están revisando o renovando herramientas de prospección? Éxitos en el rol.`;
-  }
-
-  // 3. Hiring Spree
-  if (signalType === "hiring_spree" || signalType === "company_growth") {
-    if (objective === "demo") {
-      return `Hola ${firstName}, noté el crecimiento del equipo en ${company}. Al incorporar nuevos talentos, dotarlos de automatización inteligente reduce la curva de aprendizaje a la mitad. ¿Te interesaría ver una demo rápida?`;
-    }
-    return `Hola ${firstName}, felicitaciones por la expansión y nuevas vacantes en ${company}. Al sumar nuevos perfiles comerciales, asegurar herramientas de alta conversión es clave. ¿Cómo están planificando el onboarding de prospección?`;
-  }
-
-  // 4. Default / Keyword Intent / Active Poster
-  if (objective === "demo") {
-    return `Hola ${firstName}, sigo tu trabajo en ${company}. Hemos desarrollado una solución enfocada en ${mainKw} que está duplicando respuestas en LinkedIn. ¿Tendrías 10 min para una demo rápida?`;
-  }
-  if (objective === "resource") {
-    return `Hola ${firstName}, noté tu interés en ${mainKw}. Armamos una guía con casos prácticos aplicados a empresas como ${company}. ¿Te parece bien si te la paso por aquí?`;
-  }
-  return `Hola ${firstName}, vi que sigues activo en temas de ${mainKw}. En ${company}, ¿cómo abordan actualmente este canal? Me gustaría conectar contigo para estar al día.`;
-}
-
 export default function SignalsPage({
   initialMonitors,
   lists,
   workflows,
   accounts,
 }: SignalsPageProps) {
-  const router = useRouter();
-  const { t } = useTranslation();
 
   // Estados principales
   const [activeTab, setActiveTab] = useState<"leads" | "monitors" | "guide">("leads");
@@ -381,14 +335,14 @@ export default function SignalsPage({
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [selectedMonitorFilter, setSelectedMonitorFilter] = useState<string>("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery] = useState<string>("");
 
-  // Ask AI Feature (Gojiberry 18:09)
+  // Ask AI
   const [askPrompt, setAskPrompt] = useState("");
   const [askLoading, setAskLoading] = useState(false);
-  const [askResults, setAskResults] = useState<any[] | null>(null);
+  const [askResults, setAskResults] = useState<SignalLead[] | null>(null);
 
-  // Modal Nuevo Monitor - Wizard 4 Pasos (Modelo GojiBerry)
+  // Modal Nuevo Monitor - Wizard 4 Pasos
   const [showNewModal, setShowNewModal] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -421,6 +375,8 @@ export default function SignalsPage({
   // Paso 3: Mensaje IA Anti-Stalker
   const [msgObjective, setMsgObjective] = useState<"conversation" | "demo" | "resource">("conversation");
   const [msgTone, setMsgTone] = useState<"consultive" | "professional" | "direct">("consultive");
+  const [msgLanguage, setMsgLanguage] = useState<"es" | "en" | "pt-BR">("es");
+  const [msgMaxWords, setMsgMaxWords] = useState(90);
   const [customTemplate, setCustomTemplate] = useState("");
 
   // Paso 4: Lanzamiento & Configuración
@@ -428,6 +384,12 @@ export default function SignalsPage({
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || "");
   const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
   const [newTargetList, setNewTargetList] = useState(lists[0]?.id || "");
+  const [newTargetWorkflow, setNewTargetWorkflow] = useState("");
+  const [scanIntervalMinutes, setScanIntervalMinutes] = useState(360);
+  const [accountCapabilities, setAccountCapabilities] = useState<{ accountReady: boolean; salesNavigator: boolean; supportedSignals: string[] } | null>(null);
+  const [autopilotReadiness, setAutopilotReadiness] = useState<{ ready: boolean; blockers: string[] } | null>(null);
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState("");
   const [creatingMonitor, setCreatingMonitor] = useState(false);
 
   // Modal Importar Leads a Lista
@@ -481,13 +443,43 @@ export default function SignalsPage({
     setKeywordsList(keywordsList.filter((item) => item !== k));
   };
 
+  const advanceWizard = () => {
+    if (wizardStep === 1 && icpTitles.length === 0) {
+      toast.error("Añade al menos un cargo objetivo");
+      return;
+    }
+    if (wizardStep === 2) {
+      if (accountCapabilities && !accountCapabilities.supportedSignals.includes(newType)) {
+        toast.error("La señal elegida no está disponible para esta cuenta");
+        return;
+      }
+      if (["competitor_reactions", "high_intent_comments"].includes(newType) && !newTargetUrl.trim()) {
+        toast.error("Añade la URL del post de LinkedIn");
+        return;
+      }
+      if (newType === "competitor_audience" && !newCompetitor.trim()) {
+        toast.error("Añade el competidor o referente");
+        return;
+      }
+      if (["keyword_intent", "active_poster", "hiring_spree", "company_growth"].includes(newType) && keywordsList.length === 0 && icpTitles.length === 0) {
+        toast.error("Añade palabras clave o cargos del ICP");
+        return;
+      }
+    }
+    if (wizardStep === 3 && customTemplate.trim() && customTemplate.trim().length < 20) {
+      toast.error("La plantilla personalizada es demasiado corta");
+      return;
+    }
+    setWizardStep((current) => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
+  };
+
   const handleOpenNewWizard = () => {
     setWizardStep(1);
     setShowNewModal(true);
   };
 
   // Cargar leads
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setLeadsLoading(true);
     try {
       const params = new URLSearchParams();
@@ -500,16 +492,43 @@ export default function SignalsPage({
       if (data.items) {
         setLeads(data.items);
       }
-    } catch (e) {
+    } catch {
       toast.error("Error al cargar prospectos detectados");
     } finally {
       setLeadsLoading(false);
     }
-  };
+  }, [selectedMonitorFilter, selectedStatusFilter, searchQuery]);
 
   useEffect(() => {
     fetchLeads();
-  }, [selectedMonitorFilter, selectedStatusFilter]);
+  }, [fetchLeads]);
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setAccountCapabilities(null);
+      return;
+    }
+    fetch(`/api/signals/capabilities?account_id=${encodeURIComponent(selectedAccountId)}`)
+      .then((response) => response.json())
+      .then((data) => setAccountCapabilities(data))
+      .catch(() => setAccountCapabilities({ accountReady: false, salesNavigator: false, supportedSignals: [] }));
+  }, [selectedAccountId]);
+
+  useEffect(() => {
+    if (newMode !== "autopilot") {
+      setAutopilotReadiness(null);
+      return;
+    }
+    const params = new URLSearchParams({
+      account_id: selectedAccountId,
+      list_id: newTargetList,
+      workflow_id: newTargetWorkflow,
+    });
+    fetch(`/api/signals/readiness?${params.toString()}`)
+      .then((response) => response.json())
+      .then((data) => setAutopilotReadiness(data))
+      .catch(() => setAutopilotReadiness({ ready: false, blockers: ["readiness_unavailable"] }));
+  }, [newMode, selectedAccountId, newTargetList, newTargetWorkflow]);
 
   // Manejar Escaneo de Monitor
   const handleScanMonitor = async (id: string, name: string) => {
@@ -527,7 +546,7 @@ export default function SignalsPage({
       } else {
         toast.error(data.error || "Error al escanear", { id: toastId });
       }
-    } catch (e) {
+    } catch {
       toast.error("Error de conexión al escanear señal", { id: toastId });
     }
   };
@@ -537,14 +556,25 @@ export default function SignalsPage({
     if (e) e.preventDefault();
 
     const def = SIGNAL_DEFINITIONS.find((d) => d.id === newType);
+    if (!selectedAccountId) { toast.error("Selecciona una cuenta de LinkedIn"); return; }
+    if (!newTargetList) { toast.error("Selecciona una lista de destino"); return; }
+    if (accountCapabilities && !accountCapabilities.supportedSignals.includes(newType)) {
+      toast.error("La cuenta seleccionada no es compatible con esta señal");
+      return;
+    }
+    if (newMode === "autopilot" && !newTargetWorkflow) {
+      toast.error("Piloto Automático requiere un workflow");
+      return;
+    }
+    if (newMode === "autopilot" && autopilotReadiness && !autopilotReadiness.ready) {
+      toast.error("El SDR IA aún no cumple los requisitos para Piloto Automático");
+      return;
+    }
     const monitorName =
       newName.trim() ||
       `${def?.title || "Radar"} - ${newCompetitor.trim() || keywordsList[0] || "ICP"}`;
 
-    let targetUrlToSend = newTargetUrl.trim() || undefined;
-    if (def?.inputKind === "roles_or_industry" && icpTitles.length > 0) {
-      targetUrlToSend = icpTitles.join(", ");
-    }
+    const targetUrlToSend = newTargetUrl.trim() || undefined;
 
     setCreatingMonitor(true);
     try {
@@ -561,13 +591,18 @@ export default function SignalsPage({
             titles: icpTitles,
             locations: icpCountries,
             company_sizes: icpSizes,
+            time_window_days: timeWindowDays,
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
           target_list_id: newTargetList || undefined,
+          target_workflow_id: newTargetWorkflow || undefined,
+          scan_interval_minutes: scanIntervalMinutes,
           message_config: {
             objective: msgObjective,
             tone: msgTone,
+            language: msgLanguage,
+            max_words: msgMaxWords,
             custom_template: customTemplate.trim() || undefined,
           },
         }),
@@ -585,7 +620,7 @@ export default function SignalsPage({
         const err = await res.json();
         toast.error(err.error || "Error al crear monitor");
       }
-    } catch (err) {
+    } catch {
       toast.error("Error de comunicación con el servidor");
     } finally {
       setCreatingMonitor(false);
@@ -601,18 +636,38 @@ export default function SignalsPage({
         body: JSON.stringify({ action: "update_status", lead_id: leadId, status }),
       });
 
-      if (res.ok) {
-        setLeads((prev) =>
-          prev.map((l) => (l.id === leadId ? { ...l, status } : l))
-        );
-        toast.success(status === "approved" ? "Prospecto aprobado" : "Prospecto descartado");
-      }
-    } catch (e) {
-      toast.error("Error al actualizar prospecto");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar el prospecto");
+      const nextStatus = status === "approved"
+        ? (data.promotion?.state === "enrolled" ? "enrolled" : data.promotion?.state === "imported" ? "imported" : "approved")
+        : "rejected";
+      setLeads((prev) => prev.map((lead) => lead.id === leadId ? {
+        ...lead,
+        status: nextStatus,
+        promotion_state: data.promotion?.state || lead.promotion_state,
+      } : lead));
+      toast.success(status === "approved"
+        ? data.promotion?.state === "enrolled" ? "Prospecto aprobado y enrolado en campaña" : "Prospecto aprobado e importado"
+        : "Prospecto descartado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al actualizar prospecto");
     }
   };
 
-  // Ejecutar Ask AI (Minuto 18:09 Gojiberry)
+  const handleSaveLeadDraft = async (leadId: string) => {
+    const response = await fetch("/api/signals/leads/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_message", lead_id: leadId, icebreaker_preview: editingDraft }),
+    });
+    const data = await response.json();
+    if (!response.ok) { toast.error(data.error || "No se pudo guardar el mensaje"); return; }
+    setLeads((current) => current.map((lead) => lead.id === leadId ? { ...lead, icebreaker_preview: editingDraft.trim() } : lead));
+    setEditingLeadId(null);
+    toast.success("Mensaje actualizado");
+  };
+
+  // Ejecutar Ask AI
   const handleExecuteAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!askPrompt.trim()) return;
@@ -625,7 +680,12 @@ export default function SignalsPage({
       const res = await fetch("/api/signals/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: askPrompt.trim() }),
+        body: JSON.stringify({
+          query: askPrompt.trim(),
+          account_id: selectedAccountId,
+          list_id: newTargetList || undefined,
+          workflow_id: newTargetWorkflow || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -635,7 +695,7 @@ export default function SignalsPage({
       } else {
         toast.error(data.error || "Error en la consulta Ask AI", { id: toastId });
       }
-    } catch (e) {
+    } catch {
       toast.error("Error al conectar con el servicio Ask AI", { id: toastId });
     } finally {
       setAskLoading(false);
@@ -643,19 +703,28 @@ export default function SignalsPage({
   };
 
   // Importar Ask Lead a Lista
-  const handleImportAskLead = async (lead: any) => {
-    if (!lists.length) {
-      toast.error("Crea al menos una lista en /lists para guardar prospectos");
+  const handleImportAskLead = async (lead: SignalLead) => {
+    if (!newTargetList) {
+      toast.error("Selecciona una lista de destino en el paso de lanzamiento");
       return;
     }
-    const toastId = toast.loading("Guardando en tu lista...");
+    const toastId = toast.loading("Guardando prospecto...");
     try {
-      // Crear monitor temporal o insertar en primer lista
-      const listId = lists[0].id;
-      // Primero crear en db si es necesario vía endpoint
-      toast.success(`Prospecto "${lead.full_name}" importado a "${lists[0].name}"`, { id: toastId });
-    } catch {
-      toast.error("Error al importar", { id: toastId });
+      const response = await fetch("/api/signals/leads/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "import",
+          lead_ids: [lead.id],
+          target: { list_id: newTargetList, workflow_id: newTargetWorkflow || undefined },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo importar el prospecto");
+      toast.success(`Prospecto “${lead.full_name}” importado correctamente`, { id: toastId });
+      fetchLeads();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al importar", { id: toastId });
     }
   };
 
@@ -761,7 +830,7 @@ export default function SignalsPage({
               {monitors.filter((m) => m.status === "active").length}
             </div>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Escaneando 24/7 en segundo plano
+              Según la frecuencia configurada
             </p>
           </div>
 
@@ -774,7 +843,7 @@ export default function SignalsPage({
               {totalCaptured}
             </div>
             <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-              +70% tasa de aceptación esperada
+              Basados en señales verificadas
             </p>
           </div>
 
@@ -854,7 +923,7 @@ export default function SignalsPage({
           {askResults && (
             <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-800/40 space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold text-gray-700 dark:text-gray-300">
-                <span>Resultados de Alta Intención para: "{askPrompt}"</span>
+                <span>Resultados de alta intención para: “{askPrompt}”</span>
                 <button
                   onClick={() => setAskResults(null)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -1022,7 +1091,7 @@ export default function SignalsPage({
                   No hay prospectos en esta vista
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                  Crea un nuevo monitor de señales para rastrear publicaciones de tus competidores o haz clic en "Escanear Ahora" en la pestaña de Monitores.
+                  Crea un monitor de señales para buscar evidencias reales o usa «Escanear ahora» en la pestaña de monitores.
                 </p>
                 <button
                   onClick={() => setShowNewModal(true)}
@@ -1067,7 +1136,7 @@ export default function SignalsPage({
                             ? "Nuevo en el Cargo (<90d)"
                             : lead.signal_type === "internal_promotion"
                             ? "Ascenso Interno"
-                            : lead.signal_type === "competitor_followers"
+                            : lead.signal_type === "competitor_audience"
                             ? "Seguidor de Competidor"
                             : lead.signal_type === "active_poster"
                             ? "Creador Activo (<30d)"
@@ -1096,11 +1165,35 @@ export default function SignalsPage({
                       )}
 
                       {lead.icebreaker_preview && (
-                        <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300">
-                          <span className="font-bold text-brand-600 dark:text-brand-400">
-                            Mensaje Personalizado Sugerido:{" "}
-                          </span>
-                          "{lead.icebreaker_preview}"
+                        <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-brand-600 dark:text-brand-400">Mensaje personalizado sugerido</span>
+                            {lead.status === "pending" && editingLeadId !== lead.id && (
+                              <button
+                                type="button"
+                                onClick={() => { setEditingLeadId(lead.id); setEditingDraft(lead.icebreaker_preview || ""); }}
+                                className="text-[11px] text-brand-600 hover:underline"
+                              >
+                                Editar antes de aprobar
+                              </button>
+                            )}
+                          </div>
+                          {editingLeadId === lead.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingDraft}
+                                onChange={(event) => setEditingDraft(event.target.value)}
+                                rows={4}
+                                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-900"
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button type="button" onClick={() => setEditingLeadId(null)} className="px-2 py-1 text-gray-500">Cancelar</button>
+                                <button type="button" onClick={() => handleSaveLeadDraft(lead.id)} className="px-3 py-1 rounded-lg bg-brand-500 text-white">Guardar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p>“{lead.icebreaker_preview}”</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1126,10 +1219,16 @@ export default function SignalsPage({
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300">
                             <RiCheckLine size={14} /> Aprobado
                           </span>
+                        ) : lead.status === "enrolled" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 dark:bg-purple-950/50 dark:text-purple-300">
+                            Enrolado en Campaña
+                          </span>
                         ) : lead.status === "imported" ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-blue-700 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300">
                             Importado a Lista
                           </span>
+                        ) : lead.status === "failed" ? (
+                          <span className="text-xs text-red-500" title={lead.promotion_error || undefined}>Error de promoción</span>
                         ) : (
                           <span className="text-xs text-gray-400">Descartado</span>
                         )}
@@ -1247,11 +1346,11 @@ export default function SignalsPage({
                         <RiRefreshLine size={14} /> Escanear Ahora
                       </button>
 
-                      <span className="text-[11px] text-gray-400">
-                        {m.last_checked_at
-                          ? `Escaneado ${new Date(m.last_checked_at).toLocaleDateString()}`
-                          : "Nunca escaneado"}
-                      </span>
+                      <div className="flex flex-col items-end gap-0.5 text-[11px] text-gray-400">
+                        <span>{m.scan_state === "running" ? "Escaneando…" : m.last_success_at ? `Último éxito ${new Date(m.last_success_at).toLocaleString()}` : "Sin escaneos exitosos"}</span>
+                        {m.next_scan_at && m.status === "active" && <span>Próximo: {new Date(m.next_scan_at).toLocaleString()}</span>}
+                        {m.last_error && <span className="text-red-500 max-w-52 truncate" title={m.last_error}>{m.last_error}</span>}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1270,7 +1369,7 @@ export default function SignalsPage({
                   Metodología Intent-Based Outreach
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Inspirada en el modelo de Gojiberry AI
+                  Metodología de InHubFlow
                 </span>
               </div>
               <h3 className="text-lg md:text-xl font-black text-gray-900 dark:text-white">
@@ -1278,7 +1377,7 @@ export default function SignalsPage({
               </h3>
               <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-3xl">
                 La prospección en frío masiva obtiene menos del 3% de respuesta porque contacta a destiempo. 
-                Signal Radar detecta momentos de compra activos para que tu primer mensaje tenga hasta un <strong>40%+ de respuesta</strong>.
+                Signal Radar detecta evidencias reales de intención para ayudarte a contactar en un momento relevante.
               </p>
             </div>
 
@@ -1383,7 +1482,7 @@ export default function SignalsPage({
           </div>
         )}
 
-        {/* Modal: Wizard de Creación de Monitor (4 Pasos - Inspirado en GojiBerry) */}
+        {/* Modal: Wizard de Creación de Monitor */}
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
             <div className="w-full max-w-4xl max-h-[92vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
@@ -1398,7 +1497,7 @@ export default function SignalsPage({
                       Configurar Monitor de Señales de Intención
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Asistente guiado paso a paso para prospección inteligente (Modelo GojiBerry)
+                      Asistente guiado de InHubFlow para prospección basada en señales reales
                     </p>
                   </div>
                 </div>
@@ -1427,7 +1526,8 @@ export default function SignalsPage({
                       <div key={step.num} className="flex items-center flex-1 last:flex-none">
                         <button
                           type="button"
-                          onClick={() => setWizardStep(step.num as any)}
+                          disabled={step.num > wizardStep}
+                          onClick={() => step.num <= wizardStep && setWizardStep(step.num as 1 | 2 | 3 | 4)}
                           className="flex items-center gap-2 group text-left focus:outline-none"
                         >
                           <span
@@ -1713,7 +1813,7 @@ export default function SignalsPage({
                             : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
                         }`}
                       >
-                        Todas las Señales (9)
+                        Todas las Señales ({SIGNAL_DEFINITIONS.length})
                       </button>
                       <button
                         type="button"
@@ -1756,13 +1856,15 @@ export default function SignalsPage({
                         (s) => signalLevelFilter === "ALL" || s.level === signalLevelFilter
                       ).map((sig) => {
                         const isSelected = newType === sig.id;
+                        const unsupported = Boolean(accountCapabilities && !accountCapabilities.supportedSignals.includes(sig.id));
                         const SigIcon = sig.icon;
                         return (
                           <button
                             key={sig.id}
                             type="button"
-                            onClick={() => setNewType(sig.id)}
-                            className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
+                            disabled={unsupported}
+                            onClick={() => !unsupported && setNewType(sig.id)}
+                            className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${unsupported ? "opacity-50 cursor-not-allowed" : ""} ${
                               isSelected
                                 ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/20"
                                 : "border-gray-200 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-850"
@@ -1793,7 +1895,7 @@ export default function SignalsPage({
                             </p>
                             <div className="pt-1 flex items-center justify-between">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${sig.badgeBg}`}>
-                                {sig.badge}
+                                {unsupported ? "No disponible para esta cuenta" : sig.badge}
                               </span>
                             </div>
                           </button>
@@ -1829,7 +1931,7 @@ export default function SignalsPage({
                           </div>
                           <div>
                             <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                              URL del Post Específico (Opcional)
+                              URL del Post Específico *
                             </label>
                             <input
                               type="url"
@@ -1842,19 +1944,20 @@ export default function SignalsPage({
                         </div>
                       )}
 
-                      {/* Si es seguidores o perfil de competidor */}
-                      {newType === "competitor_followers" && (
+                      {/* Audiencia activa alrededor de un competidor o referente */}
+                      {newType === "competitor_audience" && (
                         <div>
                           <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            URL de Empresa o Perfil de Referente en LinkedIn *
+                            Competidor, marca o referente a analizar *
                           </label>
                           <input
-                            type="url"
-                            value={newTargetUrl}
-                            onChange={(e) => setNewTargetUrl(e.target.value)}
-                            placeholder="https://www.linkedin.com/company/... o https://www.linkedin.com/in/..."
+                            type="text"
+                            value={newCompetitor}
+                            onChange={(e) => setNewCompetitor(e.target.value)}
+                            placeholder="Ej: HubSpot, Apollo, referente del sector..."
                             className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                           />
+                          <p className="text-[10px] text-gray-400 mt-1">Se analizará engagement público reciente; no se accede a listas privadas de seguidores.</p>
                         </div>
                       )}
 
@@ -1976,16 +2079,16 @@ export default function SignalsPage({
                       </p>
                     </div>
 
-                    {/* Banner La Regla de Oro de GojiBerry */}
+                    {/* Banner de conversación natural */}
                     <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
                       <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-bold">
                         <span className="text-amber-600 text-base">💡</span>
-                        <span>La Regla de Oro de GojiBerry:</span>
+                        <span>Regla de conversación natural:</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                         <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-red-900 dark:text-red-200">
                           <span className="font-bold">❌ Error Típico (Stalker): </span>
-                          "Hola, vi que le diste like a mi competidor X..." (Suena a acosador/invasivo).
+                          «Hola, vi que le diste like a mi competidor X…» (Suena invasivo).
                         </div>
                         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200">
                           <span className="font-bold">✅ Fórmula InHubFlow: </span>
@@ -2020,7 +2123,7 @@ export default function SignalsPage({
                           <button
                             key={obj.id}
                             type="button"
-                            onClick={() => setMsgObjective(obj.id as any)}
+                            onClick={() => setMsgObjective(obj.id as "conversation" | "demo" | "resource")}
                             className={`p-3 rounded-2xl border text-left text-xs transition-all ${
                               msgObjective === obj.id
                                 ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
@@ -2050,7 +2153,7 @@ export default function SignalsPage({
                           <button
                             key={tn.id}
                             type="button"
-                            onClick={() => setMsgTone(tn.id as any)}
+                            onClick={() => setMsgTone(tn.id as "consultive" | "professional" | "direct")}
                             className={`p-2.5 rounded-xl border text-center text-xs transition-all ${
                               msgTone === tn.id
                                 ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
@@ -2063,7 +2166,33 @@ export default function SignalsPage({
                       </div>
                     </div>
 
-                    {/* LIVE PREVIEW: Simulador de Mensaje en LinkedIn */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">Idioma del mensaje</label>
+                        <select
+                          value={msgLanguage}
+                          onChange={(e) => setMsgLanguage(e.target.value as "es" | "en" | "pt-BR")}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          <option value="es">Español</option>
+                          <option value="en">English</option>
+                          <option value="pt-BR">Português (Brasil)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">Máximo de palabras</label>
+                        <input
+                          type="number"
+                          min={20}
+                          max={180}
+                          value={msgMaxWords}
+                          onChange={(e) => setMsgMaxWords(Math.max(20, Math.min(180, Number(e.target.value) || 90)))}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Vista previa orientativa del mensaje */}
                     <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
@@ -2071,7 +2200,7 @@ export default function SignalsPage({
                           Simulación en Tiempo Real (LinkedIn Direct Message Preview)
                         </label>
                         <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                          🛡️ Anti-Stalker Verified
+                          🛡️ Vista previa orientativa
                         </span>
                       </div>
 
@@ -2102,14 +2231,16 @@ export default function SignalsPage({
                             Hoy · Mensaje generado con IA contextual
                           </span>
                           <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-xs border border-gray-200 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
-                            {getSimulatedMessage(
-                              newType,
-                              msgObjective,
-                              msgTone,
-                              newCompetitor,
-                              keywordsList,
-                              customTemplate
-                            )}
+                            {previewSignalMessage({
+                              signalType: newType,
+                              objective: msgObjective,
+                              tone: msgTone,
+                              competitor: newCompetitor,
+                              keywords: keywordsList,
+                              customTemplate,
+                              language: msgLanguage,
+                              maxWords: msgMaxWords,
+                            })}
                           </div>
                         </div>
 
@@ -2221,7 +2352,7 @@ export default function SignalsPage({
                             {newMode === "review" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
                           <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
-                            Los prospectos captados van a tu cola de "Hot Leads". Revisas y apruebas el mensaje antes de disparar el contacto.
+                            Los prospectos captados van a tu cola de «Hot Leads». Revisas y apruebas el mensaje antes de activar el contacto.
                           </div>
                         </button>
 
@@ -2238,36 +2369,76 @@ export default function SignalsPage({
                             <span className="flex items-center gap-1.5">
                               Piloto Automático (Autopilot)
                               <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                                24/7 Autónomo
+                                Gates SDR IA
                               </span>
                             </span>
                             {newMode === "autopilot" && <RiCheckLine className="text-purple-500" size={18} />}
                           </div>
                           <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
-                            InHubFlow califica a los prospectos contra tu ICP, genera el icebreaker anti-stalker y encola el contacto automáticamente.
+                            InHubFlow solo enrola automáticamente cuando la cuenta, campaña y los controles del SDR IA están listos. Si falta un gate, el lead pasa a revisión.
                           </div>
                         </button>
                       </div>
                     </div>
 
-                    {/* 4. Lista Destino (Opcional) */}
-                    {lists.length > 0 && (
+                    {/* 4. Lista y campaña destino */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
-                          Guardar prospectos aprobados en Lista (Opcional)
+                          Lista de destino *
                         </label>
                         <select
                           value={newTargetList}
                           onChange={(e) => setNewTargetList(e.target.value)}
                           className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                         >
-                          <option value="">Seleccionar lista más tarde</option>
-                          {lists.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name} ({l.target_count} contactos)
-                            </option>
+                          <option value="">Selecciona una lista</option>
+                          {lists.map((list) => (
+                            <option key={list.id} value={list.id}>{list.name} ({list.target_count} contactos)</option>
                           ))}
                         </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                          Workflow {newMode === "autopilot" ? "*" : "(opcional)"}
+                        </label>
+                        <select
+                          value={newTargetWorkflow}
+                          onChange={(e) => setNewTargetWorkflow(e.target.value)}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          <option value="">Solo guardar en lista</option>
+                          {workflows.map((workflow) => (
+                            <option key={workflow.id} value={workflow.id}>{workflow.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                        Frecuencia de escaneo
+                      </label>
+                      <select
+                        value={scanIntervalMinutes}
+                        onChange={(e) => setScanIntervalMinutes(Number(e.target.value))}
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                      >
+                        <option value={60}>Cada hora</option>
+                        <option value={360}>Cada 6 horas (recomendado)</option>
+                        <option value={720}>Cada 12 horas</option>
+                        <option value={1440}>Una vez al día</option>
+                      </select>
+                    </div>
+
+                    {newMode === "autopilot" && (
+                      <div className={`p-3 rounded-xl border text-xs ${autopilotReadiness?.ready
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-200"
+                        : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200"}`}>
+                        <strong>{autopilotReadiness?.ready ? "✓ Autopilot listo" : "Autopilot permanecerá en revisión"}</strong>
+                        {!autopilotReadiness?.ready && (
+                          <p className="mt-1">Completa cuenta, lista, workflow y gates del SDR IA. No se contactará a nadie automáticamente mientras falte un requisito.</p>
+                        )}
                       </div>
                     )}
 
@@ -2321,7 +2492,7 @@ export default function SignalsPage({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setWizardStep((prev) => ((prev - 1) as any))}
+                      onClick={() => setWizardStep((prev) => Math.max(1, prev - 1) as 1 | 2 | 3 | 4)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
                     >
                       <RiArrowLeftLine size={15} /> Atrás
@@ -2333,7 +2504,7 @@ export default function SignalsPage({
                   {wizardStep < 4 ? (
                     <button
                       type="button"
-                      onClick={() => setWizardStep((prev) => ((prev + 1) as any))}
+                      onClick={advanceWizard}
                       className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all"
                     >
                       Siguiente:{" "}

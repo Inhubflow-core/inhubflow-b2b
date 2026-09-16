@@ -1012,6 +1012,58 @@ function runMigrations(db: Database.Database) {
   // Keep provider implementation details out of customer-facing activity and
   // diagnostics, including historical rows written by older releases.
   sanitizePublicProviderBrandingMigration(db);
+
+  // Purge any orphan non-campaign contacts and inbox messages (e.g. personal DMs, Uber, spam)
+  cleanOrphanNonCampaignInboxDataMigration(db);
+}
+
+function cleanOrphanNonCampaignInboxDataMigration(db: Database.Database) {
+  try {
+    db.transaction(() => {
+      // 1. Delete sdr_threads for targets that were never enrolled in a campaign run nor part of a list
+      db.exec(`
+        DELETE FROM sdr_threads
+        WHERE target_id IN (
+          SELECT t.id FROM targets t
+          WHERE NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
+            AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)
+        );
+      `);
+
+      // 2. Delete linkedin_inbox_messages for targets that were never enrolled in a campaign run nor part of a list
+      db.exec(`
+        DELETE FROM linkedin_inbox_messages
+        WHERE target_id IN (
+          SELECT t.id FROM targets t
+          WHERE NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
+            AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)
+        );
+      `);
+
+      // 3. Delete linkedin_target_accounts for those orphan targets
+      db.exec(`
+        DELETE FROM linkedin_target_accounts
+        WHERE target_id IN (
+          SELECT t.id FROM targets t
+          WHERE NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
+            AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)
+        );
+      `);
+
+      // 4. Delete the orphan targets themselves (specifically those with last_replied_at or created by inbox sync)
+      db.exec(`
+        DELETE FROM targets
+        WHERE (
+          last_replied_at IS NOT NULL
+          OR full_name LIKE '%Uber%'
+        )
+        AND NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = targets.id)
+        AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = targets.id);
+      `);
+    })();
+  } catch (err) {
+    console.error("[db] cleanOrphanNonCampaignInboxDataMigration error:", err);
+  }
 }
 
 function sanitizePublicProviderBrandingMigration(db: Database.Database) {

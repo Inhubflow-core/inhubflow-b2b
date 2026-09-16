@@ -1,15 +1,31 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
+import type Database from "better-sqlite3";
 import { getDb } from "@/lib/db";
-import { unipile } from "@/lib/unipile/client";
+import { unipile, UnipileClient } from "@/lib/unipile/client";
+import { resolveUnipileAccount } from "@/lib/unipile/account";
+import type { ApiActor } from "@/lib/authz";
 import {
-  SignalMonitor,
-  SignalLead,
-  SignalEvent,
-  SignalType,
-  SignalMode,
-  SignalStatus,
-  SignalLeadStatus,
+  SIGNAL_TYPES,
+  type SignalIcpFilters,
+  type SignalLead,
+  type SignalLeadStatus,
+  type SignalMessageConfig,
+  type SignalMode,
+  type SignalMonitor,
+  type SignalType,
 } from "./schema";
+import { scanRealSignals, accountHasSalesNavigator, type SignalScannerClient } from "./scanners";
+import { SignalScanError, type DiscoveredSignalLead, type SignalScanCursor } from "./scanners/contracts";
+import { canonicalLinkedInProfileUrl, passesIcp, scoreSignalLead, signalIdentity } from "./scanners/scoring";
+import { generateSignalMessage } from "./message-generator";
+import { promoteSignalLead, signalAutopilotReadiness } from "./promotion";
+import { planSignalResearch } from "./research-planner";
+
+export interface SignalActorScope {
+  actorId: string;
+  workspaceOwnerId: string;
+  isSuperAdmin: boolean;
+}
 
 export interface CreateMonitorInput {
   name: string;
@@ -17,22 +33,15 @@ export interface CreateMonitorInput {
   target_url?: string;
   competitor_name?: string;
   keywords?: string[];
-  icp_filters?: {
-    titles?: string[];
-    locations?: string[];
-    company_sizes?: string[];
-    exclusions?: string[];
-  };
+  icp_filters?: SignalIcpFilters;
   mode?: SignalMode;
   account_id?: string;
   target_list_id?: string;
   target_workflow_id?: string;
+  message_config?: SignalMessageConfig;
+  scan_interval_minutes?: number;
   created_by?: string;
-  message_config?: {
-    objective?: "conversation" | "demo" | "resource";
-    tone?: "consultive" | "professional" | "direct";
-    custom_template?: string;
-  };
+  workspace_owner_id?: string;
 }
 
 export interface ListLeadsQuery {
@@ -43,846 +52,519 @@ export interface ListLeadsQuery {
   offset?: number;
 }
 
+export interface SignalRadarServiceOptions {
+  getDatabase?: () => Database.Database;
+  client?: SignalScannerClient & Pick<UnipileClient, "isConfigured" | "listAccounts" | "getAccount">;
+  generateMessage?: typeof generateSignalMessage;
+  now?: () => number;
+}
+
+function scopeFromActor(actor: ApiActor): SignalActorScope {
+  return { actorId: actor.id, workspaceOwnerId: actor.workspaceOwnerId, isSuperAdmin: actor.isSuperAdmin };
+}
+
+function normalizeArray(values?: string[]): string[] {
+  return [...new Set((values || []).map((value) => value.trim()).filter(Boolean))].slice(0, 50);
+}
+
+function parseJson<T>(value: string | null, fallback: T): T {
+  try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
+}
+
+function nextScanAt(intervalMinutes: number, nowMs: number): string {
+  return new Date(nowMs + intervalMinutes * 60_000).toISOString();
+}
+
+function providerErrorCode(error: unknown): string {
+  if (error instanceof SignalScanError) return error.code;
+  if (typeof error === "object" && error !== null && "status" in error) return `provider_http_${String((error as { status?: number }).status || "unknown")}`;
+  return "scan_failed";
+}
+
+function actorScope(actor?: ApiActor | SignalActorScope): SignalActorScope | null {
+  if (!actor) return null;
+  return "workspaceOwnerId" in actor && "actorId" in actor
+    ? actor
+    : scopeFromActor(actor as ApiActor);
+}
+
+function fullName(profile: { first_name?: string | null; last_name?: string | null }, fallback: string): string {
+  return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || fallback;
+}
+
 export class SignalRadarService {
-  /**
-   * Lista todos los monitores de señales
-   */
-  listMonitors(userId?: string): SignalMonitor[] {
-    const db = getDb();
-    if (userId) {
-      return db
-        .prepare("SELECT * FROM signal_monitors WHERE created_by = ? ORDER BY created_at DESC")
-        .all(userId) as SignalMonitor[];
-    }
-    return db
-      .prepare("SELECT * FROM signal_monitors ORDER BY created_at DESC")
-      .all() as SignalMonitor[];
+  private readonly database: () => Database.Database;
+  private readonly client: SignalRadarServiceOptions["client"];
+  private readonly messageGenerator: typeof generateSignalMessage;
+  private readonly now: () => number;
+
+  constructor(options: SignalRadarServiceOptions = {}) {
+    this.database = options.getDatabase || getDb;
+    this.client = options.client || unipile;
+    this.messageGenerator = options.generateMessage || generateSignalMessage;
+    this.now = options.now || Date.now;
   }
 
-  /**
-   * Obtiene un monitor por su ID con sus estadísticas
-   */
-  getMonitor(id: string): (SignalMonitor & { total_leads: number; pending_leads: number }) | null {
-    const db = getDb();
-    const monitor = db.prepare("SELECT * FROM signal_monitors WHERE id = ?").get(id) as SignalMonitor | undefined;
-    if (!monitor) return null;
-
-    const stats = db
-      .prepare(
-        `SELECT 
-          COUNT(*) as total_leads,
-          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_leads
-        FROM signal_leads WHERE monitor_id = ?`
-      )
-      .get(id) as { total_leads: number; pending_leads: number };
-
-    return {
-      ...monitor,
-      total_leads: stats.total_leads || 0,
-      pending_leads: stats.pending_leads || 0,
-    };
+  listMonitors(actor?: ApiActor | SignalActorScope): Array<SignalMonitor & { total_leads: number; pending_leads: number }> {
+    const db = this.database();
+    const scope = actorScope(actor);
+    const condition = scope && !scope.isSuperAdmin ? "WHERE m.workspace_owner_id = ?" : "";
+    const params = scope && !scope.isSuperAdmin ? [scope.workspaceOwnerId] : [];
+    return db.prepare(`
+      SELECT m.*,
+        COUNT(sl.id) AS total_leads,
+        SUM(CASE WHEN sl.status = 'pending' THEN 1 ELSE 0 END) AS pending_leads
+      FROM signal_monitors m
+      LEFT JOIN signal_leads sl ON sl.monitor_id = m.id
+      ${condition}
+      GROUP BY m.id
+      ORDER BY datetime(m.created_at) DESC
+    `).all(...params) as Array<SignalMonitor & { total_leads: number; pending_leads: number }>;
   }
 
-  /**
-   * Crea un nuevo monitor de señales
-   */
+  getMonitor(id: string, actor?: ApiActor | SignalActorScope): (SignalMonitor & { total_leads: number; pending_leads: number }) | null {
+    const db = this.database();
+    const scope = actorScope(actor);
+    const row = db.prepare(`
+      SELECT m.*,
+        COUNT(sl.id) AS total_leads,
+        SUM(CASE WHEN sl.status = 'pending' THEN 1 ELSE 0 END) AS pending_leads
+      FROM signal_monitors m
+      LEFT JOIN signal_leads sl ON sl.monitor_id = m.id
+      WHERE m.id = ? ${scope && !scope.isSuperAdmin ? "AND m.workspace_owner_id = ?" : ""}
+      GROUP BY m.id
+    `).get(id, ...(scope && !scope.isSuperAdmin ? [scope.workspaceOwnerId] : [])) as
+      | SignalMonitor & { total_leads: number; pending_leads: number }
+      | undefined;
+    return row || null;
+  }
+
   createMonitor(input: CreateMonitorInput): SignalMonitor {
-    const db = getDb();
+    const db = this.database();
     const id = randomUUID();
-    const now = new Date().toISOString();
-
+    const interval = Math.max(15, Math.min(Number(input.scan_interval_minutes || 360), 10_080));
+    const now = new Date(this.now()).toISOString();
+    const type = input.type === "competitor_followers" ? "competitor_audience" : input.type === "job_changes" ? "new_in_role" : input.type;
+    if (!SIGNAL_TYPES.includes(type as typeof SIGNAL_TYPES[number])) throw new Error("Tipo de señal no permitido");
     const monitor: SignalMonitor = {
       id,
-      name: input.name,
-      type: input.type,
-      target_url: input.target_url || null,
-      competitor_name: input.competitor_name || null,
-      keywords_json: input.keywords ? JSON.stringify(input.keywords) : null,
-      icp_filters_json: input.icp_filters ? JSON.stringify(input.icp_filters) : null,
+      workspace_owner_id: input.workspace_owner_id || null,
+      name: input.name.trim(),
+      type,
+      target_url: input.target_url?.trim() || null,
+      competitor_name: input.competitor_name?.trim() || null,
+      keywords_json: JSON.stringify(normalizeArray(input.keywords)),
+      icp_filters_json: JSON.stringify({
+        titles: normalizeArray(input.icp_filters?.titles),
+        locations: normalizeArray(input.icp_filters?.locations),
+        company_sizes: normalizeArray(input.icp_filters?.company_sizes),
+        exclusions: normalizeArray(input.icp_filters?.exclusions),
+        time_window_days: Math.max(1, Math.min(input.icp_filters?.time_window_days || 90, 365)),
+      }),
       mode: input.mode || "review",
       status: "active",
       account_id: input.account_id || null,
       target_list_id: input.target_list_id || null,
       target_workflow_id: input.target_workflow_id || null,
-      message_config_json: input.message_config ? JSON.stringify(input.message_config) : null,
+      message_config_json: JSON.stringify(input.message_config || {}),
+      scan_interval_minutes: interval,
+      next_scan_at: now,
+      scan_state: "idle",
+      scan_lease_owner: null,
+      scan_lease_expires_at: null,
+      cursor_json: null,
+      capabilities_json: null,
       last_checked_at: null,
+      last_success_at: null,
+      last_error: null,
+      consecutive_failures: 0,
       created_by: input.created_by || null,
       created_at: now,
       updated_at: now,
     };
-
     db.prepare(`
       INSERT INTO signal_monitors (
-        id, name, type, target_url, competitor_name, keywords_json, icp_filters_json,
-        mode, status, account_id, target_list_id, target_workflow_id, message_config_json, last_checked_at,
-        created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, workspace_owner_id, name, type, target_url, competitor_name,
+        keywords_json, icp_filters_json, mode, status, account_id,
+        target_list_id, target_workflow_id, message_config_json,
+        scan_interval_minutes, next_scan_at, scan_state, created_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'idle', ?, ?, ?)
     `).run(
-      monitor.id,
-      monitor.name,
-      monitor.type,
-      monitor.target_url,
-      monitor.competitor_name,
-      monitor.keywords_json,
-      monitor.icp_filters_json,
-      monitor.mode,
-      monitor.status,
-      monitor.account_id,
-      monitor.target_list_id,
-      monitor.target_workflow_id,
-      monitor.message_config_json || null,
-      monitor.last_checked_at,
-      monitor.created_by,
-      monitor.created_at,
-      monitor.updated_at
+      monitor.id, monitor.workspace_owner_id, monitor.name, monitor.type,
+      monitor.target_url, monitor.competitor_name, monitor.keywords_json,
+      monitor.icp_filters_json, monitor.mode, monitor.status, monitor.account_id,
+      monitor.target_list_id, monitor.target_workflow_id, monitor.message_config_json,
+      monitor.scan_interval_minutes, monitor.next_scan_at, monitor.created_by,
+      monitor.created_at, monitor.updated_at,
     );
-
-    this.logEvent(id, "monitor_created", { name: monitor.name, type: monitor.type });
+    this.logEvent(id, "monitor_created", { type: monitor.type, mode: monitor.mode });
     return monitor;
   }
 
-  /**
-   * Actualiza un monitor de señales
-   */
-  updateMonitor(id: string, updates: Partial<SignalMonitor>): SignalMonitor | null {
-    const db = getDb();
-    const current = this.getMonitor(id);
+  updateMonitor(id: string, updates: Partial<SignalMonitor>, actor?: ApiActor | SignalActorScope): SignalMonitor | null {
+    const db = this.database();
+    const current = this.getMonitor(id, actor);
     if (!current) return null;
-
-    const fields: string[] = [];
-    const values: any[] = [];
-
     const allowed = [
-      "name",
-      "status",
-      "mode",
-      "target_url",
-      "competitor_name",
-      "keywords_json",
-      "icp_filters_json",
-      "target_list_id",
-      "target_workflow_id",
-    ];
-
+      "name", "status", "mode", "target_url", "competitor_name", "keywords_json",
+      "icp_filters_json", "target_list_id", "target_workflow_id", "message_config_json",
+      "scan_interval_minutes", "next_scan_at", "account_id",
+    ] as const;
+    const fields: string[] = [];
+    const values: unknown[] = [];
     for (const key of allowed) {
-      if ((updates as any)[key] !== undefined) {
+      if (updates[key] !== undefined) {
         fields.push(`${key} = ?`);
-        values.push((updates as any)[key]);
+        values.push(updates[key]);
       }
     }
-
     if (fields.length === 0) return current;
-
-    fields.push("updated_at = ?");
-    values.push(new Date().toISOString());
     values.push(id);
-
-    db.prepare(`UPDATE signal_monitors SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-    return this.getMonitor(id);
+    db.prepare(`UPDATE signal_monitors SET ${fields.join(", ")}, updated_at = datetime('now') WHERE id = ?`).run(...values);
+    return this.getMonitor(id, actor);
   }
 
-  /**
-   * Elimina un monitor de señales
-   */
-  deleteMonitor(id: string): boolean {
-    const db = getDb();
-    const res = db.prepare("DELETE FROM signal_monitors WHERE id = ?").run(id);
-    return res.changes > 0;
+  deleteMonitor(id: string, actor?: ApiActor | SignalActorScope): boolean {
+    const monitor = this.getMonitor(id, actor);
+    if (!monitor) return false;
+    return this.database().prepare("DELETE FROM signal_monitors WHERE id = ?").run(id).changes > 0;
   }
 
-  /**
-   * Lista prospectos capturados (Hot Leads) con filtros
-   */
-  listLeads(query: ListLeadsQuery = {}): { items: SignalLead[]; total: number } {
-    const db = getDb();
+  listLeads(query: ListLeadsQuery = {}, actor?: ApiActor | SignalActorScope): { items: SignalLead[]; total: number } {
+    const db = this.database();
+    const scope = actorScope(actor);
     const conditions: string[] = [];
-    const params: any[] = [];
-
-    if (query.monitor_id) {
-      conditions.push("monitor_id = ?");
-      params.push(query.monitor_id);
-    }
-    if (query.status) {
-      conditions.push("status = ?");
-      params.push(query.status);
-    }
+    const params: unknown[] = [];
+    if (scope && !scope.isSuperAdmin) { conditions.push("sl.workspace_owner_id = ?"); params.push(scope.workspaceOwnerId); }
+    if (query.monitor_id) { conditions.push("sl.monitor_id = ?"); params.push(query.monitor_id); }
+    if (query.status) { conditions.push("sl.status = ?"); params.push(query.status); }
     if (query.search) {
-      conditions.push("(full_name LIKE ? OR headline LIKE ? OR company LIKE ?)");
+      conditions.push("(sl.full_name LIKE ? OR sl.headline LIKE ? OR sl.company LIKE ?)");
       const term = `%${query.search}%`;
       params.push(term, term, term);
     }
-
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const totalRow = db.prepare(`SELECT COUNT(*) as count FROM signal_leads ${where}`).get(...params) as { count: number };
-
-    const limit = query.limit || 50;
-    const offset = query.offset || 0;
-    const items = db
-      .prepare(`SELECT * FROM signal_leads ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
-      .all(...params, limit, offset) as SignalLead[];
-
-    return { items, total: totalRow?.count || 0 };
+    const total = (db.prepare(`SELECT COUNT(*) AS count FROM signal_leads sl ${where}`).get(...params) as { count: number }).count;
+    const limit = Math.max(1, Math.min(query.limit || 50, 200));
+    const offset = Math.max(0, query.offset || 0);
+    const items = db.prepare(`
+      SELECT sl.* FROM signal_leads sl ${where}
+      ORDER BY datetime(sl.last_detected_at) DESC LIMIT ? OFFSET ?
+    `).all(...params, limit, offset) as SignalLead[];
+    return { items, total };
   }
 
-  /**
-   * Actualiza el estado de un lead (Aprobar, Rechazar, Editar mensaje)
-   */
-  updateLeadStatus(leadId: string, status: SignalLeadStatus, icebreakerPreview?: string): boolean {
-    const db = getDb();
-    const now = new Date().toISOString();
-    let query = "UPDATE signal_leads SET status = ?, updated_at = ?";
-    const params: any[] = [status, now];
+  getLead(id: string, actor?: ApiActor | SignalActorScope): SignalLead | null {
+    const scope = actorScope(actor);
+    return (this.database().prepare(`
+      SELECT * FROM signal_leads WHERE id = ?
+      ${scope && !scope.isSuperAdmin ? "AND workspace_owner_id = ?" : ""}
+    `).get(id, ...(scope && !scope.isSuperAdmin ? [scope.workspaceOwnerId] : [])) as SignalLead | undefined) || null;
+  }
 
-    if (icebreakerPreview !== undefined) {
-      query += ", icebreaker_preview = ?";
-      params.push(icebreakerPreview);
+  updateLeadStatus(id: string, status: SignalLeadStatus, icebreakerPreview: string | undefined, actor?: ApiActor | SignalActorScope): boolean {
+    const lead = this.getLead(id, actor);
+    if (!lead) return false;
+    const result = this.database().prepare(`
+      UPDATE signal_leads SET status = ?, icebreaker_preview = COALESCE(?, icebreaker_preview), updated_at = datetime('now')
+      WHERE id = ?
+    `).run(status, icebreakerPreview ?? null, id);
+    return result.changes > 0;
+  }
+
+  promoteLead(id: string, input: { trigger: "manual" | "autopilot"; listId?: string | null; workflowId?: string | null }, actor?: ApiActor | SignalActorScope) {
+    const lead = this.getLead(id, actor);
+    if (!lead) throw new Error("Lead no encontrado");
+    return promoteSignalLead(this.database(), id, input);
+  }
+
+  async importLeads(ids: string[], target: { list_id?: string; workflow_id?: string }, actor?: ApiActor | SignalActorScope) {
+    const results = [];
+    for (const id of ids) {
+      if (!this.getLead(id, actor)) continue;
+      results.push(this.promoteLead(id, { trigger: "manual", listId: target.list_id, workflowId: target.workflow_id }, actor));
     }
-
-    query += " WHERE id = ?";
-    params.push(leadId);
-
-    const res = db.prepare(query).run(...params);
-    return res.changes > 0;
-  }
-
-  /**
-   * Importa leads aprobados hacia una Lista (/lists) o Campaña (/workflows)
-   */
-  async importLeads(
-    leadIds: string[],
-    target: { list_id?: string; workflow_id?: string }
-  ): Promise<{ imported: number; targetIds: string[] }> {
-    const db = getDb();
-    if (!leadIds.length) return { imported: 0, targetIds: [] };
-
-    const placeholders = leadIds.map(() => "?").join(",");
-    const leads = db
-      .prepare(`SELECT * FROM signal_leads WHERE id IN (${placeholders})`)
-      .all(...leadIds) as SignalLead[];
-
-    let importedCount = 0;
-    const targetIds: string[] = [];
-
-    db.transaction(() => {
-      for (const lead of leads) {
-        // 1. Verificar si ya existe en targets por linkedin_url
-        let existing = db
-          .prepare("SELECT id FROM targets WHERE linkedin_url = ?")
-          .get(lead.linkedin_url) as { id: string } | undefined;
-
-        let targetId = existing?.id;
-
-        if (!targetId) {
-          targetId = randomUUID();
-          db.prepare(`
-            INSERT INTO targets (id, name, headline, company, location, linkedin_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-          `).run(targetId, lead.full_name, lead.headline, lead.company, lead.location, lead.linkedin_url);
-        }
-
-        targetIds.push(targetId);
-
-        // 2. Asociar a lista si corresponde
-        if (target.list_id) {
-          db.prepare(`
-            INSERT OR IGNORE INTO list_targets (list_id, target_id)
-            VALUES (?, ?)
-          `).run(target.list_id, targetId);
-        }
-
-        // 3. Marcar lead como importado
-        db.prepare(`
-          UPDATE signal_leads
-          SET status = 'imported', imported_target_id = ?, updated_at = datetime('now')
-          WHERE id = ?
-        `).run(targetId, lead.id);
-
-        importedCount++;
-      }
-    })();
-
-    return { imported: importedCount, targetIds };
-  }
-
-  /**
-   * Ejecuta el escaneo de un monitor de señales mediante Unipile
-   */
-  async scanMonitor(monitorId: string): Promise<{ success: boolean; found: number; newLeads: number; message: string }> {
-    const db = getDb();
-    const monitor = this.getMonitor(monitorId);
-    if (!monitor) {
-      throw new Error(`Monitor no encontrado: ${monitorId}`);
-    }
-
-    this.logEvent(monitorId, "scan_started", { type: monitor.type });
-
-    let found = 0;
-    let newLeads = 0;
-
-    try {
-      if (
-        monitor.type === "post_engagement" ||
-        monitor.type === "influencer_activity" ||
-        monitor.type === "competitor_reactions" ||
-        monitor.type === "high_intent_comments"
-      ) {
-        // Extraer postId o URN
-        const postId = this.extractPostId(monitor.target_url || "");
-        if (!postId) {
-          // Si no hay post ID válido, generar datos de demostración calificados con la señal
-          const mockLeads = this.generateSampleLeads(monitor);
-          newLeads = this.saveDiscoveredLeads(monitor, mockLeads);
-          found = mockLeads.length;
-        } else {
-          // Consultar comentarios y reacciones en Unipile
-          try {
-            const commentsRes = (monitor.type === "competitor_reactions")
-              ? null
-              : await unipile.getPostComments(postId, monitor.account_id || undefined);
-            const reactionsRes = (monitor.type === "high_intent_comments")
-              ? null
-              : await unipile.getPostReactions(postId, monitor.account_id || undefined);
-
-            const discovered: Array<Partial<SignalLead>> = [];
-
-            if (commentsRes?.items) {
-              for (const c of commentsRes.items) {
-                if (c.author?.public_identifier || c.author?.id) {
-                  const leadName = c.author.name || `${c.author.first_name || ''} ${c.author.last_name || ''}`.trim() || 'Contacto';
-                  discovered.push({
-                    linkedin_url: c.author.profile_url || `https://www.linkedin.com/in/${c.author.public_identifier || c.author.id}`,
-                    full_name: leadName,
-                    headline: c.author.headline || 'Profesional en LinkedIn',
-                    company: monitor.competitor_name || undefined,
-                    signal_type: 'high_intent_comments',
-                    signal_snippet: c.text ? `Comentó: "${c.text.slice(0, 150)}..."` : 'Comentó activamente en la publicación',
-                    icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
-                      full_name: leadName,
-                      company: monitor.competitor_name || undefined,
-                      signal_type: 'high_intent_comments',
-                    }),
-                    score: 92,
-                  });
-                }
-              }
-            }
-
-            if (reactionsRes?.items) {
-              for (const r of reactionsRes.items) {
-                if (r.author?.public_identifier || r.author?.id) {
-                  const leadName = r.author.name || 'Contacto';
-                  discovered.push({
-                    linkedin_url: r.author.profile_url || `https://www.linkedin.com/in/${r.author.public_identifier || r.author.id}`,
-                    full_name: leadName,
-                    headline: r.author.headline || 'Profesional en LinkedIn',
-                    company: monitor.competitor_name || undefined,
-                    signal_type: 'competitor_reactions',
-                    signal_snippet: `Reaccionó (${r.reaction_type || 'Like'}) al post de ${monitor.competitor_name || 'competidor'}`,
-                    icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
-                      full_name: leadName,
-                      company: monitor.competitor_name || undefined,
-                      signal_type: 'competitor_reactions',
-                    }),
-                    score: 85,
-                  });
-                }
-              }
-            }
-
-            found = discovered.length;
-            newLeads = this.saveDiscoveredLeads(monitor, discovered.length > 0 ? discovered : this.generateSampleLeads(monitor));
-          } catch (unipileErr) {
-            console.warn("[SignalRadar] Error al consultar el motor de datos para post, recurriendo a simulación contextual:", unipileErr);
-            const fallbackLeads = this.generateSampleLeads(monitor);
-            found = fallbackLeads.length;
-            newLeads = this.saveDiscoveredLeads(monitor, fallbackLeads);
-          }
-        }
-      } else {
-        // Manejar señales de Búsqueda de Perfiles / Palabras Clave / Cambios de Rol
-        const sampleLeads = this.generateSampleLeads(monitor);
-        found = sampleLeads.length;
-        newLeads = this.saveDiscoveredLeads(monitor, sampleLeads);
-      }
-
-      // Actualizar timestamp del monitor
-      db.prepare("UPDATE signal_monitors SET last_checked_at = datetime('now') WHERE id = ?").run(monitorId);
-
-      this.logEvent(monitorId, "scan_completed", { found, newLeads });
-      return {
-        success: true,
-        found,
-        newLeads,
-        message: `Escaneo finalizado: ${found} detectados, ${newLeads} nuevos prospectos añadidos.`,
-      };
-    } catch (err: any) {
-      this.logEvent(monitorId, "scan_error", { error: err.message });
-      throw err;
-    }
-  }
-
-  /**
-   * Guarda los leads descubiertos aplicando el filtro de duplicados y modo Autopilot
-   */
-  private saveDiscoveredLeads(monitor: SignalMonitor, leads: Array<Partial<SignalLead>>): number {
-    const db = getDb();
-    let count = 0;
-    const autoApproveIds: string[] = [];
-
-    db.transaction(() => {
-      for (const l of leads) {
-        if (!l.linkedin_url || !l.full_name) continue;
-
-        // Comprobar si ya fue descubierto en este monitor
-        const existing = db
-          .prepare("SELECT id FROM signal_leads WHERE monitor_id = ? AND linkedin_url = ?")
-          .get(monitor.id, l.linkedin_url) as { id: string } | undefined;
-
-        if (existing) continue;
-
-        const id = randomUUID();
-        const status: SignalLeadStatus = monitor.mode === "autopilot" ? "approved" : "pending";
-
-        db.prepare(`
-          INSERT INTO signal_leads (
-            id, monitor_id, linkedin_url, full_name, headline, company, location,
-            signal_type, signal_snippet, icebreaker_preview, status, score, metadata_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          id,
-          monitor.id,
-          l.linkedin_url,
-          l.full_name,
-          l.headline || null,
-          l.company || null,
-          l.location || null,
-          l.signal_type || "signal_detected",
-          l.signal_snippet || null,
-          l.icebreaker_preview || null,
-          status,
-          l.score || 85,
-          l.metadata_json || null
-        );
-
-        if (status === "approved" && monitor.target_list_id) {
-          autoApproveIds.push(id);
-        }
-
-        count++;
-      }
-    })();
-
-    // Si está en piloto automático y tiene lista asignada, auto-importar
-    if (autoApproveIds.length > 0 && monitor.target_list_id) {
-      this.importLeads(autoApproveIds, { list_id: monitor.target_list_id }).catch(console.error);
-    }
-
-    return count;
-  }
-
-  /**
-   * Ejecuta una consulta de prospección en lenguaje natural ("Ask AI" - Minuto 18:09 del video de Gojiberry)
-   */
-  async executeAskResearch(
-    query: string,
-    accountId?: string
-  ): Promise<{ query: string; leads: Array<Partial<SignalLead>> }> {
-    // Simula y procesa la investigación inteligente en la web y LinkedIn según el prompt
-    const keywords = query.toLowerCase();
-    const isFunding = keywords.includes("fund") || keywords.includes("capital") || keywords.includes("ronda") || keywords.includes("raise");
-    const isHiring = keywords.includes("contrat") || keywords.includes("hir") || keywords.includes("crec");
-    const isEvent = keywords.includes("evento") || keywords.includes("feria") || keywords.includes("conferencia") || keywords.includes("trade show");
-
-    const sampleResults: Array<Partial<SignalLead>> = [
-      {
-        full_name: "Carlos Mendoza",
-        headline: "Chief Executive Officer @ LogiTech Solutions | Series A",
-        company: "LogiTech Solutions",
-        location: "Ciudad de México, México",
-        linkedin_url: "https://www.linkedin.com/in/carlos-mendoza-logitech",
-        signal_type: isFunding ? "funding_round" : "ask_research",
-        signal_snippet: isFunding
-          ? "Recaudó $4.5M en Ronda Serie A anunciado hace 5 días"
-          : "Empresa con crecimiento de +35% en contratación este mes",
-        icebreaker_preview: "Hola Carlos, felicitaciones por el anuncio de la ronda Serie A con LogiTech. Veo que están escalando operaciones...",
-        score: 95,
-      },
-      {
-        full_name: "Valeria Rossi",
-        headline: "VP of Sales & Revenue Operations @ CloudFlow Latam",
-        company: "CloudFlow Latam",
-        location: "Bogotá, Colombia",
-        linkedin_url: "https://www.linkedin.com/in/valeria-rossi-cloudflow",
-        signal_type: "job_change",
-        signal_snippet: "Asumió el liderazgo de ventas hace menos de 45 días",
-        icebreaker_preview: "Hola Valeria, felicidades por tu nombramiento como VP de Ventas en CloudFlow. Imagino que estás definiendo el nuevo stack...",
-        score: 92,
-      },
-      {
-        full_name: "Guillermo Pardo",
-        headline: "Head of Growth & Enterprise Partnerships @ FinScale",
-        company: "FinScale",
-        location: "Santiago, Chile",
-        linkedin_url: "https://www.linkedin.com/in/guillermo-pardo-finscale",
-        signal_type: isEvent ? "event_attendee" : "ask_research",
-        signal_snippet: isEvent
-          ? "Participante destacado en SaaStock Latam 2026"
-          : "Buscando activamente soluciones de automatización de prospección",
-        icebreaker_preview: "Hola Guillermo, te escribo tras ver tu participación en SaaStock. Coincido con lo que comentaste respecto al CAC...",
-        score: 88,
-      },
-      {
-        full_name: "Mariana Alarcón",
-        headline: "Founder & CEO @ HealthAI Platform",
-        company: "HealthAI Platform",
-        location: "Buenos Aires, Argentina",
-        linkedin_url: "https://www.linkedin.com/in/mariana-alarcon-healthai",
-        signal_type: "funding_round",
-        signal_snippet: "Seed round cerrada de $1.8M anunciada en TechCrunch",
-        icebreaker_preview: "Hola Mariana, vi la mención de HealthAI en TechCrunch sobre su última ronda. ¡Gran hito! Me preguntaba cómo están abordando...",
-        score: 94,
-      },
-    ];
-
     return {
-      query,
-      leads: sampleResults,
+      imported: results.filter((result) => ["imported", "enrolled"].includes(result.state)).length,
+      targetIds: results.map((result) => result.targetId).filter((id): id is string => Boolean(id)),
+      results,
     };
   }
 
-  /**
-   * Genera prospectos de muestra contextualmente acordes al monitor (como en Gojiberry Preview)
-   */
-  private generateSampleLeads(monitor: SignalMonitor): Array<Partial<SignalLead>> {
-    const comp = monitor.competitor_name || "la competencia";
-    const keywords: string[] = monitor.keywords_json ? JSON.parse(monitor.keywords_json) : [];
-    const mainKw = keywords.length > 0 ? keywords[0] : "automatización y ventas";
-
-    const sampleResults: Array<Partial<SignalLead>> = (() => {
-      switch (monitor.type) {
-      case "competitor_reactions":
-        return [
-          {
-            full_name: "Lucía Fernández",
-            headline: "Head of Business Development @ TechCorp Latam",
-            company: "TechCorp Latam",
-            location: "Barcelona, España",
-            linkedin_url: `https://www.linkedin.com/in/lucia-fernandez-${randomUUID().slice(0, 6)}`,
-            signal_type: "competitor_reactions",
-            signal_snippet: `Reaccionó con 'Insightful' al post de ${comp} sobre cuellos de botella en prospección B2B`,
-            icebreaker_preview: `Hola Lucía, noté que reaccionaste al post de ${comp} sobre prospección moderna. Me pareció muy relevante el debate y quería compartirte...`,
-            score: 91,
-          },
-          {
-            full_name: "Gabriel Ramos",
-            headline: "VP de Crecimiento & Estrategia @ NovaLogistics",
-            company: "NovaLogistics",
-            location: "Bogotá, Colombia",
-            linkedin_url: `https://www.linkedin.com/in/gabriel-ramos-${randomUUID().slice(0, 6)}`,
-            signal_type: "competitor_reactions",
-            signal_snippet: `Reaccionó con 'Support' a la actualización comercial de ${comp}`,
-            icebreaker_preview: `Hola Gabriel, vi tu interés en la publicación reciente de ${comp}. En InHubFlow resolvemos ese mismo reto con un enfoque autónomo...`,
-            score: 86,
-          },
-        ];
-
-      case "high_intent_comments":
-      case "post_engagement":
-        return [
-          {
-            full_name: "Martín Echavarría",
-            headline: "Director Comercial & Alianzas @ Grupo Retail B2B",
-            company: "Grupo Retail B2B",
-            location: "Madrid, España",
-            linkedin_url: `https://www.linkedin.com/in/martin-echavarria-${randomUUID().slice(0, 6)}`,
-            signal_type: "high_intent_comments",
-            signal_snippet: `Comentó en el post de ${comp}: "Totalmente de acuerdo, la tasa de respuesta en frío cayó dramáticamente si no hay contexto previo."`,
-            icebreaker_preview: `Hola Martín, vi tu comentario en la publicación de ${comp} sobre la caída de conversión en frío. Coincido 100% contigo...`,
-            score: 96,
-          },
-          {
-            full_name: "Carolina Silva",
-            headline: "SVP Sales Operations @ CloudConnect",
-            company: "CloudConnect",
-            location: "Santiago, Chile",
-            linkedin_url: `https://www.linkedin.com/in/carolina-silva-${randomUUID().slice(0, 6)}`,
-            signal_type: "high_intent_comments",
-            signal_snippet: `Comentó: "¿Tienen alguna comparativa o alternativa que integre directamente el inbox de LinkedIn con el CRM?"`,
-            icebreaker_preview: `Hola Carolina, leí tu consulta en el post de ${comp} buscando integración fluida de LinkedIn con CRM. Es exactamente lo que construimos en InHubFlow...`,
-            score: 98,
-          },
-        ];
-
-      case "competitor_followers":
-        return [
-          {
-            full_name: "Andrés Villalobos",
-            headline: "Director de Operaciones Comerciales @ FinPeak",
-            company: "FinPeak",
-            location: "Ciudad de México, México",
-            linkedin_url: `https://www.linkedin.com/in/andres-villalobos-${randomUUID().slice(0, 6)}`,
-            signal_type: "competitor_followers",
-            signal_snippet: `Sigue a ${comp} y a sus fundadores activamente en LinkedIn`,
-            icebreaker_preview: `Hola Andrés, veo que sigues muy de cerca el ecosistema de ${comp}. Si estás evaluando soluciones para tu equipo, te interesará ver cómo...`,
-            score: 88,
-          },
-        ];
-
-      case "new_in_role":
-      case "job_changes":
-        return [
-          {
-            full_name: "Diego Sánchez",
-            headline: "VP of Revenue & Marketing @ ScaleUp SaaS",
-            company: "ScaleUp SaaS",
-            location: "Valencia, España",
-            linkedin_url: `https://www.linkedin.com/in/diego-sanchez-${randomUUID().slice(0, 6)}`,
-            signal_type: "new_in_role",
-            signal_snippet: "Asumió el cargo de VP of Revenue hace menos de 45 días (Ventana dorada de 90 días)",
-            icebreaker_preview: "Hola Diego, muchas felicidades por tu nueva posición como VP of Revenue en ScaleUp. Éxitos en esta nueva etapa...",
-            score: 95,
-          },
-          {
-            full_name: "Mariana Alarcón",
-            headline: "Chief Commercial Officer @ HealthTech Global",
-            company: "HealthTech Global",
-            location: "Buenos Aires, Argentina",
-            linkedin_url: `https://www.linkedin.com/in/mariana-alarcon-${randomUUID().slice(0, 6)}`,
-            signal_type: "new_in_role",
-            signal_snippet: "Nombrada CCO hace 28 días; definiendo nuevo stack tecnológico para el equipo",
-            icebreaker_preview: "Hola Mariana, felicitaciones por asumir la dirección comercial en HealthTech Global. En estos primeros meses, si estás evaluando herramientas...",
-            score: 94,
-          },
-        ];
-
-      case "internal_promotion":
-        return [
-          {
-            full_name: "Sebastián Cordero",
-            headline: "Promovido a Director de Ventas Enterprise @ DataStream",
-            company: "DataStream",
-            location: "Lima, Perú",
-            linkedin_url: `https://www.linkedin.com/in/sebastian-cordero-${randomUUID().slice(0, 6)}`,
-            signal_type: "internal_promotion",
-            signal_snippet: "Ascendido internamente de Account Executive a Director de Ventas Enterprise este mes",
-            icebreaker_preview: "Hola Sebastián, qué gran noticia tu ascenso a Director de Ventas en DataStream. Conocer la operación desde adentro te dará una ventaja tremenda...",
-            score: 93,
-          },
-        ];
-
-      case "active_poster":
-        return [
-          {
-            full_name: "Esteban Mora",
-            headline: "CEO & Co-founder @ Apex Digital | Creador Top Voice B2B",
-            company: "Apex Digital",
-            location: "Medellín, Colombia",
-            linkedin_url: `https://www.linkedin.com/in/esteban-mora-${randomUUID().slice(0, 6)}`,
-            signal_type: "active_poster",
-            signal_snippet: "Publicó hace 3 días un análisis sobre optimización de costes de adquisición en B2B",
-            icebreaker_preview: "Hola Esteban, excelente tu post de hace unos días sobre la reducción del CAC en canales outbound. Me gustó especialmente tu enfoque sobre...",
-            score: 90,
-          },
-        ];
-
-      case "keyword_intent":
-        return [
-          {
-            full_name: "Valeria Rossi",
-            headline: "Gerente de Adquisición & Demand Gen @ SaaSify Latam",
-            company: "SaaSify Latam",
-            location: "Montevideo, Uruguay",
-            linkedin_url: `https://www.linkedin.com/in/valeria-rossi-${randomUUID().slice(0, 6)}`,
-            signal_type: "keyword_intent",
-            signal_snippet: `Publicó en LinkedIn mencionando "${mainKw}": "¿Alguien me recomienda una herramienta para prospección B2B que funcione en Latam?"`,
-            icebreaker_preview: `Hola Valeria, vi tu publicación reciente consultando por "${mainKw}". Justo desarrollamos InHubFlow para resolver esa necesidad sin cuellos de botella...`,
-            score: 97,
-          },
-          {
-            full_name: "Tomás Guisado",
-            headline: "Head of Outbound Strategy @ GrowthLabs",
-            company: "GrowthLabs",
-            location: "Madrid, España",
-            linkedin_url: `https://www.linkedin.com/in/tomas-guisado-${randomUUID().slice(0, 6)}`,
-            signal_type: "keyword_intent",
-            signal_snippet: `Comentó en un hilo pidiendo alternativas a ${comp} por problemas de entregabilidad y costos`,
-            icebreaker_preview: `Hola Tomás, leí tu mensaje sobre las limitaciones que estás teniendo con ${comp}. Quería mostrarte cómo varios equipos migraron a InHubFlow...`,
-            score: 94,
-          },
-        ];
-
-      case "hiring_spree":
-        return [
-          {
-            full_name: "Fernando Quiroz",
-            headline: "VP of People & Sales Talent @ Nexa Logistics",
-            company: "Nexa Logistics",
-            location: "Guadalajara, México",
-            linkedin_url: `https://www.linkedin.com/in/fernando-quiroz-${randomUUID().slice(0, 6)}`,
-            signal_type: "hiring_spree",
-            signal_snippet: "Empresa con 4 vacantes activas publicadas para SDRs y Account Executives",
-            icebreaker_preview: "Hola Fernando, noté que están abriendo nuevas posiciones comerciales en Nexa. Cuando se incorporan nuevos reps, acelerar su rampa de prospección es clave...",
-            score: 91,
-          },
-        ];
-
-      case "company_growth":
-        return [
-          {
-            full_name: "Paola Benítez",
-            headline: "Chief Operating Officer @ Soluciones Cloud Latam",
-            company: "Soluciones Cloud Latam",
-            location: "Santiago, Chile",
-            linkedin_url: `https://www.linkedin.com/in/paola-benitez-${randomUUID().slice(0, 6)}`,
-            signal_type: "company_growth",
-            signal_snippet: "Empresa en hipercrecimiento (+32% de aumento de personal en los últimos 6 meses)",
-            icebreaker_preview: "Hola Paola, muchas felicidades por la impresionante expansión que está teniendo Soluciones Cloud. Con ese nivel de aceleración, optimizar la captación comercial...",
-            score: 92,
-          },
-        ];
-
-      default:
-        return [
-          {
-            full_name: "Martín Echavarría",
-            headline: "Director Comercial @ Tech B2B",
-            company: "Tech B2B",
-            location: "Madrid, España",
-            linkedin_url: `https://www.linkedin.com/in/martin-echavarria-${randomUUID().slice(0, 6)}`,
-            signal_type: "signal_detected",
-            signal_snippet: `Detectado mediante señal de intención estratégica relacionada a ${comp}`,
-            icebreaker_preview: `Hola Martín, te contacto porque noté tu liderazgo en el sector...`,
-            score: 89,
-          },
-        ];
-      }
-    })();
-
-    return sampleResults.map((lead) => ({
-      ...lead,
-      icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
-        full_name: lead.full_name || "Contacto",
-        company: lead.company || undefined,
-        headline: lead.headline || undefined,
-        signal_type: lead.signal_type || monitor.type,
-        signal_snippet: lead.signal_snippet || undefined,
-      }),
-    }));
+  private acquireScanLease(db: Database.Database, monitorId: string): string | null {
+    const owner = randomUUID();
+    const expires = new Date(this.now() + 10 * 60_000).toISOString();
+    const result = db.prepare(`
+      UPDATE signal_monitors
+      SET scan_state = 'running', scan_lease_owner = ?, scan_lease_expires_at = ?, updated_at = datetime('now')
+      WHERE id = ? AND status = 'active'
+        AND (scan_lease_expires_at IS NULL OR datetime(scan_lease_expires_at) <= datetime('now'))
+    `).run(owner, expires, monitorId);
+    return result.changes === 1 ? owner : null;
   }
 
-  /**
-   * Genera el mensaje IA con la fórmula Anti-Stalker de GojiBerry:
-   * No decir "vi que le diste like a mi competidor" (creepy/acosador),
-   * sino usar la señal detectada como contexto natural para abrir una conversación relevante.
-   */
-  generateAntiStalkerIcebreaker(
-    monitor: SignalMonitor,
-    lead: {
-      full_name: string;
-      company?: string | null;
-      headline?: string | null;
-      signal_type?: string;
-      signal_snippet?: string;
-    }
-  ): string {
-    const firstName = lead.full_name.split(" ")[0] || "Hola";
-    const company = lead.company || "tu empresa";
-    const comp = monitor.competitor_name || "soluciones del sector";
-    let keywords: string[] = [];
+  async scanMonitor(monitorId: string, trigger: "manual" | "scheduled" | "initial" = "manual", actor?: ApiActor | SignalActorScope) {
+    const db = this.database();
+    const monitor = this.getMonitor(monitorId, actor);
+    if (!monitor) throw new Error("Monitor no encontrado");
+    if (!monitor.account_id) throw new SignalScanError("Selecciona una cuenta de LinkedIn para escanear", "invalid_configuration", false);
+    const leaseOwner = this.acquireScanLease(db, monitor.id);
+    if (!leaseOwner) throw new SignalScanError("El monitor ya se está escaneando", "provider_error", true);
+    const scanRunId = randomUUID();
+    db.prepare(`
+      INSERT INTO signal_scan_runs (id, monitor_id, trigger, state, cursor_before)
+      VALUES (?, ?, ?, 'running', ?)
+    `).run(scanRunId, monitor.id, trigger, monitor.cursor_json);
+    this.logEvent(monitor.id, "scan_started", { scanRunId, trigger });
+
     try {
-      if (monitor.keywords_json) keywords = JSON.parse(monitor.keywords_json);
-    } catch {}
-    const mainKw = keywords.length > 0 ? keywords[0] : "prospección B2B y automatización";
-
-    let cfg: { objective?: string; tone?: string; custom_template?: string } = {};
-    if (monitor.message_config_json) {
-      try {
-        cfg = JSON.parse(monitor.message_config_json);
-      } catch {}
-    }
-
-    if (cfg.custom_template && cfg.custom_template.trim()) {
-      return cfg.custom_template
-        .replace(/\{first_name\}/gi, firstName)
-        .replace(/\{company\}/gi, company)
-        .replace(/\{topic\}/gi, mainKw)
-        .replace(/\{competitor\}/gi, comp);
-    }
-
-    const obj = cfg.objective || "conversation";
-    const tone = cfg.tone || "consultive";
-
-    // 1. Competitor Engagement / Comments / Reactions / Experts
-    if (
-      monitor.type === "competitor_reactions" ||
-      monitor.type === "high_intent_comments" ||
-      monitor.type === "competitor_followers" ||
-      monitor.type === "post_engagement" ||
-      monitor.type === "influencer_activity"
-    ) {
-      if (obj === "demo") {
-        return `Hola ${firstName}, vi que has estado explorando soluciones de ${mainKw}. En InHubFlow ayudamos a equipos como el de ${company} a multiplicar sus reuniones cualificadas sin fricción. ¿Tendrías 10 min esta semana para ver una demo breve?`;
+      if (!this.client?.isConfigured()) throw new SignalScanError("El motor de búsqueda de LinkedIn no está configurado", "provider_error", true);
+      const resolved = await resolveUnipileAccount(db, monitor.account_id, this.client as UnipileClient);
+      const account = resolved.account || await this.client.getAccount(resolved.unipileAccountId);
+      const capabilities = { salesNavigator: accountHasSalesNavigator(account.connection_params) };
+      const icp = parseJson<SignalIcpFilters>(monitor.icp_filters_json, {});
+      const keywords = parseJson<string[]>(monitor.keywords_json, []);
+      const cursor = parseJson<SignalScanCursor | null>(monitor.cursor_json, null);
+      const raw = await scanRealSignals(this.client, {
+        monitor,
+        remoteAccountId: resolved.unipileAccountId,
+        icp,
+        keywords,
+        cursor,
+        limit: 50,
+        hasSalesNavigator: capabilities.salesNavigator,
+      });
+      const enriched: DiscoveredSignalLead[] = [];
+      for (const candidate of raw.leads.slice(0, 50)) {
+        const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId);
+        if (lead && passesIcp(lead, icp)) enriched.push(lead);
       }
-      if (obj === "resource") {
-        return `Hola ${firstName}, noté que te interesa el debate actual sobre ${mainKw}. Preparamos un playbook con los frameworks de prospección con mayor tasa de respuesta en B2B hoy en día. ¿Te gustaría que te lo comparta por aquí?`;
-      }
-      // conversation (default)
-      if (tone === "direct") {
-        return `Hola ${firstName}, veo que sigues de cerca la innovación en ${mainKw}. ¿Cómo están gestionando actualmente este proceso en ${company}? Sería un gusto conectar e intercambiar visiones.`;
-      }
-      if (tone === "professional") {
-        return `Hola ${firstName}, sigo tu trayectoria en ${company}. Dado el creciente interés por optimizar ${mainKw}, me gustaría conectar contigo y compartir algunas mejores prácticas del sector.`;
-      }
-      // consultive
-      return `Hola ${firstName}, vi que has estado explorando temas de ${mainKw}. En ${company}, ¿cómo están abordando actualmente la optimización de este proceso? Me encantaría conectar.`;
+      const persisted = await this.persistDiscoveredLeads(monitor, enriched, scanRunId, icp);
+      const completedAt = new Date(this.now()).toISOString();
+      const next = nextScanAt(monitor.scan_interval_minutes, this.now());
+      const state = enriched.length === 0 ? "no_results" : "completed";
+      db.transaction(() => {
+        db.prepare(`
+          UPDATE signal_scan_runs SET state = ?, cursor_after = ?, found_count = ?,
+            new_lead_count = ?, new_observation_count = ?, completed_at = ? WHERE id = ?
+        `).run(state, JSON.stringify(raw.cursor || null), enriched.length, persisted.newLeads, persisted.newObservations, completedAt, scanRunId);
+        db.prepare(`
+          UPDATE signal_monitors SET scan_state = 'idle', scan_lease_owner = NULL,
+            scan_lease_expires_at = NULL, cursor_json = ?, capabilities_json = ?,
+            last_checked_at = ?, last_success_at = ?, last_error = NULL,
+            consecutive_failures = 0, next_scan_at = ?, updated_at = datetime('now')
+          WHERE id = ? AND scan_lease_owner = ?
+        `).run(JSON.stringify(raw.cursor || null), JSON.stringify(capabilities), completedAt, completedAt, next, monitor.id, leaseOwner);
+      })();
+      this.logEvent(monitor.id, "scan_completed", { scanRunId, found: enriched.length, ...persisted, state });
+      return {
+        success: true,
+        state,
+        found: enriched.length,
+        newLeads: persisted.newLeads,
+        newObservations: persisted.newObservations,
+        promoted: persisted.promoted,
+        message: enriched.length
+          ? `Escaneo completado: ${enriched.length} señales reales verificadas, ${persisted.newLeads} nuevos prospectos.`
+          : "Escaneo completado sin nuevas señales reales.",
+      };
+    } catch (error) {
+      const code = providerErrorCode(error);
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable = error instanceof SignalScanError ? error.retryable : true;
+      const failures = monitor.consecutive_failures + 1;
+      const backoffMinutes = retryable ? Math.min(24 * 60, 15 * 2 ** Math.min(failures, 6)) : monitor.scan_interval_minutes;
+      const state = error instanceof SignalScanError && error.code === "unsupported_capability" ? "unsupported" : "failed";
+      db.transaction(() => {
+        db.prepare(`
+          UPDATE signal_scan_runs SET state = ?, error_code = ?, error_message = ?, completed_at = datetime('now') WHERE id = ?
+        `).run(state, code, message, scanRunId);
+        db.prepare(`
+          UPDATE signal_monitors SET scan_state = 'error', scan_lease_owner = NULL,
+            scan_lease_expires_at = NULL, last_checked_at = datetime('now'), last_error = ?,
+            consecutive_failures = ?, next_scan_at = ?, updated_at = datetime('now')
+          WHERE id = ? AND scan_lease_owner = ?
+        `).run(message, failures, nextScanAt(backoffMinutes, this.now()), monitor.id, leaseOwner);
+      })();
+      this.logEvent(monitor.id, "scan_failed", { scanRunId, code, error: message, retryable });
+      throw error;
     }
-
-    // 2. Job Changes / Just Hired (<90 days)
-    if (monitor.type === "new_in_role" || monitor.type === "job_changes" || monitor.type === "internal_promotion") {
-      if (obj === "demo") {
-        return `Hola ${firstName}, ¡muchas felicidades por tu nueva posición en ${company}! Durante los primeros 90 días la prioridad suele ser acelerar resultados rápido. ¿Te gustaría que te muestre en 10 min cómo apoyamos a directores en esta fase?`;
-      }
-      if (obj === "resource") {
-        return `Hola ${firstName}, felicitaciones por tu rol en ${company}. Te comparto un checklist práctico para estructurar el stack de prospección en los primeros 90 días. ¿Te interesaría revisarlo?`;
-      }
-      return `Hola ${firstName}, felicitaciones por tu nueva etapa en ${company}. En estos primeros meses al frente del equipo, ¿están revisando o renovando herramientas de prospección? Éxitos en el rol.`;
-    }
-
-    // 3. Hiring Spree
-    if (monitor.type === "hiring_spree" || monitor.type === "company_growth") {
-      if (obj === "demo") {
-        return `Hola ${firstName}, noté el crecimiento del equipo en ${company}. Al incorporar nuevos talentos, dotarlos de automatización inteligente reduce la curva de aprendizaje a la mitad. ¿Te interesaría ver una demo rápida?`;
-      }
-      return `Hola ${firstName}, felicitaciones por la expansión y nuevas vacantes en ${company}. Al sumar nuevos perfiles comerciales, asegurar herramientas de alta conversión es clave. ¿Cómo están planificando el onboarding de prospección?`;
-    }
-
-    // 4. Keyword Intent / Active Poster / Default
-    if (obj === "demo") {
-      return `Hola ${firstName}, sigo tu trabajo en ${company}. Hemos desarrollado una solución enfocada en ${mainKw} que está duplicando respuestas en LinkedIn. ¿Tendrías 10 min para una demo rápida?`;
-    }
-    if (obj === "resource") {
-      return `Hola ${firstName}, noté tu interés en ${mainKw}. Armamos una guía con casos prácticos aplicados a empresas como ${company}. ¿Te parece bien si te la paso por aquí?`;
-    }
-    return `Hola ${firstName}, vi que sigues activo en temas de ${mainKw}. En ${company}, ¿cómo abordan actualmente este canal? Me gustaría conectar contigo para estar al día.`;
   }
 
-  private extractPostId(url: string): string | null {
-    if (!url) return null;
-    const match = url.match(/activity-([0-9]+)/) || url.match(/activity:([0-9]+)/);
-    return match ? match[1] : null;
-  }
-
-  private logEvent(monitorId: string, eventType: string, details: any): void {
+  private async enrichCandidate(candidate: DiscoveredSignalLead, remoteAccountId: string): Promise<DiscoveredSignalLead | null> {
+    const canonical = canonicalLinkedInProfileUrl(candidate.linkedinUrl);
+    if (!canonical) return null;
     try {
-      const db = getDb();
-      db.prepare(`
+      const profile = await this.client!.resolveProfile(canonical, remoteAccountId);
+      const current = profile.work_experience?.find((item) => item.current) || profile.work_experience?.[0];
+      return {
+        ...candidate,
+        linkedinUrl: profile.public_profile_url || profile.profile_url || canonical,
+        providerId: profile.provider_id || candidate.providerId,
+        fullName: fullName(profile, candidate.fullName),
+        headline: profile.headline || candidate.headline || current?.position || null,
+        company: current?.company || candidate.company || null,
+        location: profile.location || candidate.location || current?.location || null,
+      };
+    } catch {
+      return { ...candidate, linkedinUrl: canonical };
+    }
+  }
+
+  private async persistDiscoveredLeads(monitor: SignalMonitor, leads: DiscoveredSignalLead[], scanRunId: string, icp: SignalIcpFilters) {
+    const db = this.database();
+    let newLeads = 0;
+    let newObservations = 0;
+    let promoted = 0;
+    const touched: string[] = [];
+    for (const discovered of leads) {
+      const identity = signalIdentity(discovered);
+      const score = scoreSignalLead(discovered, icp, this.now());
+      let lead = db.prepare("SELECT * FROM signal_leads WHERE monitor_id = ? AND identity_key = ?")
+        .get(monitor.id, identity) as SignalLead | undefined;
+      const observationExists = db.prepare("SELECT 1 FROM signal_observations WHERE monitor_id = ? AND fingerprint = ?")
+        .get(monitor.id, discovered.evidence.fingerprint);
+      if (!lead) {
+        const id = randomUUID();
+        db.prepare(`
+          INSERT INTO signal_leads (
+            id, workspace_owner_id, monitor_id, linkedin_url, identity_key, provider_id,
+            full_name, headline, company, location, signal_type, signal_snippet,
+            status, score, signal_count, first_detected_at, last_detected_at,
+            message_generation_state, promotion_state, metadata_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1, ?, ?, 'pending', 'pending', ?, ?, ?)
+        `).run(
+          id, monitor.workspace_owner_id, monitor.id, canonicalLinkedInProfileUrl(discovered.linkedinUrl) || discovered.linkedinUrl,
+          identity, discovered.providerId || null, discovered.fullName, discovered.headline || null,
+          discovered.company || null, discovered.location || null, discovered.signalType,
+          discovered.evidence.snippet || null, score.total,
+          discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
+          discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
+          JSON.stringify({ score: score.breakdown, matches: score.matches, scanRunId }),
+          new Date(this.now()).toISOString(), new Date(this.now()).toISOString(),
+        );
+        lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(id) as SignalLead;
+        newLeads++;
+      } else if (!observationExists) {
+        db.prepare(`
+          UPDATE signal_leads SET provider_id = COALESCE(provider_id, ?),
+            full_name = COALESCE(NULLIF(full_name, ''), ?), headline = COALESCE(?, headline),
+            company = COALESCE(?, company), location = COALESCE(?, location),
+            signal_type = ?, signal_snippet = ?, score = MAX(score, ?),
+            signal_count = signal_count + 1, last_detected_at = ?, metadata_json = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `).run(discovered.providerId || null, discovered.fullName, discovered.headline || null,
+          discovered.company || null, discovered.location || null, discovered.signalType,
+          discovered.evidence.snippet || null, score.total,
+          discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
+          JSON.stringify({ score: score.breakdown, matches: score.matches, scanRunId }), lead.id);
+        lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(lead.id) as SignalLead;
+      }
+      if (!observationExists) {
+        db.prepare(`
+          INSERT INTO signal_observations (
+            id, workspace_owner_id, monitor_id, lead_id, fingerprint, source_type,
+            source_id, source_url, occurred_at, snippet, score, metadata_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(randomUUID(), monitor.workspace_owner_id, monitor.id, lead.id,
+          discovered.evidence.fingerprint, discovered.evidence.sourceType,
+          discovered.evidence.sourceId || null, discovered.evidence.sourceUrl || null,
+          discovered.evidence.occurredAt || null, discovered.evidence.snippet || null,
+          score.total, JSON.stringify(discovered.evidence.metadata || {}));
+        newObservations++;
+      }
+      touched.push(lead.id);
+    }
+
+    for (const leadId of [...new Set(touched)]) {
+      let lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(leadId) as SignalLead;
+      if (!lead.icebreaker_preview || lead.message_generation_state !== "generated") {
+        const generation = await this.messageGenerator(db, monitor, lead);
+        db.prepare(`
+          UPDATE signal_leads SET icebreaker_preview = ?, message_generation_state = 'generated',
+            message_metadata_json = ?, updated_at = datetime('now') WHERE id = ?
+        `).run(generation.body, JSON.stringify(generation), lead.id);
+        lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(lead.id) as SignalLead;
+      }
+      if (monitor.mode === "autopilot") {
+        const result = promoteSignalLead(db, lead.id, { trigger: "autopilot" });
+        if (result.state === "enrolled") promoted++;
+      }
+    }
+    return { newLeads, newObservations, promoted };
+  }
+
+  async executeAskResearch(query: string, input: {
+    accountId: string;
+    workspaceOwnerId: string;
+    actorId: string;
+    listId?: string | null;
+    workflowId?: string | null;
+    isSuperAdmin?: boolean;
+  }) {
+    const plan = await planSignalResearch(query);
+    const monitor = this.createMonitor({
+      name: `Ask AI · ${plan.monitorName}`,
+      type: plan.signalType,
+      keywords: plan.keywords,
+      icp_filters: {
+        titles: plan.titles,
+        locations: plan.locations,
+        company_sizes: plan.companySizes,
+        exclusions: plan.exclusions,
+        time_window_days: plan.timeWindowDays,
+      },
+      mode: "review",
+      account_id: input.accountId,
+      target_list_id: input.listId || undefined,
+      target_workflow_id: input.workflowId || undefined,
+      message_config: { objective: "conversation", tone: "consultive", language: "es", max_words: 90 },
+      scan_interval_minutes: 10_080,
+      created_by: input.actorId,
+      workspace_owner_id: input.workspaceOwnerId,
+    });
+    this.logEvent(monitor.id, "ask_query_planned", { query, plan });
+    const scan = await this.scanMonitor(monitor.id, "initial", {
+      actorId: input.actorId,
+      workspaceOwnerId: input.workspaceOwnerId,
+      isSuperAdmin: Boolean(input.isSuperAdmin),
+    });
+    this.database().prepare("UPDATE signal_monitors SET status = 'completed', next_scan_at = NULL, updated_at = datetime('now') WHERE id = ?")
+      .run(monitor.id);
+    const leads = this.listLeads({ monitor_id: monitor.id, limit: 100 }, {
+      actorId: input.actorId,
+      workspaceOwnerId: input.workspaceOwnerId,
+      isSuperAdmin: Boolean(input.isSuperAdmin),
+    }).items;
+    return { query, plan, monitorId: monitor.id, scan, leads };
+  }
+
+  getAutopilotReadiness(monitorId: string, actor?: ApiActor | SignalActorScope) {
+    const monitor = this.getMonitor(monitorId, actor);
+    if (!monitor) throw new Error("Monitor no encontrado");
+    return signalAutopilotReadiness(this.database(), monitor);
+  }
+
+  getDueMonitorIds(limit = 5): string[] {
+    return (this.database().prepare(`
+      SELECT id FROM signal_monitors
+      WHERE status = 'active' AND datetime(COALESCE(next_scan_at, '1970-01-01')) <= datetime('now')
+        AND (scan_lease_expires_at IS NULL OR datetime(scan_lease_expires_at) <= datetime('now'))
+      ORDER BY datetime(COALESCE(next_scan_at, created_at)) ASC LIMIT ?
+    `).all(Math.max(1, Math.min(limit, 20))) as Array<{ id: string }>).map((row) => row.id);
+  }
+
+  logEvent(monitorId: string, eventType: string, details: Record<string, unknown>): void {
+    try {
+      this.database().prepare(`
         INSERT INTO signal_events (id, monitor_id, event_type, details_json, created_at)
         VALUES (?, ?, ?, ?, datetime('now'))
       `).run(randomUUID(), monitorId, eventType, JSON.stringify(details));
-    } catch (e) {
-      console.warn("[SignalRadar] No se pudo guardar evento de auditoría:", e);
+    } catch (error) {
+      console.warn("[SignalRadar] No se pudo guardar evento:", error);
     }
   }
 }
 
 export const signalRadarService = new SignalRadarService();
+export { scopeFromActor };

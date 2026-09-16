@@ -1,28 +1,35 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { requireApiActor } from "@/lib/authz";
+import { canAccessLinkedInAccount, requireApiActor } from "@/lib/authz";
+import { getDb } from "@/lib/db";
 import { signalRadarService } from "@/lib/signals/service";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed. Use POST." });
-  }
-
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed. Use POST." });
   const actor = await requireApiActor(req, res);
   if (!actor) return;
-
   try {
-    const { query, account_id } = req.body as {
+    const { query, account_id, list_id, workflow_id } = req.body as {
       query?: string;
       account_id?: string;
+      list_id?: string;
+      workflow_id?: string;
     };
-
-    if (!query || typeof query !== "string" || !query.trim()) {
-      return res.status(400).json({ error: "Debes ingresar una consulta de investigación para Ask AI." });
-    }
-
-    const result = await signalRadarService.executeAskResearch(query.trim(), account_id);
+    if (!query?.trim()) return res.status(400).json({ error: "Ingresa una consulta de investigación" });
+    if (!account_id) return res.status(400).json({ error: "Selecciona una cuenta de LinkedIn" });
+    const db = getDb();
+    if (!canAccessLinkedInAccount(db, actor, account_id)) return res.status(404).json({ error: "Cuenta de LinkedIn no encontrada" });
+    if (list_id && !db.prepare("SELECT 1 FROM lists WHERE id = ?").get(list_id)) return res.status(404).json({ error: "Lista no encontrada" });
+    if (workflow_id && !db.prepare("SELECT 1 FROM workflows WHERE id = ?").get(workflow_id)) return res.status(404).json({ error: "Workflow no encontrado" });
+    const result = await signalRadarService.executeAskResearch(query.trim(), {
+      accountId: account_id,
+      workspaceOwnerId: actor.workspaceOwnerId,
+      actorId: actor.id,
+      listId: list_id,
+      workflowId: workflow_id,
+      isSuperAdmin: actor.isSuperAdmin,
+    });
     return res.status(200).json(result);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || "Error al procesar consulta Ask AI" });
+  } catch (error) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : "Error procesando Ask AI" });
   }
 }
