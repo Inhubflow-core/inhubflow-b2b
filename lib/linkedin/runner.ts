@@ -1,3 +1,7 @@
+import {
+  recordCampaignActivity,
+  recordCampaignActivityOnce,
+} from "@/lib/linkedin/activity";
 import { getDb } from "@/lib/db";
 import { createHash, randomUUID } from "crypto";
 import { unipile, UnipileClient } from "@/lib/unipile/client";
@@ -97,16 +101,11 @@ function nowIso(now = Date.now()): string { return new Date(now).toISOString(); 
 function addHours(hours: number, now = Date.now()): string { return new Date(now + hours * 3600 * 1000).toISOString(); }
 
 function log(db: ReturnType<typeof getDb>, runId: string, targetId: string | null, level: "info" | "warn" | "error", message: string) {
-  const rendered = `[campaign-runner] [${level.toUpperCase()}] run=${runId} target=${targetId || "-"} ${message}`;
-  if (level === "error") console.error(rendered);
-  else if (level === "warn") console.warn(rendered);
-  else console.log(rendered);
-  try {
-    db.prepare(`
-      INSERT INTO logs (id, run_id, target_id, level, message, created_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(randomUUID(), runId, targetId, level, `[${level.toUpperCase()}] ${message}`);
-  } catch { /* logging must not stop a campaign */ }
+  recordCampaignActivity(db, { runId, targetId, level, message });
+}
+
+function logOnce(db: ReturnType<typeof getDb>, runId: string, targetId: string | null, level: "info" | "warn" | "error", message: string) {
+  recordCampaignActivityOnce(db, { runId, targetId, level, message });
 }
 
 function trAdvance(db: ReturnType<typeof getDb>, tr: TrackRun, steps: WorkflowStep[]) {
@@ -134,6 +133,14 @@ function trFail(db: ReturnType<typeof getDb>, tr: TrackRun, reason: string) {
 }
 
 function targetName(target: Target): string { return target.full_name || target.linkedin_url || "Contacto"; }
+
+function pendingAcceptanceActivity(name: string): string {
+  return `Solicitud de conexión enviada a ${name} con éxito. Esperando aceptación; el sistema verificará automáticamente el estado cada 6 horas.`;
+}
+
+function acceptedConnectionActivity(name: string): string {
+  return `${name} aceptó la solicitud de conexión. La secuencia continuará automáticamente.`;
+}
 
 function isConnected(target: Target): boolean { return Boolean(target.connected_at) || target.degree === 1; }
 
@@ -397,11 +404,12 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         const profile = await resolveProfile();
         enrichTarget(db, runProfile.account_id, target, profile);
         if (profileIsConnected(profile)) {
+          logOnce(db, runProfile.run_id, target.id, "info", acceptedConnectionActivity(name));
           trAdvance(db, tr, steps);
           return;
         }
         if (profileHasPendingInvitation(profile)) {
-          log(db, runProfile.run_id, target.id, "info", `La invitación a ${name} está pendiente en LinkedIn; esperando aceptación`);
+          logOnce(db, runProfile.run_id, target.id, "info", pendingAcceptanceActivity(name));
           trWait(db, tr, 6, now());
           return;
         }
@@ -447,7 +455,11 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         const profile = await resolveProfile();
         enrichTarget(db, runProfile.account_id, target, profile);
         if (profileIsConnected(profile)) {
-          log(db, runProfile.run_id, target.id, "info", `${name} ya está conectado en LinkedIn; continuando la secuencia`);
+          if (target.connection_requested_at) {
+            logOnce(db, runProfile.run_id, target.id, "info", acceptedConnectionActivity(name));
+          } else {
+            logOnce(db, runProfile.run_id, target.id, "info", `${name} ya estaba conectado al iniciar la secuencia.`);
+          }
           trAdvance(db, tr, steps);
           return;
         }
@@ -456,7 +468,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
             connection_requested_at: nowIso(now()),
             unipile_provider_id: profile.provider_id,
           });
-          log(db, runProfile.run_id, target.id, "info", `La invitación a ${name} ya está pendiente; esperando aceptación`);
+          logOnce(db, runProfile.run_id, target.id, "info", pendingAcceptanceActivity(name));
           trWait(db, tr, 6, now());
           return;
         }
@@ -495,7 +507,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         connection_requested_at: nowIso(now()),
         unipile_provider_id: providerId,
       });
-      log(db, runProfile.run_id, target.id, "info", `Solicitud de conexión enviada a ${name} con éxito!`);
+      logOnce(db, runProfile.run_id, target.id, "info", pendingAcceptanceActivity(name));
       trWait(db, tr, 6, now());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -527,7 +539,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
           connection_requested_at: nowIso(now()),
           ...(providerId ? { unipile_provider_id: providerId } : {}),
         });
-        log(db, runProfile.run_id, target.id, "info", `La invitación a ${name} ya estaba pendiente; esperando aceptación`);
+        logOnce(db, runProfile.run_id, target.id, "info", pendingAcceptanceActivity(name));
         trWait(db, tr, 6, now());
         return;
       }

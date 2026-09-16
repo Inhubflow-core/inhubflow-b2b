@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getDb } from "@/lib/db";
 import { ingestUnipileMessage } from "@/lib/unipile/inbox-sync";
+import { recordCampaignActivityOnce } from "@/lib/linkedin/activity";
 import { markLinkedInTargetState } from "@/lib/linkedin/account-state";
 import type { UnipileWebhookPayload } from "./types";
 
@@ -93,6 +94,33 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
         });
       }
     })();
+    const affectedTracks = db.prepare(`
+      SELECT DISTINCT rp.run_id, rp.target_id, t.full_name, t.linkedin_url
+      FROM run_profile_tracks rt
+      JOIN run_profiles rp ON rp.id = rt.run_profile_id
+      JOIN runs r ON r.id = rp.run_id
+      JOIN targets t ON t.id = rp.target_id
+      LEFT JOIN linkedin_target_accounts lta
+        ON lta.target_id = t.id AND lta.account_id = r.account_id
+      WHERE r.account_id = ? AND r.status IN ('running', 'paused')
+        AND rt.track = 'linkedin' AND rt.state IN ('pending', 'in_progress')
+        AND (lta.unipile_provider_id = ? OR t.unipile_provider_id = ? OR t.messaging_urn = ?)
+    `).all(localAccount.id, providerId, providerId, providerId) as Array<{
+      run_id: string;
+      target_id: string;
+      full_name: string | null;
+      linkedin_url: string | null;
+    }>;
+    for (const track of affectedTracks) {
+      const name = track.full_name || track.linkedin_url || "El contacto";
+      recordCampaignActivityOnce(db, {
+        runId: track.run_id,
+        targetId: track.target_id,
+        level: "info",
+        message: `${name} aceptó la solicitud de conexión. La secuencia continuará automáticamente.`,
+      });
+    }
+
     const wake = db.prepare(`
       UPDATE run_profile_tracks SET state = 'in_progress', next_step_at = datetime('now'), error_message = NULL
       WHERE state IN ('pending', 'in_progress') AND run_profile_id IN (

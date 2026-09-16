@@ -236,8 +236,11 @@ async function run() {
   {
     const db = makeDb(); const tr = seed(db, "connect", { connection_requested_at: "2026-09-14", unipile_provider_id: "provider-1" }); const mock = client({ resolveProfile: async () => ({ provider_id: "provider-1", provider: "LINKEDIN", object: "UserProfile", network_distance: "SECOND_DEGREE", invitation: { type: "SENT", status: "PENDING" } }) });
     await processSingleTrack(db, tr, deps(mock));
+    const nextRun = db.prepare("SELECT * FROM run_profile_tracks WHERE id='tr1'").get();
+    await processSingleTrack(db, nextRun, deps(mock));
     assert.equal(mock.calls.invite, 0, "A real pending invitation must never be duplicated");
     assert.equal(db.prepare("SELECT state FROM run_profile_tracks WHERE id='tr1'").get().state, "in_progress");
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM logs WHERE run_id='r1' AND target_id='t1' AND message LIKE '%Esperando aceptación%'").get().c, 1, "Repeated pending checks must keep one activity row");
     db.close();
   }
 
@@ -253,7 +256,13 @@ async function run() {
     const db = makeDb(); const tr = seed(db, "connect", { unipile_provider_id: "provider-1" }); const mock = client();
     await processSingleTrack(db, tr, deps(mock));
     assert.equal(mock.calls.invite, 1); assert.ok(db.prepare("SELECT connection_requested_at FROM targets WHERE id='t1'").get().connection_requested_at);
-    assert.equal(db.prepare("SELECT outcome FROM linkedin_connection_attempts").get().outcome, "submitted"); db.close();
+    assert.equal(db.prepare("SELECT outcome FROM linkedin_connection_attempts").get().outcome, "submitted");
+    const activities = db.prepare("SELECT level, message FROM logs WHERE run_id='r1' AND target_id='t1'").all();
+    assert.equal(activities.length, 1);
+    assert.equal(activities[0].level, "info");
+    assert.equal(activities[0].message, "Solicitud de conexión enviada a https://www.linkedin.com/in/test-user con éxito. Esperando aceptación; el sistema verificará automáticamente el estado cada 6 horas.");
+    assert.equal(activities[0].message.startsWith("[INFO]"), false);
+    db.close();
   }
   {
     const db = makeDb(); const tr = seed(db, "connect", { unipile_provider_id: "provider-1" }); const mock = client({ sendInvitation: async () => ({ object: "Error", status: "failed" }) });
@@ -358,7 +367,11 @@ async function run() {
   {
     const db = makeDb(); seed(db, "connect", { unipile_provider_id: "provider-1", connection_requested_at: "2026-09-14" });
     const result = await handleUnipileWebhook({ event: "new_relation", account_id: "remote-1", user_provider_id: "provider-1" }, db);
-    assert.equal(result.handled, true); assert.equal(db.prepare("SELECT degree FROM targets WHERE id='t1'").get().degree, 1);
+    const repeated = await handleUnipileWebhook({ event: "new_relation", account_id: "remote-1", user_provider_id: "provider-1" }, db);
+    assert.equal(result.handled, true); assert.equal(repeated.handled, true); assert.equal(db.prepare("SELECT degree FROM targets WHERE id='t1'").get().degree, 1);
+    const acceptanceActivities = db.prepare("SELECT message FROM logs WHERE run_id='r1' AND target_id='t1' AND message LIKE '%aceptó la solicitud de conexión%'").all();
+    assert.equal(acceptanceActivities.length, 1, "Webhook retries must not duplicate the acceptance activity");
+    assert.equal(acceptanceActivities[0].message, "https://www.linkedin.com/in/test-user aceptó la solicitud de conexión. La secuencia continuará automáticamente.");
     assert.ok(db.prepare("SELECT next_step_at FROM run_profile_tracks WHERE id='tr1'").get().next_step_at);
     db.prepare("UPDATE targets SET unipile_chat_id = 'chat-webhook' WHERE id = 't1'").run();
     db.prepare("UPDATE linkedin_target_accounts SET unipile_chat_id = 'chat-webhook' WHERE account_id = 'a1' AND target_id = 't1'").run();

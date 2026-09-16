@@ -63,7 +63,7 @@ async function run() {
     assert.ok(targetColumns.has("unipile_provider_id"));
     assert.ok(targetColumns.has("unipile_chat_id"));
     const sanitizedLog = db.prepare("SELECT message FROM logs WHERE id = 'provider-branding-test'").get();
-    assert.equal(sanitizedLog.message, "[INFO] Mensaje enviado a Prueba con éxito!");
+    assert.equal(sanitizedLog.message, "Mensaje enviado a Prueba con éxito!");
     assert.equal(sanitizedLog.message.includes("Unipile"), false);
     db.close();
     console.log("✅ MIGRACIONES UNIPILE VALIDADAS SOBRE UNA COPIA DE LA BASE EXISTENTE");

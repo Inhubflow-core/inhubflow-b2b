@@ -1023,6 +1023,17 @@ function sanitizePublicProviderBrandingMigration(db: Database.Database) {
     ["accounts", "linkedin_inbox_sync_error"],
   ] as const;
 
+  try {
+    db.exec(`
+      UPDATE logs SET message = substr(message, 8)
+      WHERE message LIKE '[INFO] %';
+      UPDATE logs SET message = substr(message, 8)
+      WHERE message LIKE '[WARN] %';
+      UPDATE logs SET message = substr(message, 9)
+      WHERE message LIKE '[ERROR] %';
+    `);
+  } catch { /* legacy logs unavailable */ }
+
   for (const [table, column] of textColumns) {
     try {
       db.exec(`
