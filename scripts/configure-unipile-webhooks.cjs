@@ -5,9 +5,12 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const envPath = path.resolve(__dirname, "..", ".env.local");
-let envText = fs.readFileSync(envPath, "utf8");
+const hasEnvFile = fs.existsSync(envPath);
+let envText = hasEnvFile ? fs.readFileSync(envPath, "utf8") : "";
 
 function readValue(key) {
+  const runtimeValue = String(process.env[key] || "").trim();
+  if (runtimeValue) return runtimeValue;
   const match = envText.match(new RegExp(`^${key}=(.*)$`, "m"));
   return match ? match[1].trim().replace(/^["']|["']$/g, "") : "";
 }
@@ -20,11 +23,13 @@ function upsert(key, value) {
 }
 
 async function run() {
-  const token = readValue("UNIPILE_WEBHOOK_TOKEN") || crypto.randomBytes(32).toString("hex");
-  const callbackSecret = readValue("UNIPILE_CALLBACK_SECRET") || crypto.randomBytes(32).toString("hex");
+  const token = readValue("UNIPILE_WEBHOOK_TOKEN") || (hasEnvFile ? crypto.randomBytes(32).toString("hex") : "");
+  const callbackSecret = readValue("UNIPILE_CALLBACK_SECRET") || (hasEnvFile ? crypto.randomBytes(32).toString("hex") : "");
   const dsn = readValue("UNIPILE_DSN").replace(/\/$/, "");
   const apiKey = readValue("UNIPILE_API_KEY");
-  if (!dsn || !apiKey) throw new Error("Faltan credenciales Unipile");
+  if (!dsn || !apiKey) throw new Error("Faltan credenciales del motor de LinkedIn");
+  if (!token) throw new Error("Falta UNIPILE_WEBHOOK_TOKEN en el entorno del servicio");
+  if (!callbackSecret) throw new Error("Falta UNIPILE_CALLBACK_SECRET en el entorno del servicio");
 
   const headers = { "X-API-KEY": apiKey, Accept: "application/json", "Content-Type": "application/json" };
   const listResponse = await fetch(`${dsn}/api/v1/webhooks`, { headers });
@@ -81,11 +86,13 @@ async function run() {
     console.log(`SEGURO CREADO ${item.source} ${id}`);
   }
 
-  upsert("UNIPILE_WEBHOOK_TOKEN", token);
-  upsert("UNIPILE_CALLBACK_SECRET", callbackSecret);
-  const temporaryPath = `${envPath}.tmp-${process.pid}`;
-  fs.writeFileSync(temporaryPath, envText, { encoding: "utf8", mode: 0o600 });
-  fs.renameSync(temporaryPath, envPath);
+  if (hasEnvFile) {
+    upsert("UNIPILE_WEBHOOK_TOKEN", token);
+    upsert("UNIPILE_CALLBACK_SECRET", callbackSecret);
+    const temporaryPath = `${envPath}.tmp-${process.pid}`;
+    fs.writeFileSync(temporaryPath, envText, { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(temporaryPath, envPath);
+  }
 
   for (const webhook of existing) {
     if (!desired.some((item) => item.source === webhook.source)) continue;
