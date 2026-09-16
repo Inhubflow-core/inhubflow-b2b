@@ -42,10 +42,10 @@ Nunca reutilices ni expongas `UNIPILE_API_KEY` en el navegador.
 ## Hosted Auth
 
 1. El usuario crea o selecciona un slot local en **Configuración → LinkedIn**.
-2. `POST /api/accounts/unipile-link` verifica autorización sobre el slot.
+2. `POST /api/accounts/linkedin-hosted-connect` verifica autorización sobre el slot.
 3. InHubFlow genera estado firmado y solicita una URL Hosted Auth.
 4. Para una cuenta nueva utiliza `type=create`; para una cuenta ya asociada utiliza `type=reconnect`.
-5. Unipile llama a `/api/accounts/unipile-callback?state=...`.
+5. El servicio de conexión llama a `/api/accounts/linkedin-hosted-callback?state=...`.
 6. El callback verifica el estado, consulta la cuenta en Unipile y guarda `accounts.unipile_account_id` y su estado real.
 
 El UUID local nunca se envía como `account_id` remoto. Si una cuenta antigua no tiene asociación, el runner solo puede adoptar una cuenta LinkedIn remota en estado `OK` que no esté asignada a otro slot.
@@ -55,7 +55,7 @@ El UUID local nunca se envía como `account_id` remoto. Si una cuenta antigua no
 Configura en Unipile tres webhooks habilitados hacia:
 
 ```text
-https://TU_DOMINIO/api/webhooks/unipile
+https://TU_DOMINIO/api/webhooks/linkedin-events
 ```
 
 | Source | Eventos necesarios | Uso |

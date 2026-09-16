@@ -32,6 +32,7 @@ async function run() {
   const payload = await listResponse.json();
   const existing = payload.items || payload || [];
   const requestUrl = "https://b2b.inhubflow.online/api/webhooks/linkedin-events";
+  const legacyRequestUrl = "https://b2b.inhubflow.online/api/webhooks/unipile";
   const desired = [
     { source: "messaging", events: ["message_received"], name: "InHubFlow Seguro - Mensajes LinkedIn" },
     { source: "users", events: ["new_relation"], name: "InHubFlow Seguro - Nuevas relaciones" },
@@ -88,7 +89,8 @@ async function run() {
 
   for (const webhook of existing) {
     if (!desired.some((item) => item.source === webhook.source)) continue;
-    if (webhook.request_url !== requestUrl || keep.has(webhook.id)) continue;
+    if (keep.has(webhook.id)) continue;
+    if (webhook.request_url !== requestUrl && webhook.request_url !== legacyRequestUrl) continue;
     const response = await fetch(`${dsn}/api/v1/webhooks/${encodeURIComponent(webhook.id)}`, { method: "DELETE", headers });
     if (!response.ok) throw new Error(`No se pudo retirar webhook inseguro ${webhook.id}: HTTP ${response.status}`);
     console.log(`INSEGURO RETIRADO ${webhook.source} ${webhook.id}`);
