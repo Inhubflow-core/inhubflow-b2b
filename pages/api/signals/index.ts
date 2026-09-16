@@ -28,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         account_id,
         target_list_id,
         target_workflow_id,
+        message_config,
       } = req.body;
 
       if (!name || !type) {
@@ -45,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         account_id,
         target_list_id,
         target_workflow_id,
+        message_config,
         created_by: actor.id,
       });
 

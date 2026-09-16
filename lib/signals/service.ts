@@ -28,6 +28,11 @@ export interface CreateMonitorInput {
   target_list_id?: string;
   target_workflow_id?: string;
   created_by?: string;
+  message_config?: {
+    objective?: "conversation" | "demo" | "resource";
+    tone?: "consultive" | "professional" | "direct";
+    custom_template?: string;
+  };
 }
 
 export interface ListLeadsQuery {
@@ -99,6 +104,7 @@ export class SignalRadarService {
       account_id: input.account_id || null,
       target_list_id: input.target_list_id || null,
       target_workflow_id: input.target_workflow_id || null,
+      message_config_json: input.message_config ? JSON.stringify(input.message_config) : null,
       last_checked_at: null,
       created_by: input.created_by || null,
       created_at: now,
@@ -108,9 +114,9 @@ export class SignalRadarService {
     db.prepare(`
       INSERT INTO signal_monitors (
         id, name, type, target_url, competitor_name, keywords_json, icp_filters_json,
-        mode, status, account_id, target_list_id, target_workflow_id, last_checked_at,
+        mode, status, account_id, target_list_id, target_workflow_id, message_config_json, last_checked_at,
         created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       monitor.id,
       monitor.name,
@@ -124,6 +130,7 @@ export class SignalRadarService {
       monitor.account_id,
       monitor.target_list_id,
       monitor.target_workflow_id,
+      monitor.message_config_json || null,
       monitor.last_checked_at,
       monitor.created_by,
       monitor.created_at,
@@ -349,7 +356,11 @@ export class SignalRadarService {
                     company: monitor.competitor_name || undefined,
                     signal_type: 'high_intent_comments',
                     signal_snippet: c.text ? `Comentó: "${c.text.slice(0, 150)}..."` : 'Comentó activamente en la publicación',
-                    icebreaker_preview: `Hola ${leadName.split(' ')[0]}, vi tu comentario sobre "${(monitor.competitor_name || 'este tema')}" en LinkedIn y me pareció muy acertado tu punto...`,
+                    icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
+                      full_name: leadName,
+                      company: monitor.competitor_name || undefined,
+                      signal_type: 'high_intent_comments',
+                    }),
                     score: 92,
                   });
                 }
@@ -367,7 +378,11 @@ export class SignalRadarService {
                     company: monitor.competitor_name || undefined,
                     signal_type: 'competitor_reactions',
                     signal_snippet: `Reaccionó (${r.reaction_type || 'Like'}) al post de ${monitor.competitor_name || 'competidor'}`,
-                    icebreaker_preview: `Hola ${leadName.split(' ')[0]}, noté que sigues de cerca las novedades de ${monitor.competitor_name || 'la industria'}...`,
+                    icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
+                      full_name: leadName,
+                      company: monitor.competitor_name || undefined,
+                      signal_type: 'competitor_reactions',
+                    }),
                     score: 85,
                   });
                 }
@@ -543,7 +558,8 @@ export class SignalRadarService {
     const keywords: string[] = monitor.keywords_json ? JSON.parse(monitor.keywords_json) : [];
     const mainKw = keywords.length > 0 ? keywords[0] : "automatización y ventas";
 
-    switch (monitor.type) {
+    const sampleResults: Array<Partial<SignalLead>> = (() => {
+      switch (monitor.type) {
       case "competitor_reactions":
         return [
           {
@@ -739,7 +755,115 @@ export class SignalRadarService {
             score: 89,
           },
         ];
+      }
+    })();
+
+    return sampleResults.map((lead) => ({
+      ...lead,
+      icebreaker_preview: this.generateAntiStalkerIcebreaker(monitor, {
+        full_name: lead.full_name || "Contacto",
+        company: lead.company || undefined,
+        headline: lead.headline || undefined,
+        signal_type: lead.signal_type || monitor.type,
+        signal_snippet: lead.signal_snippet || undefined,
+      }),
+    }));
+  }
+
+  /**
+   * Genera el mensaje IA con la fórmula Anti-Stalker de GojiBerry:
+   * No decir "vi que le diste like a mi competidor" (creepy/acosador),
+   * sino usar la señal detectada como contexto natural para abrir una conversación relevante.
+   */
+  generateAntiStalkerIcebreaker(
+    monitor: SignalMonitor,
+    lead: {
+      full_name: string;
+      company?: string | null;
+      headline?: string | null;
+      signal_type?: string;
+      signal_snippet?: string;
     }
+  ): string {
+    const firstName = lead.full_name.split(" ")[0] || "Hola";
+    const company = lead.company || "tu empresa";
+    const comp = monitor.competitor_name || "soluciones del sector";
+    let keywords: string[] = [];
+    try {
+      if (monitor.keywords_json) keywords = JSON.parse(monitor.keywords_json);
+    } catch {}
+    const mainKw = keywords.length > 0 ? keywords[0] : "prospección B2B y automatización";
+
+    let cfg: { objective?: string; tone?: string; custom_template?: string } = {};
+    if (monitor.message_config_json) {
+      try {
+        cfg = JSON.parse(monitor.message_config_json);
+      } catch {}
+    }
+
+    if (cfg.custom_template && cfg.custom_template.trim()) {
+      return cfg.custom_template
+        .replace(/\{first_name\}/gi, firstName)
+        .replace(/\{company\}/gi, company)
+        .replace(/\{topic\}/gi, mainKw)
+        .replace(/\{competitor\}/gi, comp);
+    }
+
+    const obj = cfg.objective || "conversation";
+    const tone = cfg.tone || "consultive";
+
+    // 1. Competitor Engagement / Comments / Reactions / Experts
+    if (
+      monitor.type === "competitor_reactions" ||
+      monitor.type === "high_intent_comments" ||
+      monitor.type === "competitor_followers" ||
+      monitor.type === "post_engagement" ||
+      monitor.type === "influencer_activity"
+    ) {
+      if (obj === "demo") {
+        return `Hola ${firstName}, vi que has estado explorando soluciones de ${mainKw}. En InHubFlow ayudamos a equipos como el de ${company} a multiplicar sus reuniones cualificadas sin fricción. ¿Tendrías 10 min esta semana para ver una demo breve?`;
+      }
+      if (obj === "resource") {
+        return `Hola ${firstName}, noté que te interesa el debate actual sobre ${mainKw}. Preparamos un playbook con los frameworks de prospección con mayor tasa de respuesta en B2B hoy en día. ¿Te gustaría que te lo comparta por aquí?`;
+      }
+      // conversation (default)
+      if (tone === "direct") {
+        return `Hola ${firstName}, veo que sigues de cerca la innovación en ${mainKw}. ¿Cómo están gestionando actualmente este proceso en ${company}? Sería un gusto conectar e intercambiar visiones.`;
+      }
+      if (tone === "professional") {
+        return `Hola ${firstName}, sigo tu trayectoria en ${company}. Dado el creciente interés por optimizar ${mainKw}, me gustaría conectar contigo y compartir algunas mejores prácticas del sector.`;
+      }
+      // consultive
+      return `Hola ${firstName}, vi que has estado explorando temas de ${mainKw}. En ${company}, ¿cómo están abordando actualmente la optimización de este proceso? Me encantaría conectar.`;
+    }
+
+    // 2. Job Changes / Just Hired (<90 days)
+    if (monitor.type === "new_in_role" || monitor.type === "job_changes" || monitor.type === "internal_promotion") {
+      if (obj === "demo") {
+        return `Hola ${firstName}, ¡muchas felicidades por tu nueva posición en ${company}! Durante los primeros 90 días la prioridad suele ser acelerar resultados rápido. ¿Te gustaría que te muestre en 10 min cómo apoyamos a directores en esta fase?`;
+      }
+      if (obj === "resource") {
+        return `Hola ${firstName}, felicitaciones por tu rol en ${company}. Te comparto un checklist práctico para estructurar el stack de prospección en los primeros 90 días. ¿Te interesaría revisarlo?`;
+      }
+      return `Hola ${firstName}, felicitaciones por tu nueva etapa en ${company}. En estos primeros meses al frente del equipo, ¿están revisando o renovando herramientas de prospección? Éxitos en el rol.`;
+    }
+
+    // 3. Hiring Spree
+    if (monitor.type === "hiring_spree" || monitor.type === "company_growth") {
+      if (obj === "demo") {
+        return `Hola ${firstName}, noté el crecimiento del equipo en ${company}. Al incorporar nuevos talentos, dotarlos de automatización inteligente reduce la curva de aprendizaje a la mitad. ¿Te interesaría ver una demo rápida?`;
+      }
+      return `Hola ${firstName}, felicitaciones por la expansión y nuevas vacantes en ${company}. Al sumar nuevos perfiles comerciales, asegurar herramientas de alta conversión es clave. ¿Cómo están planificando el onboarding de prospección?`;
+    }
+
+    // 4. Keyword Intent / Active Poster / Default
+    if (obj === "demo") {
+      return `Hola ${firstName}, sigo tu trabajo en ${company}. Hemos desarrollado una solución enfocada en ${mainKw} que está duplicando respuestas en LinkedIn. ¿Tendrías 10 min para una demo rápida?`;
+    }
+    if (obj === "resource") {
+      return `Hola ${firstName}, noté tu interés en ${mainKw}. Armamos una guía con casos prácticos aplicados a empresas como ${company}. ¿Te parece bien si te la paso por aquí?`;
+    }
+    return `Hola ${firstName}, vi que sigues activo en temas de ${mainKw}. En ${company}, ¿cómo abordan actualmente este canal? Me gustaría conectar contigo para estar al día.`;
   }
 
   private extractPostId(url: string): string | null {

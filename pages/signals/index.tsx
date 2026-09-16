@@ -33,6 +33,14 @@ import {
   RiQuestionLine,
   RiGroupLine,
   RiLineChartLine,
+  RiArrowLeftLine,
+  RiFireLine,
+  RiFlashlightLine,
+  RiShieldCheckLine,
+  RiSendPlane2Line,
+  RiUserVoiceLine,
+  RiCheckboxCircleLine,
+  RiTimeLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -76,10 +84,17 @@ interface WorkflowOption {
   name: string;
 }
 
+export interface AccountOption {
+  id: string;
+  name: string;
+  is_authenticated: number;
+}
+
 interface SignalsPageProps {
   initialMonitors: SignalMonitor[];
   lists: ListOption[];
   workflows: WorkflowOption[];
+  accounts: AccountOption[];
 }
 
 export const getServerSideProps: GetServerSideProps = async () => {
@@ -116,11 +131,16 @@ export const getServerSideProps: GetServerSideProps = async () => {
     .prepare("SELECT id, name FROM workflows ORDER BY created_at DESC")
     .all() as WorkflowOption[];
 
+  const accounts = db
+    .prepare("SELECT id, name, is_authenticated FROM accounts ORDER BY created_at DESC")
+    .all() as AccountOption[];
+
   return {
     props: {
       initialMonitors,
       lists,
       workflows,
+      accounts,
     },
   };
 };
@@ -129,6 +149,8 @@ export interface SignalDefinition {
   id: string;
   title: string;
   badge: string;
+  level: 1 | 2 | 3;
+  levelTitle: string;
   group: "A" | "B" | "C" | "D";
   groupTitle: string;
   description: string;
@@ -139,14 +161,16 @@ export interface SignalDefinition {
 }
 
 export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
-  // Grupo A: Señales Sociales y de Competencia (Las de mayor conversión)
+  // Nivel 1: Máxima Intención (Calientes - Competencia y Comunidad)
   {
     id: "competitor_reactions",
     title: "Reacciones a Posts de Competidores",
     badge: "Alta Conversión",
+    level: 1,
+    levelTitle: "🔥 Nivel 1: Máxima Intención",
     group: "A",
-    groupTitle: "Grupo A: Social & Competencia",
-    description: "Decisores que dieron Like, Celebrate, Insightful o Support a posts de competidores o referentes del nicho.",
+    groupTitle: "Social & Competidores",
+    description: "Decisores que dieron Like, Celebrate, Insightful o Support a posts de competidores directos o referentes del nicho.",
     icon: RiThumbUpLine,
     color: "text-amber-500",
     badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
@@ -154,11 +178,13 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
   {
     id: "high_intent_comments",
-    title: "Comentarios en Publicaciones Clave",
+    title: "Comentarios en Posts Clave / Lead Magnets",
     badge: "Máxima Intención",
+    level: 1,
+    levelTitle: "🔥 Nivel 1: Máxima Intención",
     group: "A",
-    groupTitle: "Grupo A: Social & Competencia",
-    description: "Comentaristas en posts de debate o dolor. La IA extrae el texto exacto para citar su opinión en el mensaje.",
+    groupTitle: "Social & Competidores",
+    description: "Comentaristas en posts de debate o pidiendo recursos. La IA contextualiza su opinión sin sonar intrusiva.",
     icon: RiChat1Line,
     color: "text-blue-500",
     badgeBg: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
@@ -166,10 +192,12 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
   {
     id: "competitor_followers",
-    title: "Seguidores de Competidores / Referentes",
-    badge: "Afinidad de Marca",
+    title: "Audiencia & Seguidores de Competidores",
+    badge: "Afinidad Directa",
+    level: 1,
+    levelTitle: "🔥 Nivel 1: Máxima Intención",
     group: "A",
-    groupTitle: "Grupo A: Social & Competencia",
+    groupTitle: "Social & Competidores",
     description: "Profesionales que siguen a empresas competidoras o a sus fundadores y líderes de opinión en LinkedIn.",
     icon: RiGroupLine,
     color: "text-indigo-500",
@@ -177,14 +205,16 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
     inputKind: "profile_or_company_url",
   },
 
-  // Grupo B: Señales de Carrera y Cambio de Puesto (Timing perfecto)
+  // Nivel 2: Momento de Compra / Disparadores de Cambio (Triggers)
   {
     id: "new_in_role",
-    title: "Nuevo Cargo en los Últimos 90 Días",
-    badge: "Timing Perfecto",
+    title: "Just Hired / Nuevo Cargo (<90 Días)",
+    badge: "Ventana Dorada",
+    level: 2,
+    levelTitle: "⚡ Nivel 2: Momento de Compra",
     group: "B",
-    groupTitle: "Grupo B: Carrera & Puesto",
-    description: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días buscan proveedores y tienen presupuesto.",
+    groupTitle: "Cambios de Rol & Triggers",
+    description: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días tienen presupuesto fresco para nuevos proveedores.",
     icon: RiExchangeLine,
     color: "text-emerald-500",
     badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
@@ -193,24 +223,42 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   {
     id: "internal_promotion",
     title: "Ascenso Interno a Decisor",
-    badge: "Nuevo Poder de Compra",
+    badge: "Nuevo Poder de Firma",
+    level: 2,
+    levelTitle: "⚡ Nivel 2: Momento de Compra",
     group: "B",
-    groupTitle: "Grupo B: Carrera & Puesto",
-    description: "Profesionales que acaban de ser promovidos internamente a puestos de liderazgo con capacidad de decisión.",
+    groupTitle: "Cambios de Rol & Triggers",
+    description: "Profesionales que acaban de ser promovidos internamente a puestos de liderazgo con capacidad de contratación.",
     icon: RiBriefcaseLine,
     color: "text-purple-500",
     badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
     inputKind: "roles_or_industry",
   },
+  {
+    id: "hiring_spree",
+    title: "Hiring Intent (Contratación Activa)",
+    badge: "Presupuesto Abierto",
+    level: 2,
+    levelTitle: "⚡ Nivel 2: Momento de Compra",
+    group: "D",
+    groupTitle: "Crecimiento de Empresa",
+    description: "Empresas con vacantes activas para SDRs, Ventas o Marketing. Si contratan personal, necesitan herramientas.",
+    icon: RiBuildingLine,
+    color: "text-orange-500",
+    badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+    inputKind: "roles_or_industry",
+  },
 
-  // Grupo C: Señales de Actividad y Contenido (Calidad de conexión)
+  // Nivel 3: Actividad Reciente & Búsquedas Personalizadas
   {
     id: "active_poster",
-    title: "Creadores Activos (<30 días)",
-    badge: "Bandeja Activa",
+    title: "Más Activos en tu ICP (<48h)",
+    badge: "Bandeja Caliente",
+    level: 3,
+    levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
     group: "C",
-    groupTitle: "Grupo C: Actividad & Contenido",
-    description: "Decisores que publican activamente en LinkedIn, garantizando que su bandeja de entrada está activa y abierta.",
+    groupTitle: "Actividad & Búsqueda",
+    description: "Decisores que publican activamente en LinkedIn, garantizando que su bandeja de entrada está activa y abierta a conectar.",
     icon: RiSparklingLine,
     color: "text-rose-500",
     badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
@@ -218,37 +266,27 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
   {
     id: "keyword_intent",
-    title: "Palabras Clave de Intención de Compra",
+    title: "Búsqueda Personalizada por Palabras Clave",
     badge: "Dolor Activo 24/7",
+    level: 3,
+    levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
     group: "C",
-    groupTitle: "Grupo C: Actividad & Contenido",
-    description: "Rastrea publicaciones públicas preguntando por recomendaciones ('alternativa a...', 'busco CRM', 'hiring SDRs').",
+    groupTitle: "Actividad & Búsqueda",
+    description: "Rastrea publicaciones y comentarios preguntando por recomendaciones ('alternativa a...', 'busco CRM', 'herramienta B2B').",
     icon: RiSearchLine,
     color: "text-teal-500",
     badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
     inputKind: "keywords",
   },
-
-  // Grupo D: Señales de Crecimiento de Empresa (Capacidad de pago)
-  {
-    id: "hiring_spree",
-    title: "Hiring Spree (Contratación Activa)",
-    badge: "Presupuesto Activo",
-    group: "D",
-    groupTitle: "Grupo D: Crecimiento de Empresa",
-    description: "Empresas con vacantes abiertas para roles clave (comerciales, marketing, ingeniería). Si contratan, compran software.",
-    icon: RiBuildingLine,
-    color: "text-orange-500",
-    badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
-    inputKind: "roles_or_industry",
-  },
   {
     id: "company_growth",
-    title: "Empresas en Hipercrecimiento",
-    badge: "Expansión +20%",
+    title: "Empresas en Hipercrecimiento (+20%)",
+    badge: "Expansión Acelerada",
+    level: 3,
+    levelTitle: "🟢 Nivel 3: Actividad & Búsqueda",
     group: "D",
-    groupTitle: "Grupo D: Crecimiento de Empresa",
-    description: "Empresas de tu ICP cuya plantilla ha crecido más de un 15% o 20% en los últimos 6 meses en LinkedIn.",
+    groupTitle: "Crecimiento de Empresa",
+    description: "Empresas de tu ICP cuya plantilla comercial ha crecido más de un 20% en los últimos 6 meses en LinkedIn.",
     icon: RiLineChartLine,
     color: "text-cyan-500",
     badgeBg: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300",
@@ -256,10 +294,82 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
 ];
 
+export function getSimulatedMessage(
+  signalType: string,
+  objective: "conversation" | "demo" | "resource",
+  tone: "consultive" | "professional" | "direct",
+  competitor: string,
+  keywords: string[],
+  customTemplate?: string
+): string {
+  const firstName = "Martín";
+  const company = "Grupo Retail B2B";
+  const comp = competitor.trim() || "soluciones del sector";
+  const mainKw = keywords.length > 0 ? keywords[0] : "prospección B2B y automatización";
+
+  if (customTemplate && customTemplate.trim()) {
+    return customTemplate
+      .replace(/\{first_name\}/gi, firstName)
+      .replace(/\{company\}/gi, company)
+      .replace(/\{topic\}/gi, mainKw)
+      .replace(/\{competitor\}/gi, comp);
+  }
+
+  // 1. Competitor Engagement / Comments / Reactions
+  if (
+    signalType === "competitor_reactions" ||
+    signalType === "high_intent_comments" ||
+    signalType === "competitor_followers"
+  ) {
+    if (objective === "demo") {
+      return `Hola ${firstName}, vi que has estado explorando soluciones de ${mainKw}. En InHubFlow ayudamos a equipos como el de ${company} a multiplicar sus reuniones cualificadas sin fricción. ¿Tendrías 10 min esta semana para ver una demo breve?`;
+    }
+    if (objective === "resource") {
+      return `Hola ${firstName}, noté que te interesa el debate actual sobre ${mainKw}. Preparamos un playbook con los frameworks de prospección con mayor tasa de respuesta en B2B hoy en día. ¿Te gustaría que te lo comparta por aquí?`;
+    }
+    if (tone === "direct") {
+      return `Hola ${firstName}, veo que sigues de cerca la innovación en ${mainKw}. ¿Cómo están gestionando actualmente este proceso en ${company}? Sería un gusto conectar e intercambiar visiones.`;
+    }
+    if (tone === "professional") {
+      return `Hola ${firstName}, sigo tu trayectoria en ${company}. Dado el creciente interés por optimizar ${mainKw}, me gustaría conectar contigo y compartir algunas mejores prácticas del sector.`;
+    }
+    return `Hola ${firstName}, vi que has estado explorando temas de ${mainKw}. En ${company}, ¿cómo están abordando actualmente la optimización de este proceso? Me encantaría conectar.`;
+  }
+
+  // 2. Job Changes / Just Hired (<90 days)
+  if (signalType === "new_in_role" || signalType === "internal_promotion") {
+    if (objective === "demo") {
+      return `Hola ${firstName}, ¡muchas felicidades por tu nueva posición en ${company}! Durante los primeros 90 días la prioridad suele ser acelerar resultados rápido. ¿Te gustaría que te muestre en 10 min cómo apoyamos a directores en esta fase?`;
+    }
+    if (objective === "resource") {
+      return `Hola ${firstName}, felicitaciones por tu rol en ${company}. Te comparto un checklist práctico para estructurar el stack de prospección en los primeros 90 días. ¿Te interesaría revisarlo?`;
+    }
+    return `Hola ${firstName}, felicitaciones por tu nueva etapa en ${company}. En estos primeros meses al frente del equipo, ¿están revisando o renovando herramientas de prospección? Éxitos en el rol.`;
+  }
+
+  // 3. Hiring Spree
+  if (signalType === "hiring_spree" || signalType === "company_growth") {
+    if (objective === "demo") {
+      return `Hola ${firstName}, noté el crecimiento del equipo en ${company}. Al incorporar nuevos talentos, dotarlos de automatización inteligente reduce la curva de aprendizaje a la mitad. ¿Te interesaría ver una demo rápida?`;
+    }
+    return `Hola ${firstName}, felicitaciones por la expansión y nuevas vacantes en ${company}. Al sumar nuevos perfiles comerciales, asegurar herramientas de alta conversión es clave. ¿Cómo están planificando el onboarding de prospección?`;
+  }
+
+  // 4. Default / Keyword Intent / Active Poster
+  if (objective === "demo") {
+    return `Hola ${firstName}, sigo tu trabajo en ${company}. Hemos desarrollado una solución enfocada en ${mainKw} que está duplicando respuestas en LinkedIn. ¿Tendrías 10 min para una demo rápida?`;
+  }
+  if (objective === "resource") {
+    return `Hola ${firstName}, noté tu interés en ${mainKw}. Armamos una guía con casos prácticos aplicados a empresas como ${company}. ¿Te parece bien si te la paso por aquí?`;
+  }
+  return `Hola ${firstName}, vi que sigues activo en temas de ${mainKw}. En ${company}, ¿cómo abordan actualmente este canal? Me gustaría conectar contigo para estar al día.`;
+}
+
 export default function SignalsPage({
   initialMonitors,
   lists,
   workflows,
+  accounts,
 }: SignalsPageProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -278,17 +388,46 @@ export default function SignalsPage({
   const [askLoading, setAskLoading] = useState(false);
   const [askResults, setAskResults] = useState<any[] | null>(null);
 
-  // Modal Nuevo Monitor
+  // Modal Nuevo Monitor - Wizard 4 Pasos (Modelo GojiBerry)
   const [showNewModal, setShowNewModal] = useState(false);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Paso 1: Audiencia y Cliente Ideal (ICP)
+  const [icpTitles, setIcpTitles] = useState<string[]>([
+    "CEO",
+    "Founder",
+    "VP of Sales",
+    "Director Comercial",
+  ]);
+  const [customTitleInput, setCustomTitleInput] = useState("");
+  const [icpCountries, setIcpCountries] = useState<string[]>(["España", "México", "Colombia"]);
+  const [customCountryInput, setCustomCountryInput] = useState("");
+  const [icpSizes, setIcpSizes] = useState<string[]>(["11-50", "51-200"]);
+
+  // Paso 2: Señales de Intención (3 Niveles)
   const [newType, setNewType] = useState<string>("competitor_reactions");
-  const [newGroupFilter, setNewGroupFilter] = useState<"ALL" | "A" | "B" | "C" | "D">("ALL");
-  const [newName, setNewName] = useState("");
+  const [signalLevelFilter, setSignalLevelFilter] = useState<"ALL" | 1 | 2 | 3>("ALL");
   const [newCompetitor, setNewCompetitor] = useState("");
   const [newTargetUrl, setNewTargetUrl] = useState("");
-  const [newKeywords, setNewKeywords] = useState("");
-  const [newTargetRoles, setNewTargetRoles] = useState("");
+  const [keywordsList, setKeywordsList] = useState<string[]>([
+    "automatización de ventas",
+    "crm",
+    "prospección b2b",
+    "cold outreach",
+  ]);
+  const [customKeywordInput, setCustomKeywordInput] = useState("");
+  const [timeWindowDays, setTimeWindowDays] = useState<number>(90);
+
+  // Paso 3: Mensaje IA Anti-Stalker
+  const [msgObjective, setMsgObjective] = useState<"conversation" | "demo" | "resource">("conversation");
+  const [msgTone, setMsgTone] = useState<"consultive" | "professional" | "direct">("consultive");
+  const [customTemplate, setCustomTemplate] = useState("");
+
+  // Paso 4: Lanzamiento & Configuración
+  const [newName, setNewName] = useState("");
+  const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || "");
   const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
-  const [newTargetList, setNewTargetList] = useState("");
+  const [newTargetList, setNewTargetList] = useState(lists[0]?.id || "");
   const [creatingMonitor, setCreatingMonitor] = useState(false);
 
   // Modal Importar Leads a Lista
@@ -296,6 +435,56 @@ export default function SignalsPage({
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [targetListId, setTargetListId] = useState(lists[0]?.id || "");
   const [importing, setImporting] = useState(false);
+
+  // Helpers para manipulación de chips
+  const handleAddTitle = (title: string) => {
+    const t = title.trim();
+    if (t && !icpTitles.includes(t)) {
+      setIcpTitles([...icpTitles, t]);
+    }
+    setCustomTitleInput("");
+  };
+
+  const handleRemoveTitle = (t: string) => {
+    setIcpTitles(icpTitles.filter((item) => item !== t));
+  };
+
+  const handleAddCountry = (country: string) => {
+    const c = country.trim();
+    if (c && !icpCountries.includes(c)) {
+      setIcpCountries([...icpCountries, c]);
+    }
+    setCustomCountryInput("");
+  };
+
+  const handleRemoveCountry = (c: string) => {
+    setIcpCountries(icpCountries.filter((item) => item !== c));
+  };
+
+  const handleToggleSize = (size: string) => {
+    if (icpSizes.includes(size)) {
+      setIcpSizes(icpSizes.filter((s) => s !== size));
+    } else {
+      setIcpSizes([...icpSizes, size]);
+    }
+  };
+
+  const handleAddKeyword = (kw: string) => {
+    const k = kw.trim();
+    if (k && !keywordsList.includes(k)) {
+      setKeywordsList([...keywordsList, k]);
+    }
+    setCustomKeywordInput("");
+  };
+
+  const handleRemoveKeyword = (k: string) => {
+    setKeywordsList(keywordsList.filter((item) => item !== k));
+  };
+
+  const handleOpenNewWizard = () => {
+    setWizardStep(1);
+    setShowNewModal(true);
+  };
 
   // Cargar leads
   const fetchLeads = async () => {
@@ -343,23 +532,19 @@ export default function SignalsPage({
     }
   };
 
-  // Crear Monitor
-  const handleCreateMonitor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) {
-      toast.error("Por favor ingresa un nombre para el monitor");
-      return;
-    }
+  // Crear Monitor (Lanzamiento desde Wizard)
+  const handleCreateMonitor = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
-    const selectedDef = SIGNAL_DEFINITIONS.find((d) => d.id === newType);
+    const def = SIGNAL_DEFINITIONS.find((d) => d.id === newType);
+    const monitorName =
+      newName.trim() ||
+      `${def?.title || "Radar"} - ${newCompetitor.trim() || keywordsList[0] || "ICP"}`;
+
     let targetUrlToSend = newTargetUrl.trim() || undefined;
-    if (selectedDef?.inputKind === "roles_or_industry" && newTargetRoles.trim()) {
-      targetUrlToSend = newTargetRoles.trim();
+    if (def?.inputKind === "roles_or_industry" && icpTitles.length > 0) {
+      targetUrlToSend = icpTitles.join(", ");
     }
-
-    const keywordsArray = newKeywords.trim()
-      ? newKeywords.split(",").map((k) => k.trim()).filter(Boolean)
-      : undefined;
 
     setCreatingMonitor(true);
     try {
@@ -367,13 +552,24 @@ export default function SignalsPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newName.trim(),
+          name: monitorName,
           type: newType,
           competitor_name: newCompetitor.trim() || undefined,
           target_url: targetUrlToSend,
-          keywords: keywordsArray,
+          keywords: keywordsList,
+          icp_filters: {
+            titles: icpTitles,
+            locations: icpCountries,
+            company_sizes: icpSizes,
+          },
           mode: newMode,
+          account_id: selectedAccountId || undefined,
           target_list_id: newTargetList || undefined,
+          message_config: {
+            objective: msgObjective,
+            tone: msgTone,
+            custom_template: customTemplate.trim() || undefined,
+          },
         }),
       });
 
@@ -381,11 +577,8 @@ export default function SignalsPage({
         const created = await res.json();
         toast.success(`Monitor "${created.name}" creado con éxito`);
         setShowNewModal(false);
+        setWizardStep(1);
         setNewName("");
-        setNewCompetitor("");
-        setNewTargetUrl("");
-        setNewKeywords("");
-        setNewTargetRoles("");
         // Auto-escanear para poblar prospectos iniciales
         handleScanMonitor(created.id, created.name);
       } else {
@@ -542,7 +735,8 @@ export default function SignalsPage({
 
           <div className="flex items-center gap-2.5 shrink-0">
             <button
-              onClick={() => setShowNewModal(true)}
+              type="button"
+              onClick={handleOpenNewWizard}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 transition-all shadow-xs"
             >
               <RiAddLine size={18} /> Nuevo Monitor
@@ -962,8 +1156,30 @@ export default function SignalsPage({
         {/* TAB 2: MONITORES CONFIGURADOS */}
         {activeTab === "monitors" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {monitors.map((m) => {
+            {monitors.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 space-y-4 shadow-theme-xs">
+                <div className="w-14 h-14 rounded-2xl bg-brand-500/10 text-brand-600 flex items-center justify-center mx-auto">
+                  <RiRadarLine size={28} />
+                </div>
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h3 className="font-black text-base text-gray-900 dark:text-white">
+                    Aún no tienes monitores de señales activos
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Configura tu primer radar con el asistente paso a paso para detectar decisores calientes en LinkedIn e iniciar conversaciones con la fórmula Anti-Stalker.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenNewWizard}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all"
+                >
+                  <RiAddLine size={16} /> Crear mi Primer Monitor
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {monitors.map((m) => {
                 const def = SIGNAL_DEFINITIONS.find((d) => d.id === m.type);
                 const IconComp = def ? def.icon : RiRadarLine;
                 const signalTitle = def ? def.title : (m.type === "post_engagement" ? "Post de Competidor" : m.type === "job_changes" ? "Job Changers (<90 días)" : "Señal de Intención");
@@ -1041,8 +1257,9 @@ export default function SignalsPage({
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
         {/* TAB 3: GUÍA ESTRATÉGICA DE 8+1 SEÑALES */}
         {activeTab === "guide" && (
@@ -1166,355 +1383,987 @@ export default function SignalsPage({
           </div>
         )}
 
-        {/* Modal: Crear Monitor de Señal (Con 8+1 Señales) */}
+        {/* Modal: Wizard de Creación de Monitor (4 Pasos - Inspirado en GojiBerry) */}
         {showNewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 rounded-3xl border border-gray-300 dark:border-gray-700 p-6 md:p-8 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
+            <div className="w-full max-w-4xl max-h-[92vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+              {/* 1. Cabecera Principal del Modal */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
                     <RiRadarLine size={22} />
                   </span>
                   <div>
-                    <h3 className="font-black text-base md:text-lg text-gray-900 dark:text-white">
-                      Configurar Monitor de Señales
+                    <h3 className="font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight">
+                      Configurar Monitor de Señales de Intención
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Elige qué tipo de evento de intención deseas vigilar en LinkedIn
+                      Asistente guiado paso a paso para prospección inteligente (Modelo GojiBerry)
                     </p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowNewModal(false)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <RiCloseLine size={22} />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateMonitor} className="space-y-5">
-                {/* Filtro de Grupos de Señales */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-900 dark:text-white">
-                      1. Selecciona el Tipo de Señal ({SIGNAL_DEFINITIONS.length} disponibles)
-                    </label>
-                    <span className="text-[11px] text-gray-400">
-                      {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.groupTitle}
-                    </span>
-                  </div>
-
-                  {/* Segmented Filter Bar */}
-                  <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800/60 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setNewGroupFilter("ALL")}
-                      className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                        newGroupFilter === "ALL"
-                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
-                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      Todas (9)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewGroupFilter("A")}
-                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
-                        newGroupFilter === "A"
-                          ? "bg-white dark:bg-gray-700 text-amber-700 dark:text-amber-300 shadow-xs"
-                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      A: Social & Competencia
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewGroupFilter("B")}
-                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
-                        newGroupFilter === "B"
-                          ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-300 shadow-xs"
-                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      B: Carrera & Puesto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewGroupFilter("C")}
-                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
-                        newGroupFilter === "C"
-                          ? "bg-white dark:bg-gray-700 text-brand-700 dark:text-brand-300 shadow-xs"
-                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      C: Keywords & Contenido
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewGroupFilter("D")}
-                      className={`px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
-                        newGroupFilter === "D"
-                          ? "bg-white dark:bg-gray-700 text-cyan-700 dark:text-cyan-300 shadow-xs"
-                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                      }`}
-                    >
-                      D: Crecimiento
-                    </button>
-                  </div>
-
-                  {/* Grid de Señales con scroll suave */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                    {SIGNAL_DEFINITIONS.filter(
-                      (s) => newGroupFilter === "ALL" || s.group === newGroupFilter
-                    ).map((sig) => {
-                      const isSelected = newType === sig.id;
-                      const SigIcon = sig.icon;
-                      return (
+              {/* 2. Barra de Progreso del Wizard (Stepper) */}
+              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/60 dark:bg-gray-850/50">
+                <div className="flex items-center justify-between max-w-3xl mx-auto">
+                  {[
+                    { num: 1, label: "Definir ICP", icon: RiUserSearchLine },
+                    { num: 2, label: "Señales", icon: RiRadarLine },
+                    { num: 3, label: "Mensaje IA", icon: RiSparklingLine },
+                    { num: 4, label: "Lanzar", icon: RiPlayLine },
+                  ].map((step, idx) => {
+                    const isCurrent = wizardStep === step.num;
+                    const isPast = wizardStep > step.num;
+                    const StepIcon = step.icon;
+                    return (
+                      <div key={step.num} className="flex items-center flex-1 last:flex-none">
                         <button
-                          key={sig.id}
                           type="button"
-                          onClick={() => setNewType(sig.id)}
-                          className={`p-3 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-1.5 ${
-                            isSelected
-                              ? "border-brand-500 bg-brand-50/60 dark:bg-brand-950/40 ring-2 ring-brand-500/20"
-                              : "border-gray-200 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-850"
-                          }`}
+                          onClick={() => setWizardStep(step.num as any)}
+                          className="flex items-center gap-2 group text-left focus:outline-none"
                         >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
-                              <span className={`p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 ${sig.color}`}>
-                                <SigIcon size={16} />
-                              </span>
-                              <span className="font-bold text-xs text-gray-900 dark:text-white leading-tight">
-                                {sig.title}
-                              </span>
-                            </div>
-                            {isSelected && (
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white shrink-0">
-                                <RiCheckLine size={13} />
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2">
-                            {sig.description}
-                          </p>
-                          <div className="pt-1 flex items-center gap-1.5">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${sig.badgeBg}`}>
-                              {sig.badge}
+                          <span
+                            className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all ${
+                              isCurrent
+                                ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500/30"
+                                : isPast
+                                ? "bg-emerald-500 text-white"
+                                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-gray-300"
+                            }`}
+                          >
+                            {isPast ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
+                          </span>
+                          <div className="hidden sm:block">
+                            <span
+                              className={`text-xs font-bold block leading-tight ${
+                                isCurrent
+                                  ? "text-brand-600 dark:text-brand-400"
+                                  : isPast
+                                  ? "text-gray-900 dark:text-white"
+                                  : "text-gray-400"
+                              }`}
+                            >
+                              Paso {step.num}
+                            </span>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                              {step.label}
                             </span>
                           </div>
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Parámetros del Monitor */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100 dark:border-gray-800">
-                  {/* Nombre del Monitor */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Nombre del Monitor *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Ej: Radar Competidor - Q3"
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
-
-                  {/* Competidor o Marca Referente */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Competidor o Empresa Referente (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={newCompetitor}
-                      onChange={(e) => setNewCompetitor(e.target.value)}
-                      placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Inputs Dinámicos según la Señal Elegida */}
-                {(() => {
-                  const selectedDef = SIGNAL_DEFINITIONS.find((s) => s.id === newType);
-                  if (!selectedDef) return null;
-
-                  if (selectedDef.inputKind === "post_url") {
-                    return (
-                      <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          URL de la Publicación de LinkedIn *
-                        </label>
-                        <input
-                          type="url"
-                          required
-                          value={newTargetUrl}
-                          onChange={(e) => setNewTargetUrl(e.target.value)}
-                          placeholder="https://www.linkedin.com/posts/..."
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                        />
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Rastrearemos automáticamente los comentaristas o reacciones a esta publicación.
-                        </p>
+                        {idx < 3 && (
+                          <div
+                            className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors ${
+                              isPast ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"
+                            }`}
+                          />
+                        )}
                       </div>
                     );
-                  }
+                  })}
+                </div>
+              </div>
 
-                  if (selectedDef.inputKind === "profile_or_company_url") {
-                    return (
-                      <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          URL del Perfil o Empresa de LinkedIn *
-                        </label>
-                        <input
-                          type="url"
-                          required
-                          value={newTargetUrl}
-                          onChange={(e) => setNewTargetUrl(e.target.value)}
-                          placeholder="https://www.linkedin.com/company/... o https://www.linkedin.com/in/..."
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                        />
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Monitorearemos los seguidores, publicaciones recientes o conexiones del perfil/empresa objetivo.
-                        </p>
+              {/* 3. Contenido del Wizard según el paso activo */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+                {/* =========================================================
+                    PASO 1: DEFINIR AUDIENCIA Y CLIENTE IDEAL (ICP)
+                   ========================================================= */}
+                {wizardStep === 1 && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
+                        <RiUserSearchLine size={13} /> Paso 1 de 4: Audiencia Objetivo
                       </div>
-                    );
-                  }
+                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
+                        ¿A quién deseas encontrar con este monitor?
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Filtra cargos, países y tamaños de empresa para que el radar capture únicamente a tus decisores clave.
+                      </p>
+                    </div>
 
-                  if (selectedDef.inputKind === "keywords") {
-                    return (
-                      <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          Palabras Clave de Intención de Compra (separadas por comas) *
-                        </label>
+                    {/* 1. Cargos y Títulos de Decisores */}
+                    <div className="space-y-2.5">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                        1. Cargos y Títulos Objetivo (ICP Titles)
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 min-h-[44px]">
+                        {icpTitles.map((title) => (
+                          <span
+                            key={title}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/60 shadow-2xs"
+                          >
+                            {title}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTitle(title)}
+                              className="hover:text-red-500 transition-colors"
+                            >
+                              <RiCloseLine size={14} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Input para escribir cargo */}
+                      <div className="flex gap-2">
                         <input
                           type="text"
-                          required
-                          value={newKeywords}
-                          onChange={(e) => setNewKeywords(e.target.value)}
-                          placeholder="Ej: alternativa a CRM, busco agencia de ventas, problemas con HubSpot, hiring SDRs"
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          value={customTitleInput}
+                          onChange={(e) => setCustomTitleInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddTitle(customTitleInput);
+                            }
+                          }}
+                          placeholder="Escribe un cargo y pulsa Enter (ej: Head of Outbound, CMO...)"
+                          className="flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                         />
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          El radar detectará publicaciones y discusiones públicas en LinkedIn que contengan estas frases de compra activa.
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleAddTitle(customTitleInput)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors shrink-0"
+                        >
+                          + Añadir
+                        </button>
                       </div>
-                    );
-                  }
 
-                  if (selectedDef.inputKind === "roles_or_industry") {
-                    return (
+                      {/* Sugerencias Rápidas de Cargos */}
                       <div className="space-y-1">
-                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          Cargos, Roles o Industria Objetivo (ICP)
-                        </label>
+                        <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                          Sugerencias rápidas:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            "CEO",
+                            "Founder",
+                            "VP Sales",
+                            "Director Comercial",
+                            "Head of Growth",
+                            "Director de Marketing",
+                            "COO",
+                            "Gerente General",
+                          ].map((sugg) => {
+                            const isAdded = icpTitles.includes(sugg);
+                            return (
+                              <button
+                                key={sugg}
+                                type="button"
+                                onClick={() => (isAdded ? handleRemoveTitle(sugg) : handleAddTitle(sugg))}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                                  isAdded
+                                    ? "bg-brand-500 text-white shadow-2xs"
+                                    : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                }`}
+                              >
+                                {isAdded ? `✓ ${sugg}` : `+ ${sugg}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Ubicación / Países */}
+                    <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                        2. Ubicación Geográfica / Países
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 p-2 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 min-h-[44px]">
+                        {icpCountries.map((country) => (
+                          <span
+                            key={country}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 shadow-2xs"
+                          >
+                            <RiMapPinLine size={12} /> {country}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCountry(country)}
+                              className="hover:text-red-500 transition-colors"
+                            >
+                              <RiCloseLine size={14} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
                         <input
                           type="text"
-                          value={newTargetRoles}
-                          onChange={(e) => setNewTargetRoles(e.target.value)}
-                          placeholder="Ej: CEO, Founder, VP of Sales, Director Comercial, SaaS, Fintech"
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          value={customCountryInput}
+                          onChange={(e) => setCustomCountryInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCountry(customCountryInput);
+                            }
+                          }}
+                          placeholder="Añadir país o región y pulsa Enter..."
+                          className="flex-1 rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                         />
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Filtrará a los prospectos que coincidan con estos cargos o sectores prioritarios.
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleAddCountry(customCountryInput)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 transition-colors shrink-0"
+                        >
+                          + Añadir
+                        </button>
                       </div>
-                    );
-                  }
 
-                  return null;
-                })()}
+                      <div className="flex flex-wrap gap-1.5">
+                        {["España", "México", "Colombia", "Argentina", "Chile", "Perú", "Estados Unidos"].map((c) => {
+                          const isAdded = icpCountries.includes(c);
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => (isAdded ? handleRemoveCountry(c) : handleAddCountry(c))}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                                isAdded
+                                  ? "bg-emerald-500 text-white shadow-2xs"
+                                  : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                              }`}
+                            >
+                              {isAdded ? `✓ ${c}` : `+ ${c}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                {/* 4. Modo de Operación: Review vs Autopilot */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Modo de Ejecución
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setNewMode("review")}
-                      className={`p-3.5 rounded-2xl border text-left text-xs transition-all ${
-                        newMode === "review"
-                          ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                          : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <div className="font-bold flex items-center justify-between">
-                        <span>Modo Revisión</span>
-                        {newMode === "review" && <RiCheckLine className="text-brand-500" size={16} />}
+                    {/* 3. Tamaño de Empresa */}
+                    <div className="space-y-2.5 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                        3. Tamaño de Empresa (Empleados)
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {[
+                          { id: "1-10", label: "1-10 emp." },
+                          { id: "11-50", label: "11-50 emp." },
+                          { id: "51-200", label: "51-200 emp." },
+                          { id: "201-500", label: "201-500 emp." },
+                          { id: "500+", label: "500+ emp." },
+                        ].map((sz) => {
+                          const isSelected = icpSizes.includes(sz.id);
+                          return (
+                            <button
+                              key={sz.id}
+                              type="button"
+                              onClick={() => handleToggleSize(sz.id)}
+                              className={`p-2.5 rounded-xl border text-center text-xs font-semibold transition-all ${
+                                isSelected
+                                  ? "border-brand-500 bg-brand-500 text-white shadow-2xs"
+                                  : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                              }`}
+                            >
+                              {sz.label}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
-                        Revisas y apruebas cada mensaje antes de disparar la prospección.
-                      </div>
-                    </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setNewMode("autopilot")}
-                      className={`p-3.5 rounded-2xl border text-left text-xs transition-all ${
-                        newMode === "autopilot"
-                          ? "border-purple-500 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                          : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      <div className="font-bold flex items-center justify-between">
-                        <span>Piloto Automático</span>
-                        {newMode === "autopilot" && <RiCheckLine className="text-purple-500" size={16} />}
+                    {/* Resumen de configuración ICP */}
+                    <div className="p-3.5 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/60 dark:border-brand-900/40 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-brand-900 dark:text-brand-200">
+                        <RiShieldCheckLine size={18} className="text-brand-500 shrink-0" />
+                        <span>
+                          <strong>ICP Calificado:</strong> {icpTitles.length} cargos seleccionados en{" "}
+                          {icpCountries.length} países y {icpSizes.length} rangos de tamaño.
+                        </span>
                       </div>
-                      <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
-                        La IA califica y encola la prospección automáticamente 24/7.
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 5. Lista Destino */}
-                {lists.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Guardar automáticamente en Lista (Opcional)
-                    </label>
-                    <select
-                      value={newTargetList}
-                      onChange={(e) => setNewTargetList(e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                    >
-                      <option value="">Seleccionar lista más tarde</option>
-                      {lists.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name} ({l.target_count} contactos)
-                        </option>
-                      ))}
-                    </select>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creatingMonitor}
-                    className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-                  >
-                    {creatingMonitor ? "Creando..." : "Crear & Activar Monitor"}
-                  </button>
+                {/* =========================================================
+                    PASO 2: SELECCIÓN DE SEÑAL DE INTENCIÓN (3 NIVELES)
+                   ========================================================= */}
+                {wizardStep === 2 && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <RiRadarLine size={13} /> Paso 2 de 4: Señales de Intención
+                      </div>
+                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
+                        Selecciona el Disparador de Compra
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Elige qué comportamiento o evento en LinkedIn activará la captura de prospectos según su temperatura.
+                      </p>
+                    </div>
+
+                    {/* Segmented Filter Bar por Niveles */}
+                    <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800/80 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSignalLevelFilter("ALL")}
+                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                          signalLevelFilter === "ALL"
+                            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-2xs"
+                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        Todas las Señales (9)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignalLevelFilter(1)}
+                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                          signalLevelFilter === 1
+                            ? "bg-white dark:bg-gray-700 text-amber-700 dark:text-amber-300 shadow-2xs"
+                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        🔥 Nivel 1: Máxima Intención (Calientes)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignalLevelFilter(2)}
+                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                          signalLevelFilter === 2
+                            ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-300 shadow-2xs"
+                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        ⚡ Nivel 2: Momento de Compra (Triggers)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSignalLevelFilter(3)}
+                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                          signalLevelFilter === 3
+                            ? "bg-white dark:bg-gray-700 text-teal-700 dark:text-teal-300 shadow-2xs"
+                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
+                        }`}
+                      >
+                        🟢 Nivel 3: Actividad & Búsquedas
+                      </button>
+                    </div>
+
+                    {/* Grid de Cards de Señales */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+                      {SIGNAL_DEFINITIONS.filter(
+                        (s) => signalLevelFilter === "ALL" || s.level === signalLevelFilter
+                      ).map((sig) => {
+                        const isSelected = newType === sig.id;
+                        const SigIcon = sig.icon;
+                        return (
+                          <button
+                            key={sig.id}
+                            type="button"
+                            onClick={() => setNewType(sig.id)}
+                            className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${
+                              isSelected
+                                ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/20"
+                                : "border-gray-200 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-850"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between w-full">
+                              <div className="flex items-center gap-2.5">
+                                <span className={`p-2 rounded-xl bg-gray-100 dark:bg-gray-800 ${sig.color}`}>
+                                  <SigIcon size={18} />
+                                </span>
+                                <div>
+                                  <h5 className="font-bold text-xs text-gray-900 dark:text-white leading-tight">
+                                    {sig.title}
+                                  </h5>
+                                  <span className="text-[10px] text-gray-400 font-medium">
+                                    {sig.levelTitle}
+                                  </span>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white shrink-0">
+                                  <RiCheckLine size={13} />
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
+                              {sig.description}
+                            </p>
+                            <div className="pt-1 flex items-center justify-between">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${sig.badgeBg}`}>
+                                {sig.badge}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Parámetros Contextuales según la señal seleccionada */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                          Parámetros para:{" "}
+                          <span className="text-brand-600">
+                            {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
+                          </span>
+                        </span>
+                      </div>
+
+                      {/* Si es engagement con competidores o comentarios */}
+                      {(newType === "competitor_reactions" || newType === "high_intent_comments") && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              Nombre del Competidor o Marca Referente *
+                            </label>
+                            <input
+                              type="text"
+                              value={newCompetitor}
+                              onChange={(e) => setNewCompetitor(e.target.value)}
+                              placeholder="Ej: HubSpot, Lemlist, Salesforce, Apollo..."
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                              URL del Post Específico (Opcional)
+                            </label>
+                            <input
+                              type="url"
+                              value={newTargetUrl}
+                              onChange={(e) => setNewTargetUrl(e.target.value)}
+                              placeholder="https://www.linkedin.com/posts/..."
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Si es seguidores o perfil de competidor */}
+                      {newType === "competitor_followers" && (
+                        <div>
+                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            URL de Empresa o Perfil de Referente en LinkedIn *
+                          </label>
+                          <input
+                            type="url"
+                            value={newTargetUrl}
+                            onChange={(e) => setNewTargetUrl(e.target.value)}
+                            placeholder="https://www.linkedin.com/company/... o https://www.linkedin.com/in/..."
+                            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          />
+                        </div>
+                      )}
+
+                      {/* Si es palabras clave de intención (Keyword Intent) */}
+                      {newType === "keyword_intent" && (
+                        <div className="space-y-2">
+                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                            Palabras Clave de Búsqueda de Compra (Chips interactivos)
+                          </label>
+                          <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            {keywordsList.map((kw) => (
+                              <span
+                                key={kw}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60"
+                              >
+                                {kw}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveKeyword(kw)}
+                                  className="hover:text-red-500"
+                                >
+                                  <RiCloseLine size={13} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={customKeywordInput}
+                              onChange={(e) => setCustomKeywordInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleAddKeyword(customKeywordInput);
+                                }
+                              }}
+                              placeholder="Escribe palabra clave y pulsa Enter (ej: 'busco CRM', 'alternativa a Lemlist')..."
+                              className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddKeyword(customKeywordInput)}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:text-teal-300 transition-colors shrink-0"
+                            >
+                              + Añadir
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 text-[11px]">
+                            <span className="text-gray-400">Sugerencias:</span>
+                            {[
+                              "automatización de ventas",
+                              "crm",
+                              "prospección b2b",
+                              "cold outreach",
+                              "contratar sdrs",
+                              "alternativas a hubspot",
+                            ].map((kwSugg) => (
+                              <button
+                                key={kwSugg}
+                                type="button"
+                                onClick={() => handleAddKeyword(kwSugg)}
+                                className="text-brand-600 hover:underline px-1"
+                              >
+                                + {kwSugg}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Si es nuevo en el rol o cambio de puesto */}
+                      {(newType === "new_in_role" || newType === "internal_promotion") && (
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                            Ventana Dorada de Presupuesto (Antigüedad máxima en el nuevo cargo)
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { days: 30, label: "Últimos 30 días", sub: "Recién llegado" },
+                              { days: 60, label: "Últimos 60 días", sub: "Evaluando stack" },
+                              { days: 90, label: "Últimos 90 días", sub: "Ventana Dorada (Recomendado)" },
+                            ].map((win) => (
+                              <button
+                                key={win.days}
+                                type="button"
+                                onClick={() => setTimeWindowDays(win.days)}
+                                className={`p-2.5 rounded-xl border text-center text-xs transition-all ${
+                                  timeWindowDays === win.days
+                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 font-bold ring-2 ring-emerald-500/20"
+                                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                                }`}
+                              >
+                                <div>{win.label}</div>
+                                <div className="text-[10px] text-gray-400 font-normal">{win.sub}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* =========================================================
+                    PASO 3: MENSAJE IA ANTI-STALKER & LIVE PREVIEW
+                   ========================================================= */}
+                {wizardStep === 3 && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                        <RiSparklingLine size={13} /> Paso 3 de 4: Mensaje IA Anti-Stalker
+                      </div>
+                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
+                        Fórmula de Apertura Anti-Stalker (La Regla de Oro)
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Configura cómo redactará la IA para que el contacto sea 100% natural, relevante y con alta respuesta.
+                      </p>
+                    </div>
+
+                    {/* Banner La Regla de Oro de GojiBerry */}
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+                      <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-bold">
+                        <span className="text-amber-600 text-base">💡</span>
+                        <span>La Regla de Oro de GojiBerry:</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-red-900 dark:text-red-200">
+                          <span className="font-bold">❌ Error Típico (Stalker): </span>
+                          "Hola, vi que le diste like a mi competidor X..." (Suena a acosador/invasivo).
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200">
+                          <span className="font-bold">✅ Fórmula InHubFlow: </span>
+                          Usa la señal como contexto natural para debatir su proceso actual sin revelar rastreo.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selector de Objetivo del Mensaje */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                        1. Objetivo de Conversión del Mensaje
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {[
+                          {
+                            id: "conversation",
+                            title: "💬 Iniciar Conversación",
+                            desc: "Abre diálogo estratégico sobre cuellos de botella en su proceso.",
+                          },
+                          {
+                            id: "demo",
+                            title: "📅 Agendar Demo Breve",
+                            desc: "Propuesta de valor directa para directores con dolor activo.",
+                          },
+                          {
+                            id: "resource",
+                            title: "📖 Compartir Recurso / Guía",
+                            desc: "Ofrece un framework o playbook sin fricción comercial inicial.",
+                          },
+                        ].map((obj) => (
+                          <button
+                            key={obj.id}
+                            type="button"
+                            onClick={() => setMsgObjective(obj.id as any)}
+                            className={`p-3 rounded-2xl border text-left text-xs transition-all ${
+                              msgObjective === obj.id
+                                ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
+                                : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            <div className="font-bold">{obj.title}</div>
+                            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
+                              {obj.desc}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Selector de Tono */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                        2. Tono de la IA
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "consultive", label: "🎯 Consultivo & Experto (Recomendado)" },
+                          { id: "professional", label: "⚡ Profesional & Directo" },
+                          { id: "direct", label: "🤝 Cercano & Casual" },
+                        ].map((tn) => (
+                          <button
+                            key={tn.id}
+                            type="button"
+                            onClick={() => setMsgTone(tn.id as any)}
+                            className={`p-2.5 rounded-xl border text-center text-xs transition-all ${
+                              msgTone === tn.id
+                                ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
+                                : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {tn.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* LIVE PREVIEW: Simulador de Mensaje en LinkedIn */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Simulación en Tiempo Real (LinkedIn Direct Message Preview)
+                        </label>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                          🛡️ Anti-Stalker Verified
+                        </span>
+                      </div>
+
+                      {/* Mockup de LinkedIn Card */}
+                      <div className="p-4 rounded-2xl bg-[#F3F6F8] dark:bg-gray-850 border border-gray-300 dark:border-gray-700 space-y-3">
+                        {/* Cabecera del chat de LinkedIn */}
+                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                              ME
+                            </div>
+                            <div>
+                              <div className="font-bold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                                Martín Echavarría
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              </div>
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                                Director Comercial & Alianzas @ Grupo Retail B2B
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-medium">En línea</span>
+                        </div>
+
+                        {/* Burbuja de mensaje */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-gray-400 block text-center">
+                            Hoy · Mensaje generado con IA contextual
+                          </span>
+                          <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-xs border border-gray-200 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
+                            {getSimulatedMessage(
+                              newType,
+                              msgObjective,
+                              msgTone,
+                              newCompetitor,
+                              keywordsList,
+                              customTemplate
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
+                          <span>Generado según ICP + Señal de Intención</span>
+                          <span>InHubFlow AI Engine</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Plantilla Personalizada Opcional */}
+                    <div className="pt-2">
+                      <details className="text-xs text-gray-600 dark:text-gray-400 group">
+                        <summary className="cursor-pointer font-semibold text-brand-600 hover:underline">
+                          + ¿Deseas redactar una plantilla personalizada con variables?
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            rows={3}
+                            value={customTemplate}
+                            onChange={(e) => setCustomTemplate(e.target.value)}
+                            placeholder="Hola {first_name}, vi que sigues activo en {topic}... ¿Cómo abordan este reto en {company}?"
+                            className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          />
+                          <p className="text-[11px] text-gray-400">
+                            Variables disponibles: <code>{"{first_name}"}</code>, <code>{"{company}"}</code>, <code>{"{topic}"}</code>, <code>{"{competitor}"}</code>.
+                          </p>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                )}
+
+                {/* =========================================================
+                    PASO 4: REVISIÓN FINAL, CUENTA Y LANZAMIENTO
+                   ========================================================= */}
+                {wizardStep === 4 && (
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <RiPlayLine size={13} /> Paso 4 de 4: Revisar y Activar
+                      </div>
+                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
+                        Lanzamiento del Monitor de Señales
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Define el modo de ejecución y la cuenta de LinkedIn encargada de la prospección.
+                      </p>
+                    </div>
+
+                    {/* 1. Nombre del Monitor */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                        Nombre del Monitor *
+                      </label>
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder={`Radar: ${
+                          SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title || "Señales"
+                        } - ${newCompetitor || keywordsList[0] || "ICP"}`}
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                      />
+                    </div>
+
+                    {/* 2. Cuenta de LinkedIn Remitente */}
+                    {accounts.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                          Cuenta de LinkedIn Remitente
+                        </label>
+                        <select
+                          value={selectedAccountId}
+                          onChange={(e) => setSelectedAccountId(e.target.value)}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          {accounts.map((acc) => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} {acc.is_authenticated ? "(Conectada ✓)" : "(Desconectada)"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* 3. Modo de Operación (Review vs Autopilot) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-2">
+                        Modo de Operación
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setNewMode("review")}
+                          className={`p-4 rounded-2xl border text-left text-xs transition-all ${
+                            newMode === "review"
+                              ? "border-brand-500 bg-brand-50/60 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
+                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          <div className="font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              Modo Revisión
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-100 text-brand-800 dark:bg-brand-900 dark:text-brand-300">
+                                Recomendado
+                              </span>
+                            </span>
+                            {newMode === "review" && <RiCheckLine className="text-brand-500" size={18} />}
+                          </div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
+                            Los prospectos captados van a tu cola de "Hot Leads". Revisas y apruebas el mensaje antes de disparar el contacto.
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNewMode("autopilot")}
+                          className={`p-4 rounded-2xl border text-left text-xs transition-all ${
+                            newMode === "autopilot"
+                              ? "border-purple-500 bg-purple-50/60 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
+                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          <div className="font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              Piloto Automático (Autopilot)
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                                24/7 Autónomo
+                              </span>
+                            </span>
+                            {newMode === "autopilot" && <RiCheckLine className="text-purple-500" size={18} />}
+                          </div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
+                            InHubFlow califica a los prospectos contra tu ICP, genera el icebreaker anti-stalker y encola el contacto automáticamente.
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 4. Lista Destino (Opcional) */}
+                    {lists.length > 0 && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                          Guardar prospectos aprobados en Lista (Opcional)
+                        </label>
+                        <select
+                          value={newTargetList}
+                          onChange={(e) => setNewTargetList(e.target.value)}
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                          <option value="">Seleccionar lista más tarde</option>
+                          {lists.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name} ({l.target_count} contactos)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Ficha Resumen Completa */}
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 space-y-3">
+                      <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
+                        Resumen de Configuración del Monitor
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Audiencia (ICP)</span>
+                          <strong className="text-gray-800 dark:text-gray-200">
+                            {icpTitles.length} cargos · {icpCountries.length} países
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Señal Elegida</span>
+                          <strong className="text-brand-600 truncate block">
+                            {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Fórmula Mensaje</span>
+                          <strong className="text-purple-600 truncate block capitalize">
+                            {msgObjective} · {msgTone}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Modo</span>
+                          <strong className="text-emerald-600 block">
+                            {newMode === "review" ? "Revisión Manual" : "Piloto Automático"}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Footer de Navegación del Wizard */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-850/80">
+                <div>
+                  {wizardStep === 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowNewModal(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep((prev) => ((prev - 1) as any))}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <RiArrowLeftLine size={15} /> Atrás
+                    </button>
+                  )}
                 </div>
-              </form>
+
+                <div className="flex items-center gap-2.5">
+                  {wizardStep < 4 ? (
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep((prev) => ((prev + 1) as any))}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all"
+                    >
+                      Siguiente:{" "}
+                      {wizardStep === 1
+                        ? "Señales de Intención"
+                        : wizardStep === 2
+                        ? "Mensaje IA Anti-Stalker"
+                        : "Revisar & Lanzar"}{" "}
+                      <RiArrowRightLine size={15} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={creatingMonitor}
+                      onClick={() => handleCreateMonitor()}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black text-white bg-brand-500 hover:bg-brand-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                    >
+                      {creatingMonitor ? (
+                        <>
+                          <RiRefreshLine className="animate-spin" size={16} /> Lanzando Monitor...
+                        </>
+                      ) : (
+                        <>
+                          <RiRadarLine size={16} /> Lanzar Monitor de Señales
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

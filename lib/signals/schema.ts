@@ -32,6 +32,7 @@ export interface SignalMonitor {
   account_id: string | null;
   target_list_id: string | null;
   target_workflow_id: string | null;
+  message_config_json?: string | null;
   last_checked_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -67,29 +68,82 @@ export interface SignalEvent {
 
 export function applySignalSchema(db: Database.Database): void {
   db.transaction(() => {
-    // 1. Tablas de monitores de señales
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS signal_monitors (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('post_engagement', 'influencer_activity', 'job_changes', 'ask_query')),
-        target_url TEXT,
-        competitor_name TEXT,
-        keywords_json TEXT,
-        icp_filters_json TEXT,
-        mode TEXT NOT NULL DEFAULT 'review' CHECK(mode IN ('review', 'autopilot')),
-        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'paused', 'completed')),
-        account_id TEXT,
-        target_list_id TEXT REFERENCES lists(id) ON DELETE SET NULL,
-        target_workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
-        last_checked_at TEXT,
-        created_by TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-      CREATE INDEX IF NOT EXISTS idx_signal_monitors_status ON signal_monitors(status);
-      CREATE INDEX IF NOT EXISTS idx_signal_monitors_type ON signal_monitors(type);
-    `);
+    // 1. Tablas de monitores de señales (con migración para eliminar CHECK antiguo)
+    const tableInfo = db
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'signal_monitors'")
+      .get() as { sql: string } | undefined;
+
+    if (tableInfo?.sql && tableInfo.sql.includes("CHECK(type IN")) {
+      db.pragma("foreign_keys = OFF");
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS signal_monitors_migrated (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          target_url TEXT,
+          competitor_name TEXT,
+          keywords_json TEXT,
+          icp_filters_json TEXT,
+          mode TEXT NOT NULL DEFAULT 'review' CHECK(mode IN ('review', 'autopilot')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'paused', 'completed')),
+          account_id TEXT,
+          target_list_id TEXT REFERENCES lists(id) ON DELETE SET NULL,
+          target_workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
+          message_config_json TEXT,
+          last_checked_at TEXT,
+          created_by TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        INSERT OR IGNORE INTO signal_monitors_migrated (
+          id, name, type, target_url, competitor_name, keywords_json, icp_filters_json,
+          mode, status, account_id, target_list_id, target_workflow_id, last_checked_at,
+          created_by, created_at, updated_at
+        ) SELECT 
+          id, name, type, target_url, competitor_name, keywords_json, icp_filters_json,
+          mode, status, account_id, target_list_id, target_workflow_id, last_checked_at,
+          created_by, created_at, updated_at
+        FROM signal_monitors;
+        DROP TABLE signal_monitors;
+        ALTER TABLE signal_monitors_migrated RENAME TO signal_monitors;
+        CREATE INDEX IF NOT EXISTS idx_signal_monitors_status ON signal_monitors(status);
+        CREATE INDEX IF NOT EXISTS idx_signal_monitors_type ON signal_monitors(type);
+      `);
+      db.pragma("foreign_keys = ON");
+    } else {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS signal_monitors (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          target_url TEXT,
+          competitor_name TEXT,
+          keywords_json TEXT,
+          icp_filters_json TEXT,
+          mode TEXT NOT NULL DEFAULT 'review' CHECK(mode IN ('review', 'autopilot')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'paused', 'completed')),
+          account_id TEXT,
+          target_list_id TEXT REFERENCES lists(id) ON DELETE SET NULL,
+          target_workflow_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
+          message_config_json TEXT,
+          last_checked_at TEXT,
+          created_by TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_signal_monitors_status ON signal_monitors(status);
+        CREATE INDEX IF NOT EXISTS idx_signal_monitors_type ON signal_monitors(type);
+      `);
+    }
+
+    try {
+      const cols = db.prepare("PRAGMA table_info(signal_monitors)").all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === "message_config_json")) {
+        db.exec("ALTER TABLE signal_monitors ADD COLUMN message_config_json TEXT");
+      }
+    } catch {
+      // ignore
+    }
 
     // 2. Tablas de prospectos detectados por señales (Hot Leads)
     db.exec(`
