@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   RiAddLine, RiDeleteBinLine, RiEditLine, RiMailLine,
   RiShieldCheckLine, RiShieldKeyholeLine, RiSmartphoneLine, RiDownloadLine, RiCheckLine, RiCloseLine,
-  RiLockPasswordLine, RiPlugLine,
+  RiLockPasswordLine, RiPlugLine, RiArrowLeftLine, RiArrowRightLine,
   RiLinkedinBoxLine, RiMessage2Line, RiSettings3Line, RiFileCopyLine,
   RiLockLine, RiLockUnlockLine, RiFlashlightLine, RiArrowDownSLine, RiCompassLine, RiGlobalLine,
   RiExternalLinkLine,
@@ -253,14 +253,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [slotsLimit, setSlotsLimit] = useState<number>(() => {
     return (session?.user as any)?.role === "admin" ? 999 : ((session?.user as any)?.slots_limit || 4);
   });
-  const [showModal, setShowModal] = useState(false);
+  // Estados para el Modal Unificado tipo Slider (Mismo tamaño y transición fluida)
+  const [unifiedModalOpen, setUnifiedModalOpen] = useState(false);
+  const [modalStep, setModalStep] = useState<1 | 2>(1);
   const [editingAccount, setEditingAccount] = useState<LiAccount | null>(null);
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
 
-  // Estados para el flujo de conexión embebido (White-label)
   const [authAccountId, setAuthAccountId] = useState<string | null>(null);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(false);
   const [showSuccessAdviceModal, setShowSuccessAdviceModal] = useState(false);
@@ -288,10 +288,11 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   useEffect(() => {
     function handleAuthMessage(event: MessageEvent) {
       if (event.data?.type === "LINKEDIN_AUTH_SUCCESS") {
-        setAuthModalOpen(false);
+        setUnifiedModalOpen(false);
         setIframeUrl(null);
         setAuthAccountId(null);
         setIframeLoading(false);
+        setModalStep(1);
         refresh();
         setShowSuccessAdviceModal(true);
         toast.success("¡Cuenta de LinkedIn conectada con éxito!");
@@ -303,7 +304,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
 
   // Polling de respaldo para detectar autenticación en segundo plano
   useEffect(() => {
-    if (!authModalOpen || !authAccountId) return;
+    if (!unifiedModalOpen || modalStep !== 2 || !authAccountId) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/accounts/${authAccountId}`);
@@ -311,10 +312,11 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
           const acc = await res.json();
           if (acc.is_authenticated === 1 || acc.unipile_status === "OK") {
             clearInterval(interval);
-            setAuthModalOpen(false);
+            setUnifiedModalOpen(false);
             setIframeUrl(null);
             setAuthAccountId(null);
             setIframeLoading(false);
+            setModalStep(1);
             refresh();
             setShowSuccessAdviceModal(true);
             toast.success("¡Cuenta de LinkedIn conectada con éxito!");
@@ -325,13 +327,15 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       }
     }, 2500);
     return () => clearInterval(interval);
-  }, [authModalOpen, authAccountId]);
+  }, [unifiedModalOpen, modalStep, authAccountId]);
 
   async function startAuthFlow(accountId: string) {
+    setEditingAccount(null);
     setAuthAccountId(accountId);
+    setModalStep(2);
     setIframeUrl(null);
     setIframeLoading(true);
-    setAuthModalOpen(true);
+    setUnifiedModalOpen(true);
 
     try {
       const res = await fetch("/api/accounts/unipile-link", {
@@ -345,22 +349,27 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     } catch (error) {
       setIframeLoading(false);
       toast.error(error instanceof Error ? error.message : "Error al conectar la cuenta");
-      setAuthModalOpen(false);
+      setUnifiedModalOpen(false);
     }
   }
 
-  function closeAuthModal() {
-    setAuthModalOpen(false);
+  function closeUnifiedModal() {
+    setUnifiedModalOpen(false);
+    setModalStep(1);
     setIframeUrl(null);
     setAuthAccountId(null);
     setIframeLoading(false);
+    setEditingAccount(null);
     refresh();
   }
 
   function openCreate() {
     setEditingAccount(null);
     setForm(BLANK_LI_FORM);
-    setShowModal(true);
+    setModalStep(1);
+    setIframeUrl(null);
+    setAuthAccountId(null);
+    setUnifiedModalOpen(true);
   }
 
   function openEdit(a: LiAccount) {
@@ -375,7 +384,10 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       timezone: a.timezone ?? "Europe/Berlin",
       working_days: a.working_days ?? "1,2,3,4,5",
     });
-    setShowModal(true);
+    setModalStep(1);
+    setIframeUrl(null);
+    setAuthAccountId(null);
+    setUnifiedModalOpen(true);
   }
 
   async function save(e: React.FormEvent) {
@@ -406,16 +418,35 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
         return;
       }
 
-      toast.success(editingAccount ? "Cuenta actualizada con éxito" : "Cuenta creada con éxito");
-      setShowModal(false);
-      const isNew = !editingAccount;
-      setEditingAccount(null);
-      setForm(BLANK_LI_FORM);
       await refresh();
 
-      // Al añadir una cuenta nueva, abrir inmediatamente el login embebido de LinkedIn en el popup
-      if (isNew && data && data.id) {
-        startAuthFlow(data.id);
+      if (editingAccount) {
+        toast.success("Cuenta actualizada con éxito");
+        setUnifiedModalOpen(false);
+        setEditingAccount(null);
+      } else {
+        toast.success("Configuración guardada");
+        // Efecto Slider: Deslizar suavemente al Paso 2 dentro del mismo modal
+        setAuthAccountId(data.id);
+        setModalStep(2);
+        setIframeLoading(true);
+        setIframeUrl(null);
+
+        try {
+          const linkRes = await fetch("/api/accounts/unipile-link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accountId: data.id }),
+          });
+          const linkData = await linkRes.json();
+          if (linkRes.ok && linkData.url) {
+            setIframeUrl(linkData.url);
+          } else {
+            toast.error("No se pudo cargar la ventana de conexión");
+          }
+        } catch {
+          toast.error("Error al conectar con LinkedIn");
+        }
       }
     } catch (err: any) {
       setLoading(false);
@@ -547,161 +578,50 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
         </div>
       )}
 
-      {/* Add/Edit modal */}
-      {showModal && (
+      {/* Modal Unificado con Slider (Mismo tamaño para Configuración y Conexión) */}
+      {unifiedModalOpen && (
         <div className="modal modal-open">
-          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-md">
-            <h3 className="font-semibold text-base mb-4">{editingAccount ? "Edit LinkedIn Account" : "Add LinkedIn Account"}</h3>
-            <form onSubmit={save} className="flex flex-col gap-3">
-              <div>
-                <label className="label text-xs text-base-content/50 pb-1">Display name</label>
-                <input className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="e.g. Mohammad LinkedIn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              </div>
-              <div>
-                <label className="label text-xs text-base-content/50 pb-1">Email</label>
-                <input type="email" className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white" placeholder="you@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Connections/day (Máx 20)</label>
-                  <input
-                    type="number"
-                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-                    value={form.daily_connection_limit}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setForm({ ...form, daily_connection_limit: Math.min(20, Math.max(1, val)) });
-                    }}
-                    min={1}
-                    max={20}
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Messages/day (Máx 20)</label>
-                  <input
-                    type="number"
-                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-                    value={form.daily_message_limit}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setForm({ ...form, daily_message_limit: Math.min(20, Math.max(1, val)) });
-                    }}
-                    min={1}
-                    max={20}
-                  />
-                </div>
-                <div>
-                  <label className="label text-xs text-base-content/50 pb-1">InMail/day (Máx 20)</label>
-                  <input
-                    type="number"
-                    className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-                    value={form.daily_inmail_limit}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setForm({ ...form, daily_inmail_limit: Math.min(20, Math.max(0, val)) });
-                    }}
-                    min={0}
-                    max={20}
-                  />
-                </div>
-              </div>
-              <p className="text-[11px] text-base-content/40 -mt-1">
-                🔒 Límite de seguridad para protección de cuenta: Máximo 20/día (puedes configurar menos si prefieres).
-              </p>
-
-              <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
-                <p className="text-xs font-medium text-base-content/50 uppercase tracking-wide">Working Hours</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label text-xs text-base-content/50 pb-1">Start</label>
-                    <select className="select select-sm w-full" value={form.active_hours_start} onChange={(e) => setForm({ ...form, active_hours_start: Number(e.target.value) })}>
-                      {HOURS.map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label text-xs text-base-content/50 pb-1">End</label>
-                    <select className="select select-sm w-full" value={form.active_hours_end} onChange={(e) => setForm({ ...form, active_hours_end: Number(e.target.value) })}>
-                      {HOURS.map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
-                    </select>
-                  </div>
-                </div>
-                {form.active_hours_start >= form.active_hours_end
-                  ? <p className="text-xs text-error">Start must be before end</p>
-                  : <p className="text-xs text-base-content/40">{fmtHour(form.active_hours_start)} – {fmtHour(form.active_hours_end)} ({form.active_hours_end - form.active_hours_start}h window)</p>
-                }
-                <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Timezone</label>
-                  <select className="select select-sm w-full" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })}>
-                    {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="label text-xs text-base-content/50 pb-1">Working days</label>
-                  <div className="flex gap-1.5">
-                    {WEEKDAYS.map(day => {
-                      const active = form.working_days.split(",").map(Number).includes(day.iso);
-                      return (
-                        <button
-                          key={day.iso}
-                          type="button"
-                          onClick={() => {
-                            const days = active
-                              ? form.working_days.split(",").map(Number).filter(d => d !== day.iso)
-                              : [...form.working_days.split(",").map(Number), day.iso].sort((a, b) => a - b);
-                            setForm({ ...form, working_days: days.join(",") });
-                          }}
-                          className={`flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                            active
-                              ? "bg-primary/20 text-primary border-primary/40"
-                              : "bg-base-300/40 text-base-content/40 border-base-300/50 hover:border-base-300"
-                          }`}
-                        >
-                          {day.short}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-action mt-2">
-                <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer" onClick={() => { setShowModal(false); setEditingAccount(null); }}>Cancelar</button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs cursor-pointer" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : editingAccount ? "Guardar Cambios" : "Añadir y Conectar"}
-                </button>
-              </div>
-            </form>
-          </div>
-          <div className="modal-backdrop" onClick={() => setShowModal(false)} />
-        </div>
-      )}
-
-      {/* Modal de Conexión Embebido (White-label LinkedIn Iframe) */}
-      {authModalOpen && (
-        <div className="modal modal-open">
-          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full p-0 overflow-hidden">
-            {/* Header del Modal */}
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl max-w-xl w-full p-0 overflow-hidden relative">
+            {/* Header Común / Superior */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#0A66C2]/10 text-[#0A66C2] flex items-center justify-center font-bold text-lg">
-                  in
-                </div>
+                {modalStep === 2 && !editingAccount ? (
+                  <button
+                    type="button"
+                    onClick={() => setModalStep(1)}
+                    className="p-1.5 -ml-1 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                    title="Volver al Paso 1"
+                  >
+                    <RiArrowLeftLine size={18} />
+                  </button>
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-[#0A66C2]/10 text-[#0A66C2] flex items-center justify-center font-bold text-lg">
+                    in
+                  </div>
+                )}
                 <div>
                   <h3 className="font-bold text-base text-gray-900 dark:text-white leading-snug">
-                    Conectar Cuenta de LinkedIn
+                    {modalStep === 1
+                      ? (editingAccount ? "Editar Cuenta de LinkedIn" : "Configurar Cuenta de LinkedIn")
+                      : "Conectar Cuenta de LinkedIn"}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Acceso directo y seguro mediante canal oficial cifrado.
+                    {modalStep === 1
+                      ? "Paso 1 de 2: Parámetros y límites de prospección"
+                      : "Paso 2 de 2: Acceso oficial y seguro mediante canal cifrado"}
                   </p>
                 </div>
               </div>
+
               <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
-                  🔒 Cifrado 256-bit
-                </span>
+                {modalStep === 2 && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
+                    🔒 Cifrado 256-bit
+                  </span>
+                )}
                 <button
                   type="button"
-                  onClick={closeAuthModal}
+                  onClick={closeUnifiedModal}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                   title="Cerrar"
                 >
@@ -710,60 +630,232 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </div>
             </div>
 
-            {/* Contenedor del Iframe */}
-            <div className="relative w-full h-[580px] bg-gray-50 dark:bg-gray-950">
-              {iframeLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-gray-900/95 z-10 transition-all p-6 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3 animate-spin">
-                    <RiShieldKeyholeLine size={24} />
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Estableciendo conexión segura con LinkedIn...
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
-                    Iniciando canal de autenticación encriptado punto a punto
-                  </p>
+            {/* Slider Container: Ancho idéntico con transición horizontal */}
+            <div className="relative overflow-hidden w-full">
+              <div
+                className="flex w-[200%] transition-transform duration-500 ease-in-out"
+                style={{ transform: modalStep === 1 ? "translateX(0%)" : "translateX(-50%)" }}
+              >
+                {/* ─── SLIDE 1: Formulario de Configuración ─── */}
+                <div className="w-1/2 shrink-0 flex flex-col justify-between">
+                  <form onSubmit={save}>
+                    <div className="max-h-[480px] overflow-y-auto px-6 py-4 flex flex-col gap-3">
+                      <div>
+                        <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Nombre para mostrar</label>
+                        <input
+                          className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                          placeholder="Ej. Roberto Orse LinkedIn"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Correo de LinkedIn</label>
+                        <input
+                          type="email"
+                          className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                          placeholder="tu-correo@linkedin.com"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Conexiones/día</label>
+                          <input
+                            type="number"
+                            className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                            value={form.daily_connection_limit}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setForm({ ...form, daily_connection_limit: Math.min(20, Math.max(1, val)) });
+                            }}
+                            min={1}
+                            max={20}
+                          />
+                        </div>
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Mensajes/día</label>
+                          <input
+                            type="number"
+                            className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                            value={form.daily_message_limit}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setForm({ ...form, daily_message_limit: Math.min(20, Math.max(1, val)) });
+                            }}
+                            min={1}
+                            max={20}
+                          />
+                        </div>
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">InMail/día</label>
+                          <input
+                            type="number"
+                            className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                            value={form.daily_inmail_limit}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setForm({ ...form, daily_inmail_limit: Math.min(20, Math.max(0, val)) });
+                            }}
+                            min={0}
+                            max={20}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">
+                        🔒 Límite de seguridad recomendado: Máximo 20 acciones/día para proteger tu perfil de LinkedIn.
+                      </p>
+
+                      <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
+                        <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Horario de Prospección</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Inicio</label>
+                            <select className="select select-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl" value={form.active_hours_start} onChange={(e) => setForm({ ...form, active_hours_start: Number(e.target.value) })}>
+                              {HOURS.map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Fin</label>
+                            <select className="select select-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl" value={form.active_hours_end} onChange={(e) => setForm({ ...form, active_hours_end: Number(e.target.value) })}>
+                              {HOURS.map(h => <option key={h} value={h}>{fmtHour(h)}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        {form.active_hours_start >= form.active_hours_end
+                          ? <p className="text-xs text-error">La hora de inicio debe ser anterior a la de fin</p>
+                          : <p className="text-xs text-gray-500">{fmtHour(form.active_hours_start)} – {fmtHour(form.active_hours_end)} ({form.active_hours_end - form.active_hours_start}h activas)</p>
+                        }
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Zona Horaria</label>
+                          <select className="select select-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })}>
+                            {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">Días Laborales</label>
+                          <div className="flex gap-1.5">
+                            {[
+                              { iso: 1, short: "Lun" },
+                              { iso: 2, short: "Mar" },
+                              { iso: 3, short: "Mié" },
+                              { iso: 4, short: "Jue" },
+                              { iso: 5, short: "Vie" },
+                              { iso: 6, short: "Sáb" },
+                              { iso: 7, short: "Dom" },
+                            ].map((day) => {
+                              const active = form.working_days.split(",").includes(String(day.iso));
+                              return (
+                                <button
+                                  key={day.iso}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = form.working_days.split(",").filter(Boolean);
+                                    const next = active ? current.filter(d => d !== String(day.iso)) : [...current, String(day.iso)];
+                                    if (next.length > 0) setForm({ ...form, working_days: next.sort().join(",") });
+                                  }}
+                                  className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
+                                    active
+                                      ? "bg-brand-500/15 border-brand-500 text-brand-600 dark:text-brand-400 font-semibold"
+                                      : "border-gray-200 dark:border-gray-700 text-gray-400 hover:border-gray-400"
+                                  }`}
+                                >
+                                  {day.short}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Slide 1 */}
+                    <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                        onClick={closeUnifiedModal}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : editingAccount ? (
+                          "Guardar Cambios"
+                        ) : (
+                          <>Añadir y Conectar <RiArrowRightLine size={16} /></>
+                        )}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              )}
 
-              {iframeUrl && (
-                <iframe
-                  src={iframeUrl}
-                  className="w-full h-full border-0"
-                  onLoad={() => setIframeLoading(false)}
-                  title="LinkedIn Direct Connect"
-                  allow="clipboard-write"
-                />
-              )}
-            </div>
+                {/* ─── SLIDE 2: Login Embebido de LinkedIn ─── */}
+                <div className="w-1/2 shrink-0 flex flex-col justify-between">
+                  <div className="relative w-full h-[480px] bg-gray-50 dark:bg-gray-950">
+                    {iframeLoading && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-gray-900/95 z-10 transition-all p-6 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3 animate-spin">
+                          <RiShieldKeyholeLine size={24} />
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Estableciendo conexión segura con LinkedIn...
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                          Iniciando canal de autenticación encriptado punto a punto
+                        </p>
+                      </div>
+                    )}
 
-            {/* Footer del Modal */}
-            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-xs">
-              <span className="text-gray-500 dark:text-gray-400 text-[11px]">
-                Inicia sesión con tu cuenta de LinkedIn. Si se te solicita código 2FA, ingrésalo normalmente.
-              </span>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={closeAuthModal}
-                  className="px-3.5 py-1.5 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeAuthModal();
-                    toast.success("Verificando sincronización de cuenta...");
-                  }}
-                  className="px-4 py-1.5 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer"
-                >
-                  Ya he iniciado sesión
-                </button>
+                    {iframeUrl && (
+                      <iframe
+                        src={iframeUrl}
+                        className="w-full h-full border-0"
+                        onLoad={() => setIframeLoading(false)}
+                        title="LinkedIn Direct Connect"
+                        allow="clipboard-write"
+                      />
+                    )}
+                  </div>
+
+                  {/* Footer Slide 2 */}
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-xs">
+                    <span className="text-gray-500 dark:text-gray-400 text-[11px]">
+                      Inicia sesión con tu cuenta de LinkedIn para sincronizar.
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={closeUnifiedModal}
+                        className="px-4 py-2 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeUnifiedModal();
+                          toast.success("Verificando sincronización de cuenta...");
+                        }}
+                        className="px-5 py-2 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer"
+                      >
+                        Ya he iniciado sesión
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <div className="modal-backdrop bg-black/60 backdrop-blur-xs" onClick={closeAuthModal} />
+          <div className="modal-backdrop bg-black/60 backdrop-blur-xs" onClick={closeUnifiedModal} />
         </div>
       )}
 
