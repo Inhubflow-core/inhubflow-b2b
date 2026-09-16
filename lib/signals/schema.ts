@@ -31,6 +31,7 @@ export interface SignalIcpFilters {
   company_sizes?: string[];
   exclusions?: string[];
   time_window_days?: number;
+  result_limit?: number;
 }
 
 export interface SignalMessageConfig {

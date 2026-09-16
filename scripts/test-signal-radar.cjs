@@ -25,6 +25,7 @@ const { applySignalSchema } = require("../lib/signals/schema.ts");
 const { SignalRadarService } = require("../lib/signals/service.ts");
 const { scanRealSignals } = require("../lib/signals/scanners/index.ts");
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
+const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 
 function baseDb() {
   const db = new Database(":memory:");
@@ -100,6 +101,16 @@ function mockClient(overrides = {}) {
 }
 
 async function run() {
+  console.log("▶ Ask AI interpreta consultas claras incluso si Gemini está saturado");
+  {
+    const plan = deterministicSignalResearchPlan("Encuentra 10 CEOs que levantaron fondos de inversión");
+    assert.equal(plan.signalType, "keyword_intent");
+    assert.equal(plan.resultLimit, 10);
+    assert.ok(plan.titles.includes("CEO"));
+    assert.ok(plan.keywords.some((keyword) => /inversi[oó]n|funding/i.test(keyword)));
+    assert.equal(plan.model, "deterministic-fallback");
+  }
+
   console.log("▶ Migración preserva monitores y leads legacy");
   {
     const db = baseDb();

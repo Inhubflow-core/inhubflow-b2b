@@ -30,6 +30,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     return res.status(200).json(result);
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : "Error procesando Ask AI" });
+    const message = error instanceof Error ? error.message : String(error);
+    const transient = /\b(429|503)\b|unavailable|high demand|resource_exhausted|rate limit/i.test(message);
+    if (transient) {
+      return res.status(503).json({
+        error: "El planificador IA está temporalmente ocupado. InHubFlow volverá a intentarlo con un modelo alternativo; prueba nuevamente en unos instantes.",
+        code: "ai_temporarily_unavailable",
+        retryable: true,
+      });
+    }
+    return res.status(500).json({ error: message || "Error procesando Ask AI" });
   }
 }

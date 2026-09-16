@@ -160,6 +160,7 @@ export class SignalRadarService {
         company_sizes: normalizeArray(input.icp_filters?.company_sizes),
         exclusions: normalizeArray(input.icp_filters?.exclusions),
         time_window_days: Math.max(1, Math.min(input.icp_filters?.time_window_days || 90, 365)),
+        result_limit: Math.max(1, Math.min(input.icp_filters?.result_limit || 50, 100)),
       }),
       mode: input.mode || "review",
       status: "active",
@@ -354,17 +355,18 @@ export class SignalRadarService {
       const icp = parseJson<SignalIcpFilters>(monitor.icp_filters_json, {});
       const keywords = parseJson<string[]>(monitor.keywords_json, []);
       const cursor = parseJson<SignalScanCursor | null>(monitor.cursor_json, null);
+      const requestedLimit = Math.max(1, Math.min(icp.result_limit || 50, 100));
       const raw = await scanRealSignals(this.client, {
         monitor,
         remoteAccountId: resolved.unipileAccountId,
         icp,
         keywords,
         cursor,
-        limit: 50,
+        limit: requestedLimit,
         hasSalesNavigator: capabilities.salesNavigator,
       });
       const enriched: DiscoveredSignalLead[] = [];
-      for (const candidate of raw.leads.slice(0, 50)) {
+      for (const candidate of raw.leads.slice(0, requestedLimit)) {
         const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId);
         if (lead && passesIcp(lead, icp)) enriched.push(lead);
       }
@@ -542,6 +544,7 @@ export class SignalRadarService {
         company_sizes: plan.companySizes,
         exclusions: plan.exclusions,
         time_window_days: plan.timeWindowDays,
+        result_limit: plan.resultLimit,
       },
       mode: "review",
       account_id: input.accountId,

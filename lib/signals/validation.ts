@@ -15,6 +15,7 @@ export const SignalMonitorCreateSchema = z.object({
     company_sizes: StringArray.optional(),
     exclusions: StringArray.optional(),
     time_window_days: z.number().int().min(1).max(365).optional(),
+    result_limit: z.number().int().min(1).max(100).optional(),
   }).optional(),
   mode: z.enum(["review", "autopilot"]).default("review"),
   account_id: z.string().uuid().or(z.string().min(1).max(200)),
