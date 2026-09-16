@@ -67,10 +67,10 @@ export interface UnipileSolveCheckpointResponse {
 export interface UnipileProfileWorkExperience {
   id?: string;
   position?: string;
-  compunknown?: string;
-  compunknown_id?: string;
-  compunknown_url?: string;
-  compunknown_picture_url?: string;
+  company?: string;
+  company_id?: string;
+  company_url?: string;
+  company_picture_url?: string;
   location?: string;
   current?: boolean;
   start?: string | null;
@@ -240,7 +240,7 @@ export interface UnipileLinkedInSearchParams {
   category?: 'PEOPLE' | 'POSTS' | 'COMPANIES';
   keywords?: string;
   title?: string;
-  compunknown?: string;
+  company?: string;
   location?: string;
   limit?: number;
   cursor?: string;
@@ -254,7 +254,7 @@ export interface UnipileSearchResultItem {
   public_identifier?: string;
   profile_url?: string;
   picture_url?: string;
-  compunknown?: string;
+  company?: string;
 }
 
 export interface UnipileWebhookSender {

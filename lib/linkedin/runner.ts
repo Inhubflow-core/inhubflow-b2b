@@ -97,6 +97,10 @@ function nowIso(now = Date.now()): string { return new Date(now).toISOString(); 
 function addHours(hours: number, now = Date.now()): string { return new Date(now + hours * 3600 * 1000).toISOString(); }
 
 function log(db: ReturnType<typeof getDb>, runId: string, targetId: string | null, level: "info" | "warn" | "error", message: string) {
+  const rendered = `[campaign-runner] [${level.toUpperCase()}] run=${runId} target=${targetId || "-"} ${message}`;
+  if (level === "error") console.error(rendered);
+  else if (level === "warn") console.warn(rendered);
+  else console.log(rendered);
   try {
     db.prepare(`
       INSERT INTO logs (id, run_id, target_id, level, message, created_at)
@@ -383,22 +387,43 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
   if (step.step_type === "connect") {
     if (isConnected(target)) { log(db, runProfile.run_id, target.id, "info", `${name} ya está conectado; continuando la secuencia`); trAdvance(db, tr, steps); return; }
 
-    // An accepted relation can be discovered by the periodic profile resolution
-    // even if the webhook was delayed.
+    const priorDelivery = getLinkedInStepDelivery(db, tr.id, step.id);
+
+    // Reconcile legacy/local pending state against Unipile before deciding to wait.
+    // Older browser executors could stamp connection_requested_at without actually
+    // submitting an invitation, so the remote profile is the source of truth.
     if (target.connection_requested_at) {
       try {
         const profile = await resolveProfile();
+        enrichTarget(db, runProfile.account_id, target, profile);
         if (profileIsConnected(profile)) {
-          enrichTarget(db, runProfile.account_id, target, profile);
           trAdvance(db, tr, steps);
-        } else {
-          trWait(db, tr, 6, now());
+          return;
         }
-      } catch { trWait(db, tr, 6, now()); }
-      return;
+        if (profileHasPendingInvitation(profile)) {
+          log(db, runProfile.run_id, target.id, "info", `La invitación a ${name} está pendiente en LinkedIn; esperando aceptación`);
+          trWait(db, tr, 6, now());
+          return;
+        }
+        if (priorDelivery?.state === "confirmed" || priorDelivery?.state === "uncertain" || priorDelivery?.state === "prepared") {
+          trWait(db, tr, 6, now());
+          return;
+        }
+
+        markLinkedInTargetState(db, runProfile.account_id, target.id, {
+          connection_requested_at: null,
+          unipile_provider_id: profile.provider_id,
+        });
+        target.connection_requested_at = null;
+        log(db, runProfile.run_id, target.id, "warn", `Se eliminó un marcador local obsoleto para ${name}: Unipile confirma que no hay invitación pendiente`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(db, runProfile.run_id, target.id, "warn", `No se pudo reconciliar la invitación pendiente de ${name}: ${message}`);
+        trWait(db, tr, 1, now());
+        return;
+      }
     }
 
-    const priorDelivery = getLinkedInStepDelivery(db, tr.id, step.id);
     if (priorDelivery?.state === "prepared") {
       updateLinkedInStepDelivery(db, priorDelivery.id, "uncertain", {
         errorMessage: "Ejecución interrumpida antes de confirmar la respuesta de Unipile",

@@ -219,7 +219,7 @@ async function run() {
     db.close();
   }
 
-  console.log("▶ Connect: conectado avanza y solicitud pendiente no se duplica");
+  console.log("▶ Connect: conectado avanza, pendiente real espera y marcador local obsoleto se repara");
   {
     const db = makeDb(); const tr = seed(db, "connect", { degree: 1, connected_at: "2026-09-01" }); const mock = client();
     await processSingleTrack(db, tr, deps(mock));
@@ -228,7 +228,17 @@ async function run() {
   {
     const db = makeDb(); const tr = seed(db, "connect", { connection_requested_at: "2026-09-14", unipile_provider_id: "provider-1" }); const mock = client({ resolveProfile: async () => ({ provider_id: "provider-1", provider: "LINKEDIN", object: "UserProfile", network_distance: "SECOND_DEGREE" }) });
     await processSingleTrack(db, tr, deps(mock));
-    assert.equal(mock.calls.invite, 0); assert.equal(db.prepare("SELECT state FROM run_profile_tracks WHERE id='tr1'").get().state, "in_progress"); db.close();
+    assert.equal(mock.calls.invite, 1, "A stale local marker must not suppress the real invitation");
+    assert.equal(db.prepare("SELECT state FROM run_profile_tracks WHERE id='tr1'").get().state, "in_progress");
+    assert.equal(db.prepare("SELECT state FROM linkedin_step_deliveries WHERE track_id='tr1'").get().state, "confirmed");
+    db.close();
+  }
+  {
+    const db = makeDb(); const tr = seed(db, "connect", { connection_requested_at: "2026-09-14", unipile_provider_id: "provider-1" }); const mock = client({ resolveProfile: async () => ({ provider_id: "provider-1", provider: "LINKEDIN", object: "UserProfile", network_distance: "SECOND_DEGREE", invitation: { type: "SENT", status: "PENDING" } }) });
+    await processSingleTrack(db, tr, deps(mock));
+    assert.equal(mock.calls.invite, 0, "A real pending invitation must never be duplicated");
+    assert.equal(db.prepare("SELECT state FROM run_profile_tracks WHERE id='tr1'").get().state, "in_progress");
+    db.close();
   }
 
   console.log("▶ Connect: cuota, éxito y fallo confirmado");
