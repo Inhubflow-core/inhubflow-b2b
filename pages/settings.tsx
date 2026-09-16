@@ -260,11 +260,16 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
 
-  // Estados de Autenticación 100% Nativa de LinkedIn
+  // Estados de Autenticación Nativa de LinkedIn (Credenciales, Cookies y Proxy)
   const [authAccountId, setAuthAccountId] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<"credentials" | "cookie">("credentials");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [authCookieLiAt, setAuthCookieLiAt] = useState("");
+  const [authCookieLiA, setAuthCookieLiA] = useState("");
+  const [authCountry, setAuthCountry] = useState("");
+  const [authCustomProxy, setAuthCustomProxy] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -298,9 +303,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     const acc = accounts.find((a) => a.id === accountId);
     setEditingAccount(null);
     setAuthAccountId(accountId);
+    setAuthMode("credentials");
     setAuthEmail(acc?.email || "");
     setAuthPassword("");
     setShowAuthPassword(false);
+    setAuthCookieLiAt("");
+    setAuthCookieLiA("");
+    setAuthCountry("");
+    setAuthCustomProxy("");
     setAuthError(null);
     setIsCheckpoint(false);
     setCheckpointCode("");
@@ -316,6 +326,10 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     setAuthEmail("");
     setAuthPassword("");
     setShowAuthPassword(false);
+    setAuthCookieLiAt("");
+    setAuthCookieLiA("");
+    setAuthCountry("");
+    setAuthCustomProxy("");
     setAuthError(null);
     setIsCheckpoint(false);
     setCheckpointCode("");
@@ -329,9 +343,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     setForm(BLANK_LI_FORM);
     setModalStep(1);
     setAuthAccountId(null);
+    setAuthMode("credentials");
     setAuthEmail("");
     setAuthPassword("");
     setShowAuthPassword(false);
+    setAuthCookieLiAt("");
+    setAuthCookieLiA("");
+    setAuthCountry("");
+    setAuthCustomProxy("");
     setAuthError(null);
     setIsCheckpoint(false);
     setCheckpointCode("");
@@ -353,9 +372,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
     });
     setModalStep(1);
     setAuthAccountId(null);
+    setAuthMode("credentials");
     setAuthEmail("");
     setAuthPassword("");
     setShowAuthPassword(false);
+    setAuthCookieLiAt("");
+    setAuthCookieLiA("");
+    setAuthCountry("");
+    setAuthCustomProxy("");
     setAuthError(null);
     setIsCheckpoint(false);
     setCheckpointCode("");
@@ -419,10 +443,19 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   async function handleNativeLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!authAccountId) return;
-    if (!authEmail.trim() || !authPassword) {
-      setAuthError("Por favor ingresa tu correo y contraseña de LinkedIn");
-      return;
+
+    if (authMode === "cookie") {
+      if (!authCookieLiAt.trim()) {
+        setAuthError("Por favor ingresa el valor de la cookie li_at de LinkedIn");
+        return;
+      }
+    } else {
+      if (!authEmail.trim() || !authPassword) {
+        setAuthError("Por favor ingresa tu correo y contraseña de LinkedIn");
+        return;
+      }
     }
+
     setAuthLoading(true);
     setAuthError(null);
 
@@ -432,8 +465,14 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountId: authAccountId,
+          mode: authMode,
           username: authEmail.trim(),
           password: authPassword,
+          accessToken: authCookieLiAt.trim(),
+          premiumToken: authCookieLiA.trim() || undefined,
+          country: authCountry || undefined,
+          proxy: authCustomProxy.trim() || undefined,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
         }),
       });
 
@@ -657,17 +696,12 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {modalStep === 1
                       ? "Paso 1 de 2: Parámetros y límites de prospección"
-                      : "Paso 2 de 2: Acceso oficial y seguro mediante canal cifrado"}
+                      : "Paso 2 de 2: Autenticación y opciones avanzadas"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {modalStep === 2 && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
-                    🔒 Cifrado 256-bit
-                  </span>
-                )}
                 <button
                   type="button"
                   onClick={closeUnifiedModal}
@@ -847,150 +881,228 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   </form>
                 </div>
 
-                {/* ─── SLIDE 2: Autenticación 100% Nativa de LinkedIn ─── */}
+                {/* ─── SLIDE 2: Conexión de Cuenta (Credenciales, Cookies y Opciones de Red) ─── */}
                 <div className="w-1/2 shrink-0 flex flex-col justify-between">
                   {!isCheckpoint ? (
-                    // ── Sub-vista 1: Formulario Nativo de Credenciales ──
-                    <form onSubmit={handleNativeLogin} className="flex flex-col justify-between h-full">
-                      <div className="px-6 py-5 flex flex-col gap-4 max-h-[480px] overflow-y-auto">
-                        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand-500/5 border border-brand-500/15">
-                          <div className="w-10 h-10 rounded-xl bg-[#0A66C2] text-white flex items-center justify-center font-bold text-xl shadow-sm shrink-0">
-                            in
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-gray-900 dark:text-white">
-                              Conexión Directa con LinkedIn
-                            </h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                              Ingresa tus datos para habilitar la sincronización y prospección B2B.
-                            </p>
-                          </div>
-                        </div>
-
-                        {authError && (
-                          <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs flex items-start gap-2">
-                            <span className="font-bold shrink-0">⚠️</span>
-                            <span>{authError}</span>
-                          </div>
-                        )}
-
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                            Correo o teléfono de LinkedIn
+                    <form onSubmit={handleNativeLogin}>
+                      <div className="max-h-[480px] overflow-y-auto px-6 py-4 flex flex-col gap-3">
+                        {/* Selector de Método: Credenciales vs Cookies */}
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                            Método de Conexión
                           </label>
-                          <input
-                            type="text"
-                            className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500"
-                            placeholder="ejemplo@empresa.com"
-                            value={authEmail}
-                            onChange={(e) => {
-                              setAuthEmail(e.target.value);
-                              setAuthError(null);
-                            }}
-                            disabled={authLoading}
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                            Contraseña de LinkedIn
-                          </label>
-                          <div className="relative">
-                            <input
-                              type={showAuthPassword ? "text" : "password"}
-                              className="input input-bordered input-sm w-full pr-9 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500"
-                              placeholder="••••••••••••"
-                              value={authPassword}
-                              onChange={(e) => {
-                                setAuthPassword(e.target.value);
-                                setAuthError(null);
-                              }}
-                              disabled={authLoading}
-                              required
-                            />
+                          <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => setShowAuthPassword(!showAuthPassword)}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
-                              tabIndex={-1}
+                              onClick={() => {
+                                setAuthMode("credentials");
+                                setAuthError(null);
+                              }}
+                              className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
+                                authMode === "credentials"
+                                  ? "bg-brand-500/15 border-brand-500 text-brand-600 dark:text-brand-400 font-semibold"
+                                  : "border-gray-200 dark:border-gray-700 text-gray-400 hover:border-gray-400"
+                              }`}
                             >
-                              {showAuthPassword ? <RiEyeOffLine size={15} /> : <RiEyeLine size={15} />}
+                              Credenciales (Correo y Clave)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuthMode("cookie");
+                                setAuthError(null);
+                              }}
+                              className={`flex-1 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
+                                authMode === "cookie"
+                                  ? "bg-brand-500/15 border-brand-500 text-brand-600 dark:text-brand-400 font-semibold"
+                                  : "border-gray-200 dark:border-gray-700 text-gray-400 hover:border-gray-400"
+                              }`}
+                            >
+                              Cookie de Sesión (li_at)
                             </button>
                           </div>
                         </div>
 
-                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 space-y-1 text-[11px] text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                            <RiShieldCheckLine size={14} />
-                            Canal cifrado y seguro
+                        {authMode === "credentials" ? (
+                          <>
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                Correo o teléfono de LinkedIn
+                              </label>
+                              <input
+                                type="text"
+                                className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                                placeholder="ejemplo@empresa.com"
+                                value={authEmail}
+                                onChange={(e) => {
+                                  setAuthEmail(e.target.value);
+                                  setAuthError(null);
+                                }}
+                                disabled={authLoading}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                Contraseña de LinkedIn
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type={showAuthPassword ? "text" : "password"}
+                                  className="input input-bordered input-sm w-full pr-9 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                                  placeholder="••••••••••••"
+                                  value={authPassword}
+                                  onChange={(e) => {
+                                    setAuthPassword(e.target.value);
+                                    setAuthError(null);
+                                  }}
+                                  disabled={authLoading}
+                                  required
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAuthPassword(!showAuthPassword)}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
+                                  tabIndex={-1}
+                                >
+                                  {showAuthPassword ? <RiEyeOffLine size={15} /> : <RiEyeLine size={15} />}
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                Cookie li_at (Obligatoria)
+                              </label>
+                              <input
+                                type="password"
+                                className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
+                                placeholder="AQEDAQ..."
+                                value={authCookieLiAt}
+                                onChange={(e) => {
+                                  setAuthCookieLiAt(e.target.value);
+                                  setAuthError(null);
+                                }}
+                                disabled={authLoading}
+                                required
+                              />
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                Copia el valor de la cookie <code>li_at</code> desde la consola o inspector de cookies de tu navegador.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                Cookie li_a (Opcional - Sales Navigator / Recruiter)
+                              </label>
+                              <input
+                                type="password"
+                                className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-mono text-xs"
+                                placeholder="AQEDAQ... (opcional)"
+                                value={authCookieLiA}
+                                onChange={(e) => setAuthCookieLiA(e.target.value)}
+                                disabled={authLoading}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Opciones Avanzadas: Proxy y País */}
+                        <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-col gap-3">
+                          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                            Opciones Avanzadas (Proxy y País)
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                País del Proxy
+                              </label>
+                              <select
+                                className="select select-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl"
+                                value={authCountry}
+                                onChange={(e) => setAuthCountry(e.target.value)}
+                                disabled={authLoading}
+                              >
+                                <option value="">Automático (Según tu IP)</option>
+                                <option value="ES">España (ES)</option>
+                                <option value="US">Estados Unidos (US)</option>
+                                <option value="MX">México (MX)</option>
+                                <option value="CO">Colombia (CO)</option>
+                                <option value="AR">Argentina (AR)</option>
+                                <option value="CL">Chile (CL)</option>
+                                <option value="PE">Perú (PE)</option>
+                                <option value="BR">Brasil (BR)</option>
+                                <option value="GB">Reino Unido (GB)</option>
+                                <option value="FR">Francia (FR)</option>
+                                <option value="DE">Alemania (DE)</option>
+                                <option value="IT">Italia (IT)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
+                                Proxy Personalizado (Opcional)
+                              </label>
+                              <input
+                                type="text"
+                                className="input input-bordered input-sm w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+                                placeholder="host:port:user:pass"
+                                value={authCustomProxy}
+                                onChange={(e) => setAuthCustomProxy(e.target.value)}
+                                disabled={authLoading}
+                              />
+                            </div>
                           </div>
-                          <p>
-                            Tus credenciales viajan encriptadas mediante SSL 256-bit y se procesan exclusivamente para establecer el canal seguro de prospección.
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">
+                            Si no defines un proxy propio, se asignará automáticamente un proxy de alta reputación según el país seleccionado.
                           </p>
                         </div>
+
+                        {authError && (
+                          <p className="text-xs text-error font-medium">{authError}</p>
+                        )}
                       </div>
 
-                      {/* Footer Slide 2 Credenciales */}
-                      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                      {/* Footer Slide 2 */}
+                      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
                         <button
                           type="button"
                           onClick={() => setModalStep(1)}
-                          className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer inline-flex items-center gap-1"
+                          className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                           disabled={authLoading}
                         >
-                          <RiArrowLeftLine size={14} /> Volver
+                          Volver
                         </button>
-
                         <button
                           type="submit"
                           disabled={authLoading}
-                          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-md cursor-pointer disabled:opacity-50"
+                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
                         >
                           {authLoading ? (
-                            <>
-                              <span className="loading loading-spinner loading-xs" />
-                              <span>Conectando...</span>
-                            </>
+                            <span className="loading loading-spinner loading-xs" />
                           ) : (
-                            <>
-                              <span>Iniciar Sesión en LinkedIn</span>
-                              <RiShieldKeyholeLine size={16} />
-                            </>
+                            <>Conectar Cuenta <RiArrowRightLine size={16} /></>
                           )}
                         </button>
                       </div>
                     </form>
                   ) : (
-                    // ── Sub-vista 2: Verificación 2FA Nativa ──
-                    <form onSubmit={handleSolveCheckpoint} className="flex flex-col justify-between h-full">
-                      <div className="px-6 py-6 flex flex-col gap-4 max-h-[480px] overflow-y-auto">
-                        <div className="text-center space-y-2 py-2">
-                          <div className="w-14 h-14 mx-auto rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center shadow-sm">
-                            <RiSmartphoneLine size={28} />
-                          </div>
-                          <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                    // ── Sub-vista 2FA (Mismo contenedor limpio) ──
+                    <form onSubmit={handleSolveCheckpoint}>
+                      <div className="max-h-[480px] overflow-y-auto px-6 py-6 flex flex-col gap-4">
+                        <div>
+                          <label className="label text-xs font-semibold text-gray-700 dark:text-gray-300 pb-1">
                             Verificación de Dos Pasos (2FA)
-                          </h4>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
-                            LinkedIn ha solicitado un código de verificación. Revisa tu aplicación autenticadora o tus mensajes SMS e introduce el código recibido.
+                          </label>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            LinkedIn ha solicitado verificar tu identidad. Ingresa el código recibido por SMS o en tu app autenticadora.
                           </p>
                         </div>
 
-                        {authError && (
-                          <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs flex items-start gap-2">
-                            <span className="font-bold shrink-0">⚠️</span>
-                            <span>{authError}</span>
-                          </div>
-                        )}
-
-                        <div className="space-y-1.5 max-w-xs mx-auto w-full">
-                          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block text-center">
-                            Código de Verificación
-                          </label>
+                        <div>
                           <input
                             type="text"
-                            className="input input-bordered w-full text-center text-xl font-mono font-bold tracking-widest bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:border-brand-500 py-3 h-auto"
+                            className="input input-bordered input-sm w-full text-center text-lg font-mono font-bold tracking-widest bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
                             placeholder="123456"
                             value={checkpointCode}
                             onChange={(e) => {
@@ -1003,7 +1115,11 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                           />
                         </div>
 
-                        <div className="text-center pt-2">
+                        {authError && (
+                          <p className="text-xs text-error font-medium">{authError}</p>
+                        )}
+
+                        <div>
                           <button
                             type="button"
                             onClick={() => {
@@ -1011,40 +1127,33 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                               setAuthError(null);
                               setCheckpointCode("");
                             }}
-                            className="text-xs text-brand-600 dark:text-brand-400 hover:underline inline-flex items-center gap-1 cursor-pointer font-medium"
+                            className="text-xs text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                             disabled={checkpointLoading}
                           >
-                            <RiArrowLeftLine size={13} /> Volver a ingresar credenciales
+                            ← Volver a ingresar datos
                           </button>
                         </div>
                       </div>
 
-                      {/* Footer Slide 2 Checkpoint */}
-                      <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                      {/* Footer 2FA */}
+                      <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
                         <button
                           type="button"
                           onClick={closeUnifiedModal}
-                          className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                          className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                           disabled={checkpointLoading}
                         >
                           Cancelar
                         </button>
-
                         <button
                           type="submit"
                           disabled={checkpointLoading}
-                          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-md cursor-pointer disabled:opacity-50"
+                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-white transition-all shadow-sm cursor-pointer disabled:opacity-50"
                         >
                           {checkpointLoading ? (
-                            <>
-                              <span className="loading loading-spinner loading-xs" />
-                              <span>Verificando...</span>
-                            </>
+                            <span className="loading loading-spinner loading-xs" />
                           ) : (
-                            <>
-                              <span>Verificar y Conectar</span>
-                              <RiCheckLine size={16} />
-                            </>
+                            <>Verificar y Conectar <RiCheckLine size={16} /></>
                           )}
                         </button>
                       </div>

@@ -38,6 +38,25 @@ export interface UnipileCredentialsAuthResponse {
   [key: string]: unknown;
 }
 
+export interface UnipileProxyConfig {
+  host: string;
+  port: number;
+  protocol?: 'http' | 'https' | 'socks5';
+  username?: string;
+  password?: string;
+}
+
+export interface UnipileLinkedInAuthParams {
+  username?: string;
+  password?: string;
+  accessToken?: string;
+  premiumToken?: string;
+  country?: string;
+  proxy?: UnipileProxyConfig;
+  userAgent?: string;
+  name?: string;
+}
+
 export interface UnipileSolveCheckpointResponse {
   object?: string;
   id?: string;

@@ -16,6 +16,7 @@ import {
   UnipileLinkedInSearchParams,
   UnipileSearchResultItem,
   UnipileCredentialsAuthResponse,
+  UnipileLinkedInAuthParams,
   UnipileSolveCheckpointResponse,
 } from './types';
 
@@ -116,20 +117,26 @@ export class UnipileClient {
   }
 
   /**
-   * Conecta una cuenta de LinkedIn usando credenciales directas (Native Auth)
+   * Conecta una cuenta de LinkedIn usando credenciales o cookies directas (Native Auth)
+   * Soporta opciones avanzadas de país (proxy location) y proxy dedicado.
    * Puede retornar una Account creada (201) o un Checkpoint (202) requiriendo código 2FA.
    */
-  async startCredentialsAuth(params: {
-    username: string;
-    password: string;
-    name?: string;
-  }): Promise<UnipileCredentialsAuthResponse> {
-    const payload = {
+  async startCredentialsAuth(params: UnipileLinkedInAuthParams): Promise<UnipileCredentialsAuthResponse> {
+    const payload: Record<string, unknown> = {
       provider: 'LINKEDIN',
-      username: params.username,
-      password: params.password,
       ...(params.name ? { name: params.name } : {}),
+      ...(params.country?.trim() ? { country: params.country.trim().toUpperCase() } : {}),
+      ...(params.proxy ? { proxy: params.proxy } : {}),
     };
+
+    if (params.accessToken?.trim()) {
+      payload.access_token = params.accessToken.trim();
+      if (params.premiumToken?.trim()) payload.premium_token = params.premiumToken.trim();
+      if (params.userAgent?.trim()) payload.user_agent = params.userAgent.trim();
+    } else if (params.username && params.password) {
+      payload.username = params.username.trim();
+      payload.password = params.password;
+    }
 
     return this.request<UnipileCredentialsAuthResponse>('/api/v1/accounts', {
       method: 'POST',
