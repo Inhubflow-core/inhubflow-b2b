@@ -401,6 +401,19 @@ export default function SignalsPage({
   const [deletingLeads, setDeletingLeads] = useState(false);
   const [deletingMonitorId, setDeletingMonitorId] = useState<string | null>(null);
 
+  const visibleLeadIds = leads.map((lead) => lead.id);
+  const allVisibleLeadsSelected = visibleLeadIds.length > 0
+    && visibleLeadIds.every((id) => selectedLeadIds.includes(id));
+
+  const handleToggleSelectAllVisible = () => {
+    if (allVisibleLeadsSelected) {
+      const visible = new Set(visibleLeadIds);
+      setSelectedLeadIds((current) => current.filter((id) => !visible.has(id)));
+      return;
+    }
+    setSelectedLeadIds((current) => [...new Set([...current, ...visibleLeadIds])]);
+  };
+
   // Helpers para manipulación de chips
   const handleAddTitle = (title: string) => {
     const t = title.trim();
@@ -486,6 +499,7 @@ export default function SignalsPage({
     setLeadsLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set("limit", "200");
       if (selectedMonitorFilter !== "all") params.set("monitor_id", selectedMonitorFilter);
       if (selectedStatusFilter !== "all") params.set("status", selectedStatusFilter);
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
@@ -501,6 +515,10 @@ export default function SignalsPage({
       setLeadsLoading(false);
     }
   }, [selectedMonitorFilter, selectedStatusFilter, searchQuery]);
+
+  useEffect(() => {
+    setSelectedLeadIds([]);
+  }, [selectedMonitorFilter, selectedStatusFilter]);
 
   useEffect(() => {
     fetchLeads();
@@ -1129,7 +1147,23 @@ export default function SignalsPage({
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                  leads.length > 0
+                    ? "cursor-pointer border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                    : "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-600"
+                }`}>
+                  <input
+                    type="checkbox"
+                    disabled={leads.length === 0 || leadsLoading}
+                    checked={allVisibleLeadsSelected}
+                    onChange={handleToggleSelectAllVisible}
+                    className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  {allVisibleLeadsSelected
+                    ? `Deseleccionar todos (${visibleLeadIds.length})`
+                    : `Seleccionar todos (${visibleLeadIds.length})`}
+                </label>
                 <button
                   onClick={fetchLeads}
                   disabled={leadsLoading}
