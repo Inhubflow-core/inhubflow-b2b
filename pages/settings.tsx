@@ -257,8 +257,12 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   const [editingAccount, setEditingAccount] = useState<LiAccount | null>(null);
   const [form, setForm] = useState(BLANK_LI_FORM);
   const [loading, setLoading] = useState(false);
-  const [authModal, setAuthModal] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
+
+  // Estados para el flujo de conexión embebido (White-label)
+  const [authAccountId, setAuthAccountId] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  const [iframeLoading, setIframeLoading] = useState(false);
   const [showSuccessAdviceModal, setShowSuccessAdviceModal] = useState(false);
 
   useEffect(() => {
@@ -272,20 +276,85 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       .catch(() => {});
   }, []);
 
-  function openAuthModal(account: LiAccount) {
-    setAuthModal(account.id);
-  }
-
-  function closeAuthModal() {
-    setAuthModal(null);
-  }
-
   async function refresh() {
     const res = await fetch("/api/accounts");
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) setAccounts(data);
     }
+  }
+
+  // Escuchar mensaje del iframe de callback para cerrar y confirmar automáticamente
+  useEffect(() => {
+    function handleAuthMessage(event: MessageEvent) {
+      if (event.data?.type === "LINKEDIN_AUTH_SUCCESS") {
+        setAuthModalOpen(false);
+        setIframeUrl(null);
+        setAuthAccountId(null);
+        setIframeLoading(false);
+        refresh();
+        setShowSuccessAdviceModal(true);
+        toast.success("¡Cuenta de LinkedIn conectada con éxito!");
+      }
+    }
+    window.addEventListener("message", handleAuthMessage);
+    return () => window.removeEventListener("message", handleAuthMessage);
+  }, []);
+
+  // Polling de respaldo para detectar autenticación en segundo plano
+  useEffect(() => {
+    if (!authModalOpen || !authAccountId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/accounts/${authAccountId}`);
+        if (res.ok) {
+          const acc = await res.json();
+          if (acc.is_authenticated === 1 || acc.unipile_status === "OK") {
+            clearInterval(interval);
+            setAuthModalOpen(false);
+            setIframeUrl(null);
+            setAuthAccountId(null);
+            setIframeLoading(false);
+            refresh();
+            setShowSuccessAdviceModal(true);
+            toast.success("¡Cuenta de LinkedIn conectada con éxito!");
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [authModalOpen, authAccountId]);
+
+  async function startAuthFlow(accountId: string) {
+    setAuthAccountId(accountId);
+    setIframeUrl(null);
+    setIframeLoading(true);
+    setAuthModalOpen(true);
+
+    try {
+      const res = await fetch("/api/accounts/unipile-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo iniciar la conexión segura con LinkedIn");
+      setIframeUrl(data.url);
+    } catch (error) {
+      setIframeLoading(false);
+      toast.error(error instanceof Error ? error.message : "Error al conectar la cuenta");
+      setAuthModalOpen(false);
+    }
+  }
+
+  function closeAuthModal() {
+    setAuthModalOpen(false);
+    setIframeUrl(null);
+    setAuthAccountId(null);
+    setIframeLoading(false);
+    refresh();
   }
 
   function openCreate() {
@@ -344,9 +413,9 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
       setForm(BLANK_LI_FORM);
       await refresh();
 
-      // Automatically open Auth Modal for the newly created account!
+      // Al añadir una cuenta nueva, abrir inmediatamente el login embebido de LinkedIn en el popup
       if (isNew && data && data.id) {
-        openAuthModal(data);
+        startAuthFlow(data.id);
       }
     } catch (err: any) {
       setLoading(false);
@@ -355,29 +424,18 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
   }
 
   async function deleteAccount(id: string) {
-    if (!confirm("Delete this LinkedIn account?")) return;
-    await fetch(`/api/accounts/${id}`, { method: "DELETE" });
-    toast.success("Deleted");
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
-  }
-
-  async function submitAuth(e: React.FormEvent) {
-    e.preventDefault();
-    if (!authModal) return;
-
-    setAuthLoading(true);
+    if (!confirm("¿Estás seguro de eliminar esta cuenta de LinkedIn?")) return;
     try {
-      const res = await fetch("/api/accounts/unipile-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: authModal }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo abrir la conexión de Unipile");
-      window.location.href = data.url;
-    } catch (error) {
-      setAuthLoading(false);
-      toast.error(error instanceof Error ? error.message : "No se pudo conectar la cuenta");
+      const res = await fetch(`/api/accounts/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "No se pudo eliminar la cuenta");
+      }
+      toast.success("Cuenta eliminada exitosamente");
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Error al eliminar la cuenta");
     }
   }
 
@@ -447,23 +505,27 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                     <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" /> In use
                   </span>
                 ) : null}
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${a.is_authenticated ? "bg-success/15 text-success" : "bg-base-300 text-base-content/40"}`}>
-                  {a.is_authenticated ? <><RiCheckLine size={10} /> Auth</> : "Unauth"}
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${a.is_authenticated ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-base-300 text-base-content/40"}`}>
+                  {a.is_authenticated ? <><RiCheckLine size={10} /> Activo</> : "Inactivo"}
                 </span>
                 {a.unipile_status === "OK" ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-500" title="Cuenta de LinkedIn sincronizada mediante Unipile">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Unipile OK
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Cuenta de LinkedIn sincronizada y lista para prospección">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Conectado
+                  </span>
+                ) : a.unipile_status === "CREDENTIALS" ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Inicia sesión para renovar la conexión con LinkedIn">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Reconexión requerida
                   </span>
                 ) : (
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-warning/15 text-warning" title="Conecta o reconecta esta cuenta mediante Unipile">
-                    {a.unipile_status || "Unipile sin conectar"}
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700" title="Conecta esta cuenta para sincronizar con LinkedIn">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Sin conectar
                   </span>
                 )}
                 <button
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-                  onClick={() => openAuthModal(a)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-all cursor-pointer"
+                  onClick={() => startAuthFlow(a.id)}
                 >
-                  <RiShieldKeyholeLine size={12} /> Authenticate
+                  <RiShieldKeyholeLine size={13} /> {a.unipile_status === "OK" ? "Reconectar" : "Conectar LinkedIn"}
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
@@ -603,9 +665,9 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
               </div>
 
               <div className="modal-action mt-2">
-                <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" onClick={() => { setShowModal(false); setEditingAccount(null); }}>Cancel</button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : editingAccount ? "Save Changes" : "Add Account"}
+                <button type="button" className="px-4 py-2 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer" onClick={() => { setShowModal(false); setEditingAccount(null); }}>Cancelar</button>
+                <button type="submit" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs cursor-pointer" disabled={loading}>
+                  {loading ? <span className="loading loading-spinner loading-xs" /> : editingAccount ? "Guardar Cambios" : "Añadir y Conectar"}
                 </button>
               </div>
             </form>
@@ -614,44 +676,94 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
         </div>
       )}
 
-      {/* Auth modal */}
-      {authModal && (
+      {/* Modal de Conexión Embebido (White-label LinkedIn Iframe) */}
+      {authModalOpen && (
         <div className="modal modal-open">
-          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-lg">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="font-bold text-base text-gray-900 dark:text-white">Conectar Cuenta de LinkedIn</h3>
-                <p className="text-xs text-base-content/60">
-                  Conexión directa y 100% segura mediante sesión verificada (sin contraseña).
-                </p>
+          <div className="modal-box bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full p-0 overflow-hidden">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#0A66C2]/10 text-[#0A66C2] flex items-center justify-center font-bold text-lg">
+                  in
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-white leading-snug">
+                    Conectar Cuenta de LinkedIn
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Acceso directo y seguro mediante canal oficial cifrado.
+                  </p>
+                </div>
               </div>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full shrink-0 whitespace-nowrap">
-                🔒 100% Seguro
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
+                  🔒 Cifrado 256-bit
+                </span>
+                <button
+                  type="button"
+                  onClick={closeAuthModal}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  title="Cerrar"
+                >
+                  <RiCloseLine size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenedor del Iframe */}
+            <div className="relative w-full h-[580px] bg-gray-50 dark:bg-gray-950">
+              {iframeLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 dark:bg-gray-900/95 z-10 transition-all p-6 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3 animate-spin">
+                    <RiShieldKeyholeLine size={24} />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Estableciendo conexión segura con LinkedIn...
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
+                    Iniciando canal de autenticación encriptado punto a punto
+                  </p>
+                </div>
+              )}
+
+              {iframeUrl && (
+                <iframe
+                  src={iframeUrl}
+                  className="w-full h-full border-0"
+                  onLoad={() => setIframeLoading(false)}
+                  title="LinkedIn Direct Connect"
+                  allow="clipboard-write"
+                />
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-xs">
+              <span className="text-gray-500 dark:text-gray-400 text-[11px]">
+                Inicia sesión con tu cuenta de LinkedIn. Si se te solicita código 2FA, ingrésalo normalmente.
               </span>
-            </div>
-
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-brand-500/10 border border-brand-500/25 text-xs mb-4">
-              <span className="text-base shrink-0 mt-0.5">☁️</span>
-              <div className="space-y-1">
-                <p className="font-bold text-gray-900 dark:text-white">Conexión cloud mediante Unipile</p>
-                <p className="text-base-content/70">
-                  Se abrirá el asistente seguro de Unipile. No necesitas instalar extensiones ni copiar cookies de LinkedIn.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={submitAuth}>
-              <div className="modal-action mt-2">
-                <button type="button" className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors cursor-pointer" onClick={closeAuthModal}>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={closeAuthModal}
+                  className="px-3.5 py-1.5 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm disabled:opacity-50 cursor-pointer" disabled={authLoading}>
-                  {authLoading ? <span className="loading loading-spinner loading-xs" /> : "Continuar con Unipile"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeAuthModal();
+                    toast.success("Verificando sincronización de cuenta...");
+                  }}
+                  className="px-4 py-1.5 rounded-xl font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer"
+                >
+                  Ya he iniciado sesión
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-          <div className="modal-backdrop" onClick={closeAuthModal} />
+          <div className="modal-backdrop bg-black/60 backdrop-blur-xs" onClick={closeAuthModal} />
         </div>
       )}
 

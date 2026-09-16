@@ -42,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       reconnect_account: localAccount.unipile_account_id || undefined,
       providers: ["LINKEDIN"],
       name: accountId,
-      success_redirect_url: successUrl || `${baseUrl}/settings?unipile_status=success`,
-      failure_redirect_url: failureUrl || `${baseUrl}/settings?unipile_status=error`,
+      success_redirect_url: successUrl || `${baseUrl}/auth/linkedin-callback?status=success`,
+      failure_redirect_url: failureUrl || `${baseUrl}/auth/linkedin-callback?status=error`,
       notify_url: callbackUrl,
     });
 

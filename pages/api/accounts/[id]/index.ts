@@ -48,7 +48,55 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === "DELETE") {
-    db.prepare("DELETE FROM accounts WHERE id = ?").run(id);
+    const account = db.prepare("SELECT id, unipile_account_id FROM accounts WHERE id = ?").get(id) as
+      | { id: string; unipile_account_id?: string | null }
+      | undefined;
+
+    if (!account) return res.status(404).json({ error: "Cuenta no encontrada" });
+
+    // Borrado ordenado en cascada dentro de una transacción para satisfacer las restricciones FK de SQLite
+    const cascadeDelete = db.transaction(() => {
+      // 1. Limpiar referencias foráneas que no tienen ON DELETE CASCADE
+      db.prepare("UPDATE targets SET last_replied_account_id = NULL WHERE last_replied_account_id = ?").run(id);
+      db.prepare("UPDATE users SET assigned_account_id = NULL WHERE assigned_account_id = ?").run(id);
+      db.prepare("UPDATE runs SET account_id = NULL WHERE account_id = ?").run(id);
+
+      // Tablas auxiliares / módulos opcionales
+      try { db.prepare("UPDATE signal_monitors SET account_id = NULL WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("UPDATE list_imports SET account_id = NULL WHERE account_id = ?").run(id); } catch {}
+
+      // Módulo SDR
+      try { db.prepare("DELETE FROM sdr_agent_accounts WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("DELETE FROM sdr_quota_reservations WHERE account_id = ?").run(id); } catch {}
+      try {
+        db.prepare("DELETE FROM sdr_thread_events WHERE thread_id IN (SELECT id FROM sdr_threads WHERE linkedin_account_id = ?)").run(id);
+        db.prepare("DELETE FROM sdr_turns WHERE thread_id IN (SELECT id FROM sdr_threads WHERE linkedin_account_id = ?)").run(id);
+        db.prepare("DELETE FROM sdr_outbox WHERE thread_id IN (SELECT id FROM sdr_threads WHERE linkedin_account_id = ?)").run(id);
+        db.prepare("DELETE FROM sdr_threads WHERE linkedin_account_id = ?").run(id);
+      } catch {}
+
+      // LinkedIn y Unipile dependencias directas
+      try { db.prepare("DELETE FROM linkedin_target_accounts WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("DELETE FROM linkedin_step_deliveries WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("DELETE FROM linkedin_connection_attempts WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("DELETE FROM linkedin_inbox_messages WHERE account_id = ?").run(id); } catch {}
+      try { db.prepare("DELETE FROM account_daily_usage WHERE account_id = ?").run(id); } catch {}
+
+      // 2. Eliminar la cuenta de accounts
+      db.prepare("DELETE FROM accounts WHERE id = ?").run(id);
+    });
+
+    cascadeDelete();
+
+    // 3. Eliminar la cuenta de Unipile de forma asíncrona si tenía unipile_account_id
+    if (account.unipile_account_id) {
+      import("@/lib/unipile/client")
+        .then(({ unipile }) => unipile.deleteAccount(account.unipile_account_id!))
+        .catch((err) => {
+          console.warn("[deleteAccount] No se pudo dar de baja la cuenta en Unipile:", err?.message || err);
+        });
+    }
+
     return res.status(204).end();
   }
 
