@@ -21,8 +21,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return updated ? res.status(200).json(updated) : res.status(404).json({ error: "Monitor no encontrado" });
     }
     if (req.method === "DELETE") {
-      const deleted = signalRadarService.deleteMonitor(id, actor);
-      return deleted ? res.status(200).json({ success: true }) : res.status(404).json({ error: "Monitor no encontrado" });
+      try {
+        const deleted = signalRadarService.deleteMonitor(id, actor);
+        return deleted ? res.status(200).json({ success: true }) : res.status(404).json({ error: "Monitor no encontrado" });
+      } catch (error) {
+        return res.status(409).json({ error: error instanceof Error ? error.message : "No se pudo eliminar el monitor" });
+      }
     }
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {

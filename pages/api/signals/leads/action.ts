@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { action, lead_id, lead_ids, status: rawStatus, icebreaker_preview, target } = req.body as {
-      action?: "update_status" | "update_message" | "import";
+      action?: "update_status" | "update_message" | "import" | "delete";
       lead_id?: string;
       lead_ids?: string[];
       status?: string;
@@ -37,6 +37,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!lead) return res.status(404).json({ error: "Lead no encontrado" });
       const success = signalRadarService.updateLeadStatus(lead_id, lead.status, icebreaker_preview.trim(), actor);
       return res.status(200).json({ success });
+    }
+    if (action === "delete") {
+      const ids = Array.isArray(lead_ids) ? lead_ids : lead_id ? [lead_id] : [];
+      if (ids.length === 0) return res.status(400).json({ error: "Selecciona al menos un lead" });
+      if (ids.length > 500) return res.status(400).json({ error: "Puedes eliminar hasta 500 leads por operación" });
+      const result = signalRadarService.deleteLeads(ids, actor);
+      return res.status(200).json({ success: true, ...result });
     }
     if (action === "import") {
       const ids = Array.isArray(lead_ids) ? lead_ids : lead_id ? [lead_id] : [];

@@ -200,7 +200,14 @@ async function run() {
     assert.equal(db.prepare("SELECT body FROM run_profile_step_messages WHERE step_id='step-message'").get().body, lead.icebreaker_preview);
     const repeated = service.promoteLead(lead.id, { trigger: "manual" }, { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false });
     assert.equal(repeated.targetId, promotion.targetId);
-    assert.equal(db.prepare("SELECT COUNT(*) c FROM targets").get().c, 1);
+    const preservedTargetId = promotion.targetId;
+    const deletion = service.deleteLeads([lead.id], { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false });
+    assert.equal(deletion.deleted, 1);
+    assert.equal(deletion.preservedTargets, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_leads").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_observations").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_promotions").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM targets WHERE id = ?").get(preservedTargetId).c, 1);
     db.close();
   }
 
@@ -221,6 +228,27 @@ async function run() {
     assert.equal(result.state, "blocked");
     assert.equal(db.prepare("SELECT COUNT(*) c FROM targets").get().c, 0);
     assert.equal(db.prepare("SELECT status FROM signal_leads WHERE id='lead1'").get().status, "pending");
+    db.close();
+  }
+
+  console.log("▶ Eliminar monitor limpia Radar pero conserva recursos promovidos");
+  {
+    const db = baseDb(); applySignalSchema(db);
+    db.exec(`
+      INSERT INTO users (id) VALUES ('owner-1');
+      INSERT INTO accounts (id,name,email,owner_id) VALUES ('a1','Cuenta','a@x.com','owner-1');
+      INSERT INTO lists (id,name) VALUES ('l1','Lista');
+      INSERT INTO targets (id,linkedin_url,full_name) VALUES ('target-kept','https://www.linkedin.com/in/kept/','Contacto preservado');
+      INSERT INTO signal_monitors (id,workspace_owner_id,name,type,mode,status,account_id,target_list_id,keywords_json,icp_filters_json,message_config_json,scan_state) VALUES ('m-delete','owner-1','Eliminar','keyword_intent','review','active','a1','l1','[]','{}','{}','idle');
+      INSERT INTO signal_leads (id,workspace_owner_id,monitor_id,linkedin_url,identity_key,full_name,signal_type,status,score,imported_target_id) VALUES ('lead-delete','owner-1','m-delete','https://www.linkedin.com/in/kept/','url:kept','Contacto preservado','keyword_intent','imported',90,'target-kept');
+      INSERT INTO signal_observations (id,workspace_owner_id,monitor_id,lead_id,fingerprint,source_type) VALUES ('obs-delete','owner-1','m-delete','lead-delete','fingerprint-delete','post_search');
+    `);
+    const service = new SignalRadarService({ getDatabase: () => db, client: mockClient() });
+    assert.equal(service.deleteMonitor("m-delete", { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false }), true);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_monitors WHERE id='m-delete'").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_leads WHERE id='lead-delete'").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_observations WHERE id='obs-delete'").get().c, 0);
+    assert.equal(db.prepare("SELECT COUNT(*) c FROM targets WHERE id='target-kept'").get().c, 1);
     db.close();
   }
 

@@ -31,6 +31,7 @@ import {
   RiLineChartLine,
   RiArrowLeftLine,
   RiShieldCheckLine,
+  RiDeleteBinLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -397,6 +398,8 @@ export default function SignalsPage({
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [targetListId, setTargetListId] = useState(lists[0]?.id || "");
   const [importing, setImporting] = useState(false);
+  const [deletingLeads, setDeletingLeads] = useState(false);
+  const [deletingMonitorId, setDeletingMonitorId] = useState<string | null>(null);
 
   // Helpers para manipulación de chips
   const handleAddTitle = (title: string) => {
@@ -728,6 +731,53 @@ export default function SignalsPage({
     }
   };
 
+  const handleDeleteSelectedLeads = async () => {
+    if (selectedLeadIds.length === 0 || deletingLeads) return;
+    const selected = leads.filter((lead) => selectedLeadIds.includes(lead.id));
+    const imported = selected.filter((lead) => Boolean(lead.promotion_state && ["imported", "enrolled"].includes(lead.promotion_state))).length;
+    const explanation = imported > 0
+      ? `\n\n${imported} ya fueron promovidos. Se eliminarán del Radar, pero sus contactos, listas y campañas se conservarán.`
+      : "";
+    if (!window.confirm(`¿Eliminar ${selectedLeadIds.length} lead(s) seleccionados del Signal Radar? Esta acción no se puede deshacer.${explanation}`)) return;
+    setDeletingLeads(true);
+    try {
+      const response = await fetch("/api/signals/leads/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", lead_ids: selectedLeadIds }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudieron eliminar los leads");
+      setLeads((current) => current.filter((lead) => !selectedLeadIds.includes(lead.id)));
+      setSelectedLeadIds([]);
+      toast.success(`${data.deleted} lead(s) eliminados del Radar`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al eliminar leads");
+    } finally {
+      setDeletingLeads(false);
+    }
+  };
+
+  const handleDeleteMonitor = async (monitor: SignalMonitor) => {
+    if (deletingMonitorId) return;
+    if (!window.confirm(`¿Eliminar el monitor “${monitor.name}” y todos sus leads/evidencias del Signal Radar?\n\nLos contactos, listas y campañas ya creados se conservarán.`)) return;
+    setDeletingMonitorId(monitor.id);
+    try {
+      const response = await fetch(`/api/signals/${monitor.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo eliminar el monitor");
+      setMonitors((current) => current.filter((item) => item.id !== monitor.id));
+      setLeads((current) => current.filter((lead) => lead.monitor_id !== monitor.id));
+      setSelectedLeadIds((current) => current.filter((id) => !leads.some((lead) => lead.id === id && lead.monitor_id === monitor.id)));
+      if (selectedMonitorFilter === monitor.id) setSelectedMonitorFilter("all");
+      toast.success(`Monitor “${monitor.name}” eliminado`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al eliminar monitor");
+    } finally {
+      setDeletingMonitorId(null);
+    }
+  };
+
   // Importar seleccionados
   const handleBatchImport = async () => {
     if (!selectedLeadIds.length) {
@@ -1025,12 +1075,24 @@ export default function SignalsPage({
           </div>
 
           {activeTab === "leads" && selectedLeadIds.length > 0 && (
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 mb-2 rounded-xl text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-xs"
-            >
-              <RiFileList3Line size={14} /> Importar ({selectedLeadIds.length}) a Lista
-            </button>
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                disabled={deletingLeads}
+                onClick={handleDeleteSelectedLeads}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50"
+              >
+                {deletingLeads ? <RiRefreshLine className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
+                Eliminar seleccionados ({selectedLeadIds.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-xs"
+              >
+                <RiFileList3Line size={14} /> Importar ({selectedLeadIds.length}) a Lista
+              </button>
+            </div>
           )}
         </div>
 
@@ -1338,13 +1400,27 @@ export default function SignalsPage({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
-                      <button
-                        onClick={() => handleScanMonitor(m.id, m.name)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/40 dark:text-brand-300 transition-colors"
-                      >
-                        <RiRefreshLine size={14} /> Escanear Ahora
-                      </button>
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={m.scan_state === "running" || deletingMonitorId === m.id}
+                          onClick={() => handleScanMonitor(m.id, m.name)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/40 dark:text-brand-300 transition-colors disabled:opacity-50"
+                        >
+                          <RiRefreshLine className={m.scan_state === "running" ? "animate-spin" : ""} size={14} /> Escanear ahora
+                        </button>
+                        <button
+                          type="button"
+                          disabled={m.scan_state === "running" || deletingMonitorId === m.id}
+                          onClick={() => handleDeleteMonitor(m)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50"
+                          title={m.scan_state === "running" ? "Espera a que termine el escaneo" : "Eliminar monitor"}
+                        >
+                          {deletingMonitorId === m.id ? <RiRefreshLine className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
+                          Eliminar
+                        </button>
+                      </div>
 
                       <div className="flex flex-col items-end gap-0.5 text-[11px] text-gray-400">
                         <span>{m.scan_state === "running" ? "Escaneando…" : m.last_success_at ? `Último éxito ${new Date(m.last_success_at).toLocaleString()}` : "Sin escaneos exitosos"}</span>

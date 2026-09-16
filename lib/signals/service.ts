@@ -227,6 +227,13 @@ export class SignalRadarService {
   deleteMonitor(id: string, actor?: ApiActor | SignalActorScope): boolean {
     const monitor = this.getMonitor(id, actor);
     if (!monitor) return false;
+    if (
+      monitor.scan_state === "running"
+      && monitor.scan_lease_expires_at
+      && Date.parse(monitor.scan_lease_expires_at) > this.now()
+    ) {
+      throw new Error("El monitor se está escaneando. Espera a que finalice antes de eliminarlo.");
+    }
     return this.database().prepare("DELETE FROM signal_monitors WHERE id = ?").run(id).changes > 0;
   }
 
@@ -270,6 +277,28 @@ export class SignalRadarService {
       WHERE id = ?
     `).run(status, icebreakerPreview ?? null, id);
     return result.changes > 0;
+  }
+
+  deleteLeads(ids: string[], actor?: ApiActor | SignalActorScope): { deleted: number; skipped: number; preservedTargets: number } {
+    const db = this.database();
+    const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(0, 500);
+    if (uniqueIds.length === 0) return { deleted: 0, skipped: 0, preservedTargets: 0 };
+    const authorized = uniqueIds
+      .map((id) => this.getLead(id, actor))
+      .filter((lead): lead is SignalLead => Boolean(lead));
+    const authorizedIds = authorized.map((lead) => lead.id);
+    if (authorizedIds.length === 0) return { deleted: 0, skipped: uniqueIds.length, preservedTargets: 0 };
+    const placeholders = authorizedIds.map(() => "?").join(",");
+    const preservedTargets = authorized.filter((lead) => Boolean(lead.imported_target_id)).length;
+    const monitorCounts = new Map<string, number>();
+    for (const lead of authorized) monitorCounts.set(lead.monitor_id, (monitorCounts.get(lead.monitor_id) || 0) + 1);
+    const deleted = db.transaction(() => {
+      for (const [monitorId, count] of monitorCounts) {
+        this.logEvent(monitorId, "leads_deleted", { count, leadIds: authorized.filter((lead) => lead.monitor_id === monitorId).map((lead) => lead.id), preservedTargets });
+      }
+      return db.prepare(`DELETE FROM signal_leads WHERE id IN (${placeholders})`).run(...authorizedIds).changes;
+    })();
+    return { deleted, skipped: uniqueIds.length - authorizedIds.length, preservedTargets };
   }
 
   promoteLead(id: string, input: { trigger: "manual" | "autopilot"; listId?: string | null; workflowId?: string | null }, actor?: ApiActor | SignalActorScope) {
