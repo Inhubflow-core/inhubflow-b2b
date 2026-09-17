@@ -38,31 +38,34 @@ function postIdentifier(value: string): string | null {
   if (!cleaned) return null;
   const decoded = decodeURIComponent(cleaned);
 
-  // 1. ID puramente numérico (10 a 25 dígitos)
-  if (/^[0-9]{10,25}$/.test(decoded)) return decoded;
+  // 1. Si ya viene como un URN completo de LinkedIn (urn:li:activity:..., urn:li:ugcPost:..., urn:li:share:...)
+  const directUrnMatch = decoded.match(/urn:li:(?:activity|share|ugcPost):([0-9]{10,25})/i);
+  if (directUrnMatch) {
+    const fullUrn = decoded.match(/(urn:li:(?:activity|share|ugcPost):[0-9]{10,25})/i);
+    if (fullUrn) return fullUrn[1];
+    return `urn:li:activity:${directUrnMatch[1]}`;
+  }
 
-  // 2. Formato URN estándar (activity, share, ugcPost)
-  const urnMatch = decoded.match(/urn:li:(?:activity|share|ugcPost):([0-9]{10,25})/i);
-  if (urnMatch) return urnMatch[1];
+  // 2. Si contiene prefijos de tipo y dígitos (activity-724..., ugcPost-724..., share-724...)
+  const typedPrefix = decoded.match(/(activity|share|ugcPost)[-:_]([0-9]{10,25})/i);
+  if (typedPrefix) {
+    const type = typedPrefix[1].toLowerCase();
+    const digits = typedPrefix[2];
+    if (type === "ugcpost") return `urn:li:ugcPost:${digits}`;
+    return `urn:li:activity:${digits}`;
+  }
 
-  // 3. Prefijos en URLs con guión o dos puntos (activity-724..., ugcPost-724..., share-724...)
-  const prefixMatch = decoded.match(/(?:activity|share|ugcPost)[-:_]([0-9]{10,25})/i);
-  if (prefixMatch) return prefixMatch[1];
-
-  // 4. URLs de updates, posts, shares
+  // 3. URLs de updates, posts, shares
   const updateMatch = decoded.match(/(?:update|posts|shares)\/(?:urn:li:[a-z]+:)?([0-9]{10,25})/i);
-  if (updateMatch) return updateMatch[1];
+  if (updateMatch) return `urn:li:activity:${updateMatch[1]}`;
 
-  // 5. Fallback por longitud típica de LinkedIn Activity/Post IDs (16 a 22 dígitos)
-  const longDigits = decoded.match(/([0-9]{16,22})/);
-  if (longDigits) return longDigits[1];
-
-  // 6. Fallback general: cualquier secuencia de 10 a 25 dígitos
+  // 4. Fallback: secuencia de 10 a 25 dígitos -> convertir a urn:li:activity:
   const digitsMatch = decoded.match(/([0-9]{10,25})/);
-  if (digitsMatch) return digitsMatch[1];
+  if (digitsMatch) return `urn:li:activity:${digitsMatch[1]}`;
 
   return null;
 }
+
 
 function parseTargetUrls(raw?: string | null): string[] {
   if (!raw || typeof raw !== "string" || !raw.trim()) return [];
@@ -182,99 +185,149 @@ async function postSearch(client: SignalScannerClient, context: SignalScannerCon
   return { posts: response.items.filter(isPost), cursor: response.cursor };
 }
 
+async function fetchPostItemsWithFallback<T>(
+  fetchFn: (urn: string) => Promise<{ items: T[] }>,
+  primaryUrn: string
+): Promise<{ items: T[] }> {
+  const digits = primaryUrn.match(/([0-9]{10,25})/)?.[1];
+  const urnVariants: string[] = [primaryUrn];
+  if (digits) {
+    const altActivity = `urn:li:activity:${digits}`;
+    const altShare = `urn:li:share:${digits}`;
+    const altUgc = `urn:li:ugcPost:${digits}`;
+    if (!urnVariants.includes(altActivity)) urnVariants.push(altActivity);
+    if (!urnVariants.includes(altShare)) urnVariants.push(altShare);
+    if (!urnVariants.includes(altUgc)) urnVariants.push(altUgc);
+  }
+
+  for (const variant of urnVariants) {
+    try {
+      const res = await fetchFn(variant);
+      if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+        return res;
+      }
+    } catch {
+      // Probar siguiente variante si da error 400 o 404
+    }
+  }
+
+  return { items: [] };
+}
+
+function parseCommentLead(
+  comment: any,
+  monitorId: string,
+  signalType: string,
+  sourceType: string,
+  postUrl: string,
+  fallbackSnippet?: string
+): DiscoveredSignalLead | null {
+  const authorObj = typeof comment.author === "object" && comment.author !== null ? comment.author : {};
+  const authorDetails = comment.author_details || {};
+  const authorName = (
+    typeof comment.author === "string"
+      ? comment.author
+      : authorObj.name || `${authorObj.first_name || ""} ${authorObj.last_name || ""}`.trim() || authorDetails.name
+  )?.trim();
+  const profileUrlVal = authorDetails.profile_url || authorObj.profile_url || authorDetails.public_profile_url || authorObj.public_profile_url || null;
+  const headlineVal = authorDetails.headline || authorObj.headline || null;
+  const authorIdVal = authorDetails.id || authorObj.id || null;
+  const publicIdVal = authorDetails.public_identifier || authorObj.public_identifier || null;
+  const commentText = comment.text || "";
+  const commentDate = comment.date || comment.created_at || null;
+  const snippet = commentText ? `Comentó: “${commentText.slice(0, 240)}”` : (fallbackSnippet || "Comentó en la publicación");
+
+  return authorLead({
+    monitorId,
+    signalType,
+    sourceType,
+    sourceId: comment.id,
+    sourceUrl: postUrl,
+    occurredAt: commentDate,
+    snippet,
+    id: authorIdVal,
+    publicIdentifier: publicIdVal,
+    name: authorName,
+    headline: headlineVal,
+    explicitProfileUrl: profileUrlVal,
+    metadata: { commentId: comment.id, postUrl },
+  });
+}
+
+function parseReactionLead(
+  reaction: any,
+  monitorId: string,
+  signalType: string,
+  sourceType: string,
+  postUrn: string,
+  postUrl: string,
+  fallbackSnippet?: string
+): DiscoveredSignalLead | null {
+  const authorObj = reaction.author || {};
+  const authorName = (
+    authorObj.name || `${authorObj.first_name || ""} ${authorObj.last_name || ""}`.trim()
+  )?.trim();
+  const profileUrlVal = authorObj.profile_url || authorObj.public_profile_url || null;
+  const headlineVal = authorObj.headline || null;
+  const reactionKind = reaction.value || reaction.reaction_type || "LIKE";
+  const snippet = fallbackSnippet || `Reaccionó (${reactionKind}) a la publicación`;
+
+  return authorLead({
+    monitorId,
+    signalType,
+    sourceType,
+    sourceId: reaction.id || `${postUrn}:${authorObj.id || authorName}:${reactionKind}`,
+    sourceUrl: postUrl,
+    occurredAt: new Date().toISOString(),
+    snippet,
+    id: authorObj.id || null,
+    publicIdentifier: authorObj.public_identifier || null,
+    name: authorName,
+    headline: headlineVal,
+    explicitProfileUrl: profileUrlVal,
+    metadata: { reactionType: reactionKind, postUrl },
+  });
+}
+
 async function scanPostEngagement(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
   const targetUrls = parseTargetUrls(context.monitor.target_url);
   if (targetUrls.length === 0) {
     throw new SignalScanError("Se requiere al menos una URL válida de publicación de LinkedIn", "invalid_configuration", false);
   }
 
-  const postsToScan = targetUrls.slice(0, 5);
-  const limitPerPost = Math.max(10, Math.floor(context.limit / postsToScan.length));
+  const postsToScan = targetUrls.slice(0, 15);
+  const limitPerPost = Math.max(10, Math.floor(context.limit / Math.max(1, postsToScan.length)));
   const leads: DiscoveredSignalLead[] = [];
   const seenFingerprints = new Set<string>();
 
   for (const postUrl of postsToScan) {
-    const id = postIdentifier(postUrl);
-    if (!id) continue;
+    const urn = postIdentifier(postUrl);
+    if (!urn) continue;
 
     const shouldFetchComments = context.monitor.type !== "competitor_reactions";
     const shouldFetchReactions = context.monitor.type !== "high_intent_comments";
 
     const [comments, reactions] = await Promise.all([
-      (async () => {
-        if (!shouldFetchComments) return { items: [] };
-        try {
-          const res = await client.getPostComments(id, context.remoteAccountId, limitPerPost);
-          if (res?.items?.length) return res;
-          if (/^[0-9]+$/.test(id)) {
-            const urnRes = await client.getPostComments(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
-            if (urnRes?.items?.length) return urnRes;
-          }
-          return res || { items: [] };
-        } catch {
-          if (/^[0-9]+$/.test(id)) {
-            return client.getPostComments(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
-          }
-          return { items: [] };
-        }
-      })(),
-      (async () => {
-        if (!shouldFetchReactions) return { items: [] };
-        try {
-          const res = await client.getPostReactions(id, context.remoteAccountId, limitPerPost);
-          if (res?.items?.length) return res;
-          if (/^[0-9]+$/.test(id)) {
-            const urnRes = await client.getPostReactions(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
-            if (urnRes?.items?.length) return urnRes;
-          }
-          return res || { items: [] };
-        } catch {
-          if (/^[0-9]+$/.test(id)) {
-            return client.getPostReactions(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
-          }
-          return { items: [] };
-        }
-      })(),
+      shouldFetchComments
+        ? fetchPostItemsWithFallback((u) => client.getPostComments(u, context.remoteAccountId, limitPerPost), urn)
+        : Promise.resolve({ items: [] }),
+      shouldFetchReactions
+        ? fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, limitPerPost), urn)
+        : Promise.resolve({ items: [] }),
     ]);
 
+    const signalTypeComment = context.monitor.type === "post_engagement" ? "post_engagement" : "high_intent_comments";
     for (const comment of comments.items || []) {
-      const lead = authorLead({
-        monitorId: context.monitor.id,
-        signalType: context.monitor.type === "post_engagement" ? "post_engagement" : "high_intent_comments",
-        sourceType: "post_comment",
-        sourceId: comment.id,
-        sourceUrl: postUrl,
-        occurredAt: comment.created_at || null,
-        snippet: comment.text ? `Comentó: “${comment.text.slice(0, 240)}”` : "Comentó en la publicación",
-        id: comment.author?.id,
-        publicIdentifier: comment.author?.public_identifier,
-        name: comment.author?.name || `${comment.author?.first_name || ""} ${comment.author?.last_name || ""}`.trim(),
-        headline: comment.author?.headline,
-        explicitProfileUrl: comment.author?.profile_url,
-        metadata: { commentId: comment.id, postUrl },
-      });
+      const lead = parseCommentLead(comment, context.monitor.id, signalTypeComment, "post_comment", postUrl);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }
     }
 
+    const signalTypeReaction = context.monitor.type === "post_engagement" ? "post_engagement" : "competitor_reactions";
     for (const reaction of reactions.items || []) {
-      const lead = authorLead({
-        monitorId: context.monitor.id,
-        signalType: context.monitor.type === "post_engagement" ? "post_engagement" : "competitor_reactions",
-        sourceType: "post_reaction",
-        sourceId: reaction.id || `${id}:${reaction.author?.id}:${reaction.reaction_type || "reaction"}`,
-        sourceUrl: postUrl,
-        occurredAt: new Date().toISOString(),
-        snippet: `Reaccionó (${reaction.reaction_type || "reacción"}) a la publicación`,
-        id: reaction.author?.id,
-        publicIdentifier: reaction.author?.public_identifier,
-        name: reaction.author?.name,
-        headline: reaction.author?.headline,
-        explicitProfileUrl: reaction.author?.profile_url,
-        metadata: { reactionType: reaction.reaction_type || null, postUrl },
-      });
+      const lead = parseReactionLead(reaction, context.monitor.id, signalTypeReaction, "post_reaction", urn, postUrl);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
@@ -333,44 +386,33 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
   });
   const leads: DiscoveredSignalLead[] = [];
   for (const post of posts.slice(0, 3)) {
-    const postId = postIdentifier(post.social_id || post.share_url || post.id);
-    if (!postId) continue;
+    const postUrn = postIdentifier(post.social_id || post.share_url || post.id);
+    if (!postUrn) continue;
     const [comments, reactions] = await Promise.all([
-      client.getPostComments(postId, context.remoteAccountId, Math.min(context.limit, 25)),
-      client.getPostReactions(postId, context.remoteAccountId, Math.min(context.limit, 25)),
+      fetchPostItemsWithFallback((u) => client.getPostComments(u, context.remoteAccountId, Math.min(context.limit, 25)), postUrn),
+      fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, Math.min(context.limit, 25)), postUrn),
     ]);
     for (const comment of comments.items || []) {
-      const lead = authorLead({
-        monitorId: context.monitor.id,
-        signalType: "competitor_audience",
-        sourceType: "competitor_post_comment",
-        sourceId: comment.id,
-        sourceUrl: post.share_url,
-        occurredAt: comment.created_at || post.parsed_datetime || null,
-        snippet: comment.text?.slice(0, 240) || `Comentó en contenido relacionado con ${subject}`,
-        id: comment.author?.id,
-        publicIdentifier: comment.author?.public_identifier,
-        name: comment.author?.name || `${comment.author?.first_name || ""} ${comment.author?.last_name || ""}`.trim(),
-        headline: comment.author?.headline,
-        explicitProfileUrl: comment.author?.profile_url,
-      });
+      const lead = parseCommentLead(
+        comment,
+        context.monitor.id,
+        "competitor_audience",
+        "competitor_post_comment",
+        post.share_url || "",
+        `Comentó en contenido relacionado con ${subject}`
+      );
       if (lead) leads.push(lead);
     }
     for (const reaction of reactions.items || []) {
-      const lead = authorLead({
-        monitorId: context.monitor.id,
-        signalType: "competitor_audience",
-        sourceType: "competitor_post_reaction",
-        sourceId: reaction.id || `${postId}:${reaction.author?.id}:${reaction.reaction_type || "reaction"}`,
-        sourceUrl: post.share_url,
-        occurredAt: post.parsed_datetime || null,
-        snippet: `Interactuó con contenido relacionado con ${subject}`,
-        id: reaction.author?.id,
-        publicIdentifier: reaction.author?.public_identifier,
-        name: reaction.author?.name,
-        headline: reaction.author?.headline,
-        explicitProfileUrl: reaction.author?.profile_url,
-      });
+      const lead = parseReactionLead(
+        reaction,
+        context.monitor.id,
+        "competitor_audience",
+        "competitor_post_reaction",
+        postUrn,
+        post.share_url || "",
+        `Interactuó con contenido relacionado con ${subject}`
+      );
       if (lead) leads.push(lead);
     }
   }

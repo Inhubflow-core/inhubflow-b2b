@@ -302,9 +302,13 @@ export class UnipileClient {
     if (accountId) query.set('account_id', accountId);
     query.set('limit', String(limit));
 
-    return this.request<{ items: UnipilePostComment[] }>(
-      `/api/v1/posts/${encodeURIComponent(postId)}/comments?${query.toString()}`
+    const safePostId = encodeURIComponent(postId).replace(/%3A/gi, ':');
+    const rawRes = await this.request<any>(
+      `/api/v1/posts/${safePostId}/comments?${query.toString()}`
     );
+    if (Array.isArray(rawRes)) return { items: rawRes };
+    if (rawRes && Array.isArray(rawRes.items)) return rawRes;
+    return { items: [] };
   }
 
   /**
@@ -315,9 +319,13 @@ export class UnipileClient {
     if (accountId) query.set('account_id', accountId);
     query.set('limit', String(limit));
 
-    return this.request<{ items: UnipilePostReaction[] }>(
-      `/api/v1/posts/${encodeURIComponent(postId)}/reactions?${query.toString()}`
+    const safePostId = encodeURIComponent(postId).replace(/%3A/gi, ':');
+    const rawRes = await this.request<any>(
+      `/api/v1/posts/${safePostId}/reactions?${query.toString()}`
     );
+    if (Array.isArray(rawRes)) return { items: rawRes };
+    if (rawRes && Array.isArray(rawRes.items)) return rawRes;
+    return { items: [] };
   }
 
   /**
