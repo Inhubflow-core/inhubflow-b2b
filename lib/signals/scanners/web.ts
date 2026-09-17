@@ -124,9 +124,26 @@ function webQuery(context: SignalScannerContext): string {
     acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió)',
     industry_event: '(conference OR summit OR event OR conferencia OR feria)',
     company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión)',
-    keyword_intent: context.keywords.map((keyword) => `"${keyword}"`).join(" OR "),
+    keyword_intent: context.keywords.length ? `(${context.keywords.map((keyword) => `"${keyword}"`).join(" OR ")})` : "",
   };
-  return [terms[context.monitor.type] || context.keywords.join(" OR "), titles, location].filter(Boolean).join(" ");
+
+  const activeKinds = (context.icp.event_kinds && context.icp.event_kinds.length > 0)
+    ? context.icp.event_kinds
+    : [context.monitor.type];
+
+  const matchedTerms = activeKinds
+    .map((kind) => terms[kind])
+    .filter(Boolean);
+
+  if (context.keywords.length && terms.keyword_intent && !matchedTerms.includes(terms.keyword_intent)) {
+    matchedTerms.push(terms.keyword_intent);
+  }
+
+  const queryTerms = matchedTerms.length > 1
+    ? `(${matchedTerms.join(" OR ")})`
+    : (matchedTerms[0] || context.keywords.join(" OR "));
+
+  return [queryTerms, titles, location].filter(Boolean).join(" ");
 }
 
 async function findPeople(

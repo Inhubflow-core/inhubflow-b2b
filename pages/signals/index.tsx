@@ -462,7 +462,12 @@ export default function SignalsPage({
 
   // Paso 2: Señales de Intención (Pestañas de Navegación: "posts" vs "keywords")
   const [signalCategoryTab, setSignalCategoryTab] = useState<"posts" | "keywords">("posts");
-  const [marketEventType, setMarketEventType] = useState<string>("none");
+  const [selectedMarketEvents, setSelectedMarketEvents] = useState<string[]>([]);
+  const handleToggleMarketEvent = (id: string) => {
+    setSelectedMarketEvents((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
   const [newType, setNewType] = useState<string>("post_engagement");
   const [signalLevelFilter, setSignalLevelFilter] = useState<"ALL" | 1 | 2 | 3>("ALL");
   const [newCompetitor, setNewCompetitor] = useState("");
@@ -644,8 +649,8 @@ export default function SignalsPage({
           return;
         }
       } else if (signalCategoryTab === "keywords") {
-        if (keywordsList.length === 0 && !newCompetitor.trim() && marketEventType === "none") {
-          toast.error("Añade al menos una palabra clave, un competidor o activa un evento");
+        if (keywordsList.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
+          toast.error("Añade al menos una palabra clave, un competidor o activa al menos un evento");
           return;
         }
       }
@@ -704,7 +709,7 @@ export default function SignalsPage({
     setWizardStep(1);
     setNewName("");
     setSignalCategoryTab("posts");
-    setMarketEventType("none");
+    setSelectedMarketEvents([]);
     setNewType("post_engagement");
     setSignalLevelFilter("ALL");
     setNewCompetitor("");
@@ -742,16 +747,27 @@ export default function SignalsPage({
     setNewName(monitor.name || "");
     const monitorType = monitor.type || "post_engagement";
     setNewType(monitorType);
-    if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
+
+    let initialEvents: string[] = [];
+    if (monitor.icp_filters_json) {
+      try {
+        const icp = JSON.parse(monitor.icp_filters_json);
+        if (Array.isArray(icp.event_kinds)) {
+          initialEvents = icp.event_kinds.filter((k: string) =>
+            ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(k)
+          );
+        }
+      } catch {}
+    }
+    if (initialEvents.length === 0 && ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
+      initialEvents = [monitorType];
+    }
+    setSelectedMarketEvents(initialEvents);
+
+    if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType) || initialEvents.length > 0) {
       setSignalCategoryTab("keywords");
-      if (["funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
-        setMarketEventType(monitorType);
-      } else {
-        setMarketEventType("none");
-      }
     } else {
       setSignalCategoryTab("posts");
-      setMarketEventType("none");
     }
     setSignalLevelFilter("ALL");
     if (monitor.account_id) setSelectedAccountId(monitor.account_id);
@@ -981,8 +997,8 @@ export default function SignalsPage({
       else if (extractComments && !extractReactions) effectiveType = "high_intent_comments";
       else if (!extractComments && extractReactions) effectiveType = "competitor_reactions";
     } else if (signalCategoryTab === "keywords") {
-      if (marketEventType !== "none") {
-        effectiveType = marketEventType;
+      if (selectedMarketEvents.length > 0) {
+        effectiveType = selectedMarketEvents[0];
       } else if (newCompetitor.trim() && keywordsList.length === 0) {
         effectiveType = "competitor_audience";
       } else {
@@ -1032,8 +1048,8 @@ export default function SignalsPage({
               company: icpCompany.trim() || undefined,
               industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
               time_window_days: timeWindowDays,
-              source_strategy: sourceStrategy,
-              event_kinds: [effectiveType],
+              source_strategy: selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
+              event_kinds: selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType],
             },
             mode: newMode,
             account_id: selectedAccountId || undefined,
@@ -1084,8 +1100,8 @@ export default function SignalsPage({
             company: icpCompany.trim() || undefined,
             industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
             time_window_days: timeWindowDays,
-            source_strategy: sourceStrategy,
-            event_kinds: [newType],
+            source_strategy: selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
+            event_kinds: selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType],
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
@@ -3126,16 +3142,32 @@ export default function SignalsPage({
                           </div>
                         </div>
 
-                        {/* 3. Eventos Disparadores de Compra (Trigger Events) */}
+                        {/* 3. Eventos Disparadores de Mercado (Trigger Events) - MULTISELECCIÓN */}
                         <div className="p-4 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2.5">
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
                               Eventos Disparadores de Mercado (Trigger Events)
                             </label>
-                            <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold">Web Pública + LinkedIn</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (selectedMarketEvents.length === 3) {
+                                    setSelectedMarketEvents([]);
+                                  } else {
+                                    setSelectedMarketEvents(["funding_round", "company_news", "acquisition_event"]);
+                                  }
+                                }}
+                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                              >
+                                {selectedMarketEvents.length === 3 ? "Deseleccionar todos" : "Seleccionar los 3"}
+                              </button>
+                              <span className="text-gray-300 dark:text-gray-600">|</span>
+                              <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold">Web Pública + LinkedIn</span>
+                            </div>
                           </div>
                           <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                            Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital:
+                            Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             {[
@@ -3143,21 +3175,29 @@ export default function SignalsPage({
                               { id: "company_news", icon: "📢", title: "Expansión / Noticias", desc: "Nuevas aperturas y lanzamientos" },
                               { id: "acquisition_event", icon: "🤝", title: "Fusiones & Compras", desc: "Reestructuración y nuevo stack" },
                             ].map((ev) => {
-                              const isActive = marketEventType === ev.id;
+                              const isActive = selectedMarketEvents.includes(ev.id);
                               return (
                                 <button
                                   key={ev.id}
                                   type="button"
-                                  onClick={() => setMarketEventType(isActive ? "none" : ev.id)}
-                                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                                  onClick={() => handleToggleMarketEvent(ev.id)}
+                                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                                     isActive
-                                      ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30"
+                                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/40 shadow-xs"
                                       : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-300"
                                   }`}
                                 >
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm">{ev.icon}</span>
-                                    {isActive && <RiCheckLine className="text-emerald-600" size={14} />}
+                                    <div
+                                      className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+                                        isActive
+                                          ? "bg-emerald-600 text-white shadow-xs"
+                                          : "border border-gray-300 dark:border-gray-600 text-transparent"
+                                      }`}
+                                    >
+                                      ✓
+                                    </div>
                                   </div>
                                   <strong className="text-xs block mt-1 leading-tight">{ev.title}</strong>
                                   <span className="text-[10px] text-gray-400 block mt-0.5 leading-snug">{ev.desc}</span>
@@ -3165,9 +3205,9 @@ export default function SignalsPage({
                               );
                             })}
                           </div>
-                          {marketEventType !== "none" && (
+                          {selectedMarketEvents.length > 0 && (
                             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              ✓ Se detectarán noticias públicas verificadas y se localizarán automáticamente los decisores en LinkedIn que coincidan con tu ICP.
+                              ✓ Se detectarán {selectedMarketEvents.length === 3 ? "los 3 tipos de noticias públicas" : `${selectedMarketEvents.length} tipo(s) de noticias públicas`} y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
                             </p>
                           )}
                         </div>
