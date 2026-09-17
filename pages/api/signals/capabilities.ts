@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       salesNavigator,
       webEvidence,
       supportedSignals: [
-        "competitor_reactions", "high_intent_comments", "competitor_audience",
+        "post_engagement", "competitor_reactions", "high_intent_comments", "competitor_audience",
         "new_in_role", "internal_promotion", "active_poster", "keyword_intent", "hiring_spree",
         ...(webEvidence ? ["funding_round", "company_news", "acquisition_event", "industry_event"] : []),
         ...(salesNavigator ? ["company_growth", "profile_viewers"] : []),

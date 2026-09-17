@@ -29,13 +29,35 @@ export interface SignalScannerClient {
 }
 
 function postIdentifier(value: string): string | null {
-  if (!value.trim()) return null;
-  const decoded = decodeURIComponent(value);
-  const urn = decoded.match(/urn:li:(?:activity|share):([0-9]+)/i);
+  if (!value || !value.trim()) return null;
+  const decoded = decodeURIComponent(value.trim());
+  if (/^[0-9]+$/.test(decoded)) return decoded;
+  const urn = decoded.match(/urn:li:(?:activity|share|ugcPost):([0-9]+)/i);
   if (urn) return urn[1];
   const activity = decoded.match(/(?:activity-|activity:)([0-9]+)/i);
   if (activity) return activity[1];
+  const generalId = decoded.match(/(?:posts\/|detail\/recent-activity\/shares\/|update\/urn:li:activity:)([0-9]+)/i);
+  if (generalId) return generalId[1];
   return null;
+}
+
+function parseTargetUrls(raw?: string | null): string[] {
+  if (!raw || !raw.trim()) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      // fallback to delimiter split
+    }
+  }
+  return trimmed
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function profileUrl(publicIdentifier?: string, explicit?: string): string | null {
@@ -73,18 +95,18 @@ function authorLead(input: {
   });
   return {
     linkedinUrl: url,
-    providerId,
     fullName: name,
     headline: input.headline || null,
+    providerId,
     signalType: input.signalType,
     evidence: {
       fingerprint,
       sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      sourceUrl: input.sourceUrl,
-      occurredAt: input.occurredAt,
-      snippet: input.snippet,
-      metadata: input.metadata,
+      sourceId: input.sourceId || null,
+      sourceUrl: input.sourceUrl || null,
+      occurredAt: input.occurredAt || null,
+      snippet: input.snippet || null,
+      metadata: input.metadata || {},
     },
   };
 }
@@ -138,49 +160,84 @@ async function postSearch(client: SignalScannerClient, context: SignalScannerCon
 }
 
 async function scanPostEngagement(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
-  const id = postIdentifier(context.monitor.target_url || "");
-  if (!id) throw new SignalScanError("Se requiere una URL válida de publicación de LinkedIn", "invalid_configuration", false);
-  const [comments, reactions] = await Promise.all([
-    context.monitor.type === "competitor_reactions" ? Promise.resolve({ items: [] }) : client.getPostComments(id, context.remoteAccountId, context.limit),
-    context.monitor.type === "high_intent_comments" ? Promise.resolve({ items: [] }) : client.getPostReactions(id, context.remoteAccountId, context.limit),
-  ]);
+  const targetUrls = parseTargetUrls(context.monitor.target_url);
+  if (targetUrls.length === 0) {
+    throw new SignalScanError("Se requiere al menos una URL válida de publicación de LinkedIn", "invalid_configuration", false);
+  }
+
+  const postsToScan = targetUrls.slice(0, 5);
+  const limitPerPost = Math.max(10, Math.floor(context.limit / postsToScan.length));
   const leads: DiscoveredSignalLead[] = [];
-  for (const comment of comments.items || []) {
-    const lead = authorLead({
-      monitorId: context.monitor.id,
-      signalType: "high_intent_comments",
-      sourceType: "post_comment",
-      sourceId: comment.id,
-      sourceUrl: context.monitor.target_url,
-      occurredAt: comment.created_at || null,
-      snippet: comment.text ? `Comentó: “${comment.text.slice(0, 240)}”` : "Comentó en la publicación",
-      id: comment.author?.id,
-      publicIdentifier: comment.author?.public_identifier,
-      name: comment.author?.name || `${comment.author?.first_name || ""} ${comment.author?.last_name || ""}`.trim(),
-      headline: comment.author?.headline,
-      explicitProfileUrl: comment.author?.profile_url,
-      metadata: { commentId: comment.id },
-    });
-    if (lead) leads.push(lead);
+  const seenFingerprints = new Set<string>();
+
+  for (const postUrl of postsToScan) {
+    const id = postIdentifier(postUrl);
+    if (!id) continue;
+
+    const shouldFetchComments = context.monitor.type !== "competitor_reactions";
+    const shouldFetchReactions = context.monitor.type !== "high_intent_comments";
+
+    const [comments, reactions] = await Promise.all([
+      shouldFetchComments
+        ? client.getPostComments(id, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }))
+        : Promise.resolve({ items: [] }),
+      shouldFetchReactions
+        ? client.getPostReactions(id, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }))
+        : Promise.resolve({ items: [] }),
+    ]);
+
+    for (const comment of comments.items || []) {
+      const lead = authorLead({
+        monitorId: context.monitor.id,
+        signalType: context.monitor.type === "post_engagement" ? "post_engagement" : "high_intent_comments",
+        sourceType: "post_comment",
+        sourceId: comment.id,
+        sourceUrl: postUrl,
+        occurredAt: comment.created_at || null,
+        snippet: comment.text ? `Comentó: “${comment.text.slice(0, 240)}”` : "Comentó en la publicación",
+        id: comment.author?.id,
+        publicIdentifier: comment.author?.public_identifier,
+        name: comment.author?.name || `${comment.author?.first_name || ""} ${comment.author?.last_name || ""}`.trim(),
+        headline: comment.author?.headline,
+        explicitProfileUrl: comment.author?.profile_url,
+        metadata: { commentId: comment.id, postUrl },
+      });
+      if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        seenFingerprints.add(lead.evidence.fingerprint);
+        leads.push(lead);
+      }
+    }
+
+    for (const reaction of reactions.items || []) {
+      const lead = authorLead({
+        monitorId: context.monitor.id,
+        signalType: context.monitor.type === "post_engagement" ? "post_engagement" : "competitor_reactions",
+        sourceType: "post_reaction",
+        sourceId: reaction.id || `${id}:${reaction.author?.id}:${reaction.reaction_type || "reaction"}`,
+        sourceUrl: postUrl,
+        occurredAt: new Date().toISOString(),
+        snippet: `Reaccionó (${reaction.reaction_type || "reacción"}) a la publicación`,
+        id: reaction.author?.id,
+        publicIdentifier: reaction.author?.public_identifier,
+        name: reaction.author?.name,
+        headline: reaction.author?.headline,
+        explicitProfileUrl: reaction.author?.profile_url,
+        metadata: { reactionType: reaction.reaction_type || null, postUrl },
+      });
+      if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        seenFingerprints.add(lead.evidence.fingerprint);
+        leads.push(lead);
+      }
+    }
   }
-  for (const reaction of reactions.items || []) {
-    const lead = authorLead({
-      monitorId: context.monitor.id,
-      signalType: "competitor_reactions",
-      sourceType: "post_reaction",
-      sourceId: reaction.id || `${id}:${reaction.author?.id}:${reaction.reaction_type || "reaction"}`,
-      sourceUrl: context.monitor.target_url,
-      occurredAt: new Date().toISOString(),
-      snippet: `Reaccionó (${reaction.reaction_type || "reacción"}) a la publicación`,
-      id: reaction.author?.id,
-      publicIdentifier: reaction.author?.public_identifier,
-      name: reaction.author?.name,
-      headline: reaction.author?.headline,
-      explicitProfileUrl: reaction.author?.profile_url,
-      metadata: { reactionType: reaction.reaction_type || null },
-    });
-    if (lead) leads.push(lead);
+
+  if (leads.length === 0 && targetUrls.length > 0) {
+    const validIds = targetUrls.map(postIdentifier).filter(Boolean);
+    if (validIds.length === 0) {
+      throw new SignalScanError("Ninguna de las URLs proporcionadas tiene un ID de publicación de LinkedIn válido", "invalid_configuration", false);
+    }
   }
+
   return { leads };
 }
 

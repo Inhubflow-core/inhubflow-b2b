@@ -6,7 +6,7 @@ const StringArray = z.array(z.string().trim().min(1).max(120)).max(50).default([
 export const SignalMonitorCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   type: z.enum(SIGNAL_TYPES),
-  target_url: z.string().trim().url().max(2_000).optional().or(z.literal("")),
+  target_url: z.string().trim().max(10_000).optional().or(z.literal("")),
   competitor_name: z.string().trim().max(200).optional(),
   keywords: StringArray.optional(),
   icp_filters: z.object({
@@ -34,8 +34,8 @@ export const SignalMonitorCreateSchema = z.object({
     max_words: z.number().int().min(20).max(180).default(90),
   }).optional(),
 }).superRefine((value, ctx) => {
-  if (["competitor_reactions", "high_intent_comments"].includes(value.type) && !value.target_url) {
-    ctx.addIssue({ code: "custom", path: ["target_url"], message: "Esta señal requiere la URL de una publicación de LinkedIn" });
+  if (["post_engagement", "competitor_reactions", "high_intent_comments"].includes(value.type) && !value.target_url) {
+    ctx.addIssue({ code: "custom", path: ["target_url"], message: "Esta señal requiere al menos una publicación de LinkedIn" });
   }
   if (value.type === "competitor_audience" && !value.competitor_name) {
     ctx.addIssue({ code: "custom", path: ["competitor_name"], message: "Esta señal requiere un competidor o referente" });
@@ -54,7 +54,7 @@ export const SignalMonitorPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   status: z.enum(["active", "paused", "completed"]).optional(),
   mode: z.enum(["review", "autopilot"]).optional(),
-  target_url: z.string().trim().url().max(2_000).nullable().optional(),
+  target_url: z.string().trim().max(10_000).nullable().optional(),
   competitor_name: z.string().trim().max(200).nullable().optional(),
   target_list_id: z.string().min(1).max(200).nullable().optional(),
   target_workflow_id: z.string().min(1).max(200).nullable().optional(),

@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 
 export const SIGNAL_TYPES = [
+  "post_engagement",
   "competitor_reactions",
   "high_intent_comments",
   "competitor_audience",

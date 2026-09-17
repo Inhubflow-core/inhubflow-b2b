@@ -39,6 +39,11 @@ import {
   RiArrowLeftLine,
   RiShieldCheckLine,
   RiDeleteBinLine,
+  RiFireLine,
+  RiCalendarLine,
+  RiFilter3Line,
+  RiShareForwardLine,
+  RiTimeLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -183,6 +188,20 @@ export interface SignalDefinition {
 
 export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   // Nivel 1: Máxima Intención (Calientes - Competencia y Comunidad)
+  {
+    id: "post_engagement",
+    title: "Buscador de Posts (Likes + Comentarios)",
+    badge: "⭐ Recomendado",
+    level: 1,
+    levelTitle: "🔥 Nivel 1: Máxima Intención",
+    group: "A",
+    groupTitle: "Social & Competidores",
+    description: "Encuentra posts virales o de competidores en LinkedIn. Extrae tanto a quienes comentaron como a quienes reaccionaron en un solo monitor.",
+    icon: RiFireLine,
+    color: "text-amber-500",
+    badgeBg: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+    inputKind: "post_url",
+  },
   {
     id: "competitor_reactions",
     title: "Reacciones a Posts de Competidores",
@@ -435,7 +454,7 @@ export default function SignalsPage({
   })();
 
   // Paso 2: Señales de Intención (3 Niveles)
-  const [newType, setNewType] = useState<string>("competitor_reactions");
+  const [newType, setNewType] = useState<string>("post_engagement");
   const [signalLevelFilter, setSignalLevelFilter] = useState<"ALL" | 1 | 2 | 3>("ALL");
   const [newCompetitor, setNewCompetitor] = useState("");
   const [newTargetUrl, setNewTargetUrl] = useState("");
@@ -449,6 +468,34 @@ export default function SignalsPage({
   const [timeWindowDays, setTimeWindowDays] = useState<number>(90);
   const [sourceStrategy, setSourceStrategy] = useState<"linkedin" | "web" | "hybrid">("linkedin");
 
+  // Buscador Inteligente de Posts en LinkedIn (Unipile)
+  const [postSearchMode, setPostSearchMode] = useState<"search" | "manual">("search");
+  const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
+  const [postSearchKeywords, setPostSearchKeywords] = useState("");
+  const [postSearchDate, setPostSearchDate] = useState<"past_24h" | "past_week" | "past_month">("past_month");
+  const [postSearchSortBy, setPostSearchSortBy] = useState<"engagement" | "date">("engagement");
+  const [isSearchingPosts, setIsSearchingPosts] = useState(false);
+  const [discoveredPosts, setDiscoveredPosts] = useState<Array<{
+    id: string;
+    shareUrl: string;
+    text: string;
+    date: string | null;
+    reactionCount: number;
+    commentCount: number;
+    repostCount: number;
+    author: {
+      id: string | null;
+      name: string;
+      headline: string | null;
+      profilePictureUrl: string | null;
+      publicIdentifier: string | null;
+      isCompany: boolean;
+    };
+  }>>([]);
+  const [selectedPostUrls, setSelectedPostUrls] = useState<string[]>([]);
+  const [extractComments, setExtractComments] = useState(true);
+  const [extractReactions, setExtractReactions] = useState(true);
+
   // Paso 3: Mensaje IA Anti-Stalker
   const [msgObjective, setMsgObjective] = useState<"conversation" | "demo" | "resource">("conversation");
   const [msgTone, setMsgTone] = useState<"consultive" | "professional" | "direct">("consultive");
@@ -459,12 +506,162 @@ export default function SignalsPage({
   // Paso 4: Lanzamiento & Configuración
   const [newName, setNewName] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || "");
-  const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
   const [newTargetList, setNewTargetList] = useState(lists[0]?.id || "");
-  const [newTargetWorkflow, setNewTargetWorkflow] = useState("");
+  const [newTargetWorkflow, setNewTargetWorkflow] = useState(workflows[0]?.id || "");
+  const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
   const [scanIntervalMinutes, setScanIntervalMinutes] = useState(360);
-  const [accountCapabilities, setAccountCapabilities] = useState<{ accountReady: boolean; salesNavigator: boolean; webEvidence: boolean; supportedSignals: string[] } | null>(null);
-  const [autopilotReadiness, setAutopilotReadiness] = useState<{ ready: boolean; blockers: string[] } | null>(null);
+  const [accountCapabilities, setAccountCapabilities] = useState<{
+    accountReady: boolean;
+    salesNavigator: boolean;
+    webEvidence: boolean;
+    supportedSignals: string[];
+    error?: string;
+  } | null>(null);
+  const [autopilotReadiness, setAutopilotReadiness] = useState<{
+    ready: boolean;
+    score: number;
+    checklist: Array<{ key: string; label: string; ok: boolean }>;
+  } | null>(null);
+
+  const handleAddKeyword = (kw: string) => {
+    const k = kw.trim();
+    if (k && !keywordsList.includes(k)) {
+      setKeywordsList([...keywordsList, k]);
+    }
+    setCustomKeywordInput("");
+  };
+
+  const handleRemoveKeyword = (k: string) => {
+    setKeywordsList(keywordsList.filter((item) => item !== k));
+  };
+
+  // Búsqueda de posts en LinkedIn vía Unipile
+  const handleSearchLinkedInPosts = async () => {
+    if (!selectedAccountId) {
+      toast.error("Selecciona una cuenta de LinkedIn conectada");
+      return;
+    }
+    const queryComp = postSearchCompetitor.trim() || newCompetitor.trim();
+    const queryKw = postSearchKeywords.trim();
+    if (!queryComp && !queryKw) {
+      toast.error("Ingresa el nombre del competidor o al menos una palabra clave");
+      return;
+    }
+    setIsSearchingPosts(true);
+    try {
+      const res = await fetch("/api/signals/posts/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: selectedAccountId,
+          competitor: queryComp,
+          keywords: queryKw,
+          date_posted: postSearchDate,
+          sort_by: postSearchSortBy,
+          limit: 25,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error al buscar publicaciones");
+      }
+      setDiscoveredPosts(data.posts || []);
+      if ((data.posts || []).length === 0) {
+        toast.info("No se encontraron publicaciones con esos criterios. Prueba ampliando la fecha o con otras palabras clave.");
+      } else {
+        toast.success(`Se encontraron ${data.posts.length} publicaciones con alto engagement`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al buscar publicaciones");
+    } finally {
+      setIsSearchingPosts(false);
+    }
+  };
+
+  const toggleSelectPost = (shareUrl: string) => {
+    setSelectedPostUrls((prev) => {
+      const exists = prev.includes(shareUrl);
+      const next = exists ? prev.filter((u) => u !== shareUrl) : [...prev, shareUrl];
+      if (next.length === 0) {
+        setNewTargetUrl("");
+      } else if (next.length === 1) {
+        setNewTargetUrl(next[0]);
+      } else {
+        setNewTargetUrl(JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  const handleSelectTopPosts = (count: number = 3) => {
+    const top = discoveredPosts.slice(0, count).map((p) => p.shareUrl).filter(Boolean);
+    setSelectedPostUrls(top);
+    if (top.length === 0) {
+      setNewTargetUrl("");
+    } else if (top.length === 1) {
+      setNewTargetUrl(top[0]);
+    } else {
+      setNewTargetUrl(JSON.stringify(top));
+    }
+  };
+
+  const handleToggleExtraction = (kind: "comments" | "reactions") => {
+    let nextComments = extractComments;
+    let nextReactions = extractReactions;
+    if (kind === "comments") {
+      nextComments = !extractComments;
+      if (!nextComments && !nextReactions) {
+        toast.error("Debes extraer al menos comentarios o reacciones");
+        return;
+      }
+      setExtractComments(nextComments);
+    } else {
+      nextReactions = !extractReactions;
+      if (!nextComments && !nextReactions) {
+        toast.error("Debes extraer al menos comentarios o reacciones");
+        return;
+      }
+      setExtractReactions(nextReactions);
+    }
+
+    if (nextComments && nextReactions) {
+      setNewType("post_engagement");
+    } else if (nextComments) {
+      setNewType("high_intent_comments");
+    } else {
+      setNewType("competitor_reactions");
+    }
+  };
+
+  const advanceWizard = () => {
+    if (wizardStep === 1 && icpTitles.length === 0) {
+      toast.error("Añade al menos un cargo objetivo");
+      return;
+    }
+    if (wizardStep === 2) {
+      if (accountCapabilities && !accountCapabilities.supportedSignals.includes(newType)) {
+        toast.error("La señal elegida no está disponible para esta cuenta");
+        return;
+      }
+      if (["post_engagement", "competitor_reactions", "high_intent_comments"].includes(newType) && !newTargetUrl.trim() && selectedPostUrls.length === 0) {
+        toast.error("Selecciona al menos una publicación o introduce su URL de LinkedIn");
+        return;
+      }
+      if (newType === "competitor_audience" && !newCompetitor.trim()) {
+        toast.error("Añade el competidor o referente");
+        return;
+      }
+      if (["keyword_intent", "active_poster", "hiring_spree", "company_growth"].includes(newType) && keywordsList.length === 0 && icpTitles.length === 0) {
+        toast.error("Añade palabras clave o cargos del ICP");
+        return;
+      }
+    }
+    if (wizardStep === 3 && customTemplate.trim() && customTemplate.trim().length < 20) {
+      toast.error("La plantilla personalizada es demasiado corta");
+      return;
+    }
+    setWizardStep((current) => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
+  };
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState("");
   const [creatingMonitor, setCreatingMonitor] = useState(false);
@@ -506,48 +703,6 @@ export default function SignalsPage({
     } else {
       setIcpSizes([...icpSizes, size]);
     }
-  };
-
-  const handleAddKeyword = (kw: string) => {
-    const k = kw.trim();
-    if (k && !keywordsList.includes(k)) {
-      setKeywordsList([...keywordsList, k]);
-    }
-    setCustomKeywordInput("");
-  };
-
-  const handleRemoveKeyword = (k: string) => {
-    setKeywordsList(keywordsList.filter((item) => item !== k));
-  };
-
-  const advanceWizard = () => {
-    if (wizardStep === 1 && icpTitles.length === 0) {
-      toast.error("Añade al menos un cargo objetivo");
-      return;
-    }
-    if (wizardStep === 2) {
-      if (accountCapabilities && !accountCapabilities.supportedSignals.includes(newType)) {
-        toast.error("La señal elegida no está disponible para esta cuenta");
-        return;
-      }
-      if (["competitor_reactions", "high_intent_comments"].includes(newType) && !newTargetUrl.trim()) {
-        toast.error("Añade la URL del post de LinkedIn");
-        return;
-      }
-      if (newType === "competitor_audience" && !newCompetitor.trim()) {
-        toast.error("Añade el competidor o referente");
-        return;
-      }
-      if (["keyword_intent", "active_poster", "hiring_spree", "company_growth"].includes(newType) && keywordsList.length === 0 && icpTitles.length === 0) {
-        toast.error("Añade palabras clave o cargos del ICP");
-        return;
-      }
-    }
-    if (wizardStep === 3 && customTemplate.trim() && customTemplate.trim().length < 20) {
-      toast.error("La plantilla personalizada es demasiado corta");
-      return;
-    }
-    setWizardStep((current) => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
   };
 
   const handleOpenNewWizard = () => {
@@ -609,7 +764,7 @@ export default function SignalsPage({
     fetch(`/api/signals/readiness?${params.toString()}`)
       .then((response) => response.json())
       .then((data) => setAutopilotReadiness(data))
-      .catch(() => setAutopilotReadiness({ ready: false, blockers: ["readiness_unavailable"] }));
+      .catch(() => setAutopilotReadiness({ ready: false, score: 0, checklist: [] }));
   }, [newMode, selectedAccountId, newTargetList, newTargetWorkflow]);
 
   // Manejar Escaneo de Monitor
@@ -637,10 +792,17 @@ export default function SignalsPage({
   const handleCreateMonitor = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    const def = SIGNAL_DEFINITIONS.find((d) => d.id === newType);
+    let effectiveType = newType;
+    if (["post_engagement", "competitor_reactions", "high_intent_comments"].includes(newType)) {
+      if (extractComments && extractReactions) effectiveType = "post_engagement";
+      else if (extractComments && !extractReactions) effectiveType = "high_intent_comments";
+      else if (!extractComments && extractReactions) effectiveType = "competitor_reactions";
+    }
+
+    const def = SIGNAL_DEFINITIONS.find((d) => d.id === effectiveType) || SIGNAL_DEFINITIONS.find((d) => d.id === newType);
     if (!selectedAccountId) { toast.error("Selecciona una cuenta de LinkedIn"); return; }
     if (!newTargetList) { toast.error("Selecciona una lista de destino"); return; }
-    if (accountCapabilities && !accountCapabilities.supportedSignals.includes(newType)) {
+    if (accountCapabilities && !accountCapabilities.supportedSignals.includes(effectiveType)) {
       toast.error("La cuenta seleccionada no es compatible con esta señal");
       return;
     }
@@ -654,9 +816,11 @@ export default function SignalsPage({
     }
     const monitorName =
       newName.trim() ||
-      `${def?.title || "Radar"} - ${newCompetitor.trim() || keywordsList[0] || "ICP"}`;
+      `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`;
 
-    const targetUrlToSend = newTargetUrl.trim() || undefined;
+    const targetUrlToSend = selectedPostUrls.length > 1
+      ? JSON.stringify(selectedPostUrls)
+      : (selectedPostUrls[0] || newTargetUrl.trim() || undefined);
 
     setCreatingMonitor(true);
     try {
@@ -665,8 +829,8 @@ export default function SignalsPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: monitorName,
-          type: newType,
-          competitor_name: newCompetitor.trim() || undefined,
+          type: effectiveType,
+          competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
           target_url: targetUrlToSend,
           keywords: keywordsList,
           icp_filters: {
@@ -2109,32 +2273,451 @@ export default function SignalsPage({
                         </div>
                       )}
 
-                      {/* Si es engagement con competidores o comentarios */}
-                      {(newType === "competitor_reactions" || newType === "high_intent_comments") && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                              Nombre del Competidor o Marca Referente *
-                            </label>
-                            <input
-                              type="text"
-                              value={newCompetitor}
-                              onChange={(e) => setNewCompetitor(e.target.value)}
-                              placeholder="Ej: HubSpot, Lemlist, Salesforce, Apollo..."
-                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                            />
+                      {/* Si es engagement en publicaciones (Buscador Inteligente de Posts + Modo Manual) */}
+                      {(["post_engagement", "competitor_reactions", "high_intent_comments"] as string[]).includes(newType) && (
+                        <div className="space-y-4 pt-1">
+                          {/* Selector de modo: Buscador vs Manual */}
+                          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
+                            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-200/70 dark:bg-gray-800 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setPostSearchMode("search")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                  postSearchMode === "search"
+                                    ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
+                                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                                }`}
+                              >
+                                <RiSearchLine size={13} /> Buscador de Posts en LinkedIn (Recomendado)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPostSearchMode("manual")}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                  postSearchMode === "manual"
+                                    ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
+                                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                                }`}
+                              >
+                                <RiFileList3Line size={13} /> Pegar URL(s) Manualmente
+                              </button>
+                            </div>
+                            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+                              <RiSparklingLine className="text-amber-500" size={13} /> Motor Unipile en tiempo real
+                            </span>
                           </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                              URL del Post Específico *
-                            </label>
-                            <input
-                              type="url"
-                              value={newTargetUrl}
-                              onChange={(e) => setNewTargetUrl(e.target.value)}
-                              placeholder="https://www.linkedin.com/posts/..."
-                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                            />
+
+                          {/* MODO BUSCADOR INTELIGENTE */}
+                          {postSearchMode === "search" && (
+                            <div className="space-y-4">
+                              <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3.5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  {/* Campo 1: Competidor o Marca */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                      Competidor, Marca o Creador
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={postSearchCompetitor}
+                                      onChange={(e) => {
+                                        setPostSearchCompetitor(e.target.value);
+                                        setNewCompetitor(e.target.value);
+                                      }}
+                                      placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                                    />
+                                  </div>
+
+                                  {/* Campo 2: Fecha de Publicación */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                      Fecha de Publicación
+                                    </label>
+                                    <select
+                                      value={postSearchDate}
+                                      onChange={(e) => setPostSearchDate(e.target.value as any)}
+                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    >
+                                      <option value="past_week">Esta semana (Más recientes)</option>
+                                      <option value="past_month">Último mes (Mayor volumen)</option>
+                                      <option value="past_24h">Últimas 24 horas (Inmediato)</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Campo 3: Ordenar por */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                      Priorizar Resultados Por
+                                    </label>
+                                    <select
+                                      value={postSearchSortBy}
+                                      onChange={(e) => setPostSearchSortBy(e.target.value as any)}
+                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    >
+                                      <option value="engagement">🔥 Mayor Viralidad (Likes + Comentarios)</option>
+                                      <option value="date">🕒 Más Recientes</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {/* Palabras clave de búsqueda */}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    Palabras Clave en la Publicación *
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                      <input
+                                        type="text"
+                                        value={postSearchKeywords}
+                                        onChange={(e) => setPostSearchKeywords(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleSearchLinkedInPosts();
+                                          }
+                                        }}
+                                        placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
+                                        className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                      />
+                                      {postSearchKeywords && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setPostSearchKeywords("")}
+                                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <RiCloseLine size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleSearchLinkedInPosts}
+                                      disabled={isSearchingPosts}
+                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 shadow-xs transition-all shrink-0"
+                                    >
+                                      {isSearchingPosts ? (
+                                        <>
+                                          <RiRefreshLine className="animate-spin" size={14} /> Buscando en LinkedIn...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <RiSearchLine size={14} /> Buscar Posts
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {/* Chips sugeridos de 1 clic */}
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                    <span className="text-[10px] font-medium text-gray-400">Sugerencias rápidas:</span>
+                                    {[
+                                      "Prospección B2B",
+                                      "Inteligencia Artificial",
+                                      "Automatización",
+                                      "Cold Outreach",
+                                      "Generación de Leads",
+                                      "SaaS",
+                                    ].map((sug) => (
+                                      <button
+                                        key={sug}
+                                        type="button"
+                                        onClick={() => {
+                                          const current = postSearchKeywords.trim();
+                                          if (!current) {
+                                            setPostSearchKeywords(sug);
+                                          } else if (!current.toLowerCase().includes(sug.toLowerCase())) {
+                                            setPostSearchKeywords(`${current}, ${sug}`);
+                                          }
+                                        }}
+                                        className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-600 border border-gray-200 dark:border-gray-600 transition-colors"
+                                      >
+                                        + {sug}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* RESULTADOS DE BÚSQUEDA */}
+                              {isSearchingPosts && (
+                                <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-3">
+                                  <RiRefreshLine className="animate-spin text-brand-500 mx-auto" size={28} />
+                                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                    Conectando con LinkedIn y ordenando publicaciones por viralidad...
+                                  </p>
+                                  <p className="text-[11px] text-gray-400">
+                                    Esto toma unos segundos mientras calculamos reacciones y comentarios reales.
+                                  </p>
+                                </div>
+                              )}
+
+                              {!isSearchingPosts && discoveredPosts.length > 0 && (
+                                <div className="space-y-3">
+                                  {/* Barra de control de publicaciones */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-200/80 dark:border-brand-900/60">
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                                        {selectedPostUrls.length}
+                                      </span>
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                        {selectedPostUrls.length === 1
+                                          ? "1 publicación seleccionada"
+                                          : `${selectedPostUrls.length} publicaciones seleccionadas`}
+                                      </span>
+                                      <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                        (de {discoveredPosts.length} encontradas)
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSelectTopPosts(3)}
+                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-700 bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-800 hover:bg-brand-100/50 transition-colors"
+                                      >
+                                        ⭐ Seleccionar Top 3 Virales
+                                      </button>
+                                      {selectedPostUrls.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSelectTopPosts(0)}
+                                          className="px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
+                                        >
+                                          Limpiar
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Grid de Tarjetas de Posts */}
+                                  <div className="grid grid-cols-1 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                                    {discoveredPosts.map((post) => {
+                                      const isSelected = selectedPostUrls.includes(post.shareUrl);
+                                      return (
+                                        <div
+                                          key={post.id || post.shareUrl}
+                                          onClick={() => toggleSelectPost(post.shareUrl)}
+                                          className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                                            isSelected
+                                              ? "border-brand-500 bg-brand-50/40 dark:bg-brand-950/40 shadow-xs ring-1 ring-brand-500"
+                                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/80 hover:border-brand-300 dark:hover:border-brand-700"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            {/* Checkbox + Autor */}
+                                            <div className="flex items-start gap-3 min-w-0">
+                                              <div className="pt-0.5 shrink-0">
+                                                <div
+                                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                                                    isSelected
+                                                      ? "bg-brand-500 border-brand-500 text-white"
+                                                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                                                  }`}
+                                                >
+                                                  {isSelected && <RiCheckLine size={12} />}
+                                                </div>
+                                              </div>
+
+                                              {/* Avatar */}
+                                              {post.author.profilePictureUrl ? (
+                                                <img
+                                                  src={post.author.profilePictureUrl}
+                                                  alt={post.author.name}
+                                                  className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-700"
+                                                />
+                                              ) : (
+                                                <div className="w-9 h-9 rounded-full bg-linear-to-br from-brand-400 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                                                  {post.author.name ? post.author.name.slice(0, 2).toUpperCase() : "IN"}
+                                                </div>
+                                              )}
+
+                                              {/* Info Autor */}
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                                    {post.author.name}
+                                                  </span>
+                                                  {post.author.isCompany && (
+                                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                      Empresa
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {post.author.headline && (
+                                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                                                    {post.author.headline}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            {/* Enlace para ver en LinkedIn */}
+                                            {post.shareUrl && (
+                                              <a
+                                                href={post.shareUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 transition-colors shrink-0"
+                                              >
+                                                Ver en LinkedIn <RiExternalLinkLine size={11} />
+                                              </a>
+                                            )}
+                                          </div>
+
+                                          {/* Snippet del texto */}
+                                          {post.text && (
+                                            <p className="mt-2.5 text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+                                              {post.text}
+                                            </p>
+                                          )}
+
+                                          {/* Métricas de Engagement */}
+                                          <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">
+                                              <RiThumbUpLine size={12} /> {post.reactionCount} reacciones
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                                              <RiChat1Line size={12} /> {post.commentCount} comentarios
+                                            </span>
+                                            {post.repostCount > 0 && (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-gray-500 bg-gray-100 dark:bg-gray-700/60">
+                                                <RiShareForwardLine size={12} /> {post.repostCount}
+                                              </span>
+                                            )}
+                                            {post.date && (
+                                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 ml-auto">
+                                                <RiTimeLine size={11} /> {post.date}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {!isSearchingPosts && discoveredPosts.length === 0 && (
+                                <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border border-dashed border-gray-300 dark:border-gray-700 space-y-2">
+                                  <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
+                                    <RiFireLine size={20} />
+                                  </div>
+                                  <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                    Descubre publicaciones virales de competidores en 1 clic
+                                  </h5>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                                    Escribe el nombre de un competidor o temas clave de tu nicho arriba y pulsa <strong>Buscar Posts</strong> para ver publicaciones reales con alto volumen de comentarios y reacciones.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* MODO MANUAL (Pegar URLs) */}
+                          {postSearchMode === "manual" && (
+                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    Nombre del Competidor o Referente (Opcional)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={newCompetitor}
+                                    onChange={(e) => setNewCompetitor(e.target.value)}
+                                    placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    URL(s) de Publicaciones en LinkedIn *
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={newTargetUrl}
+                                    onChange={(e) => {
+                                      setNewTargetUrl(e.target.value);
+                                      // Si pega múltiples URLs
+                                      const urls = e.target.value.split(/[\n,]+/).map((u) => u.trim()).filter((u) => u.startsWith("http"));
+                                      setSelectedPostUrls(urls);
+                                    }}
+                                    placeholder="Pega 1 o varias URLs de posts (separadas por saltos de línea)..."
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-gray-400">
+                                Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...).
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Opciones de Extracción Dual (Comentarios + Reacciones) */}
+                          <div className="p-3.5 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2">
+                            <span className="block text-[11px] font-bold text-gray-800 dark:text-gray-200">
+                              ¿Qué perfiles deseas captar de las publicaciones seleccionadas?
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              <label
+                                onClick={() => handleToggleExtraction("comments")}
+                                className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                  extractComments
+                                    ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200"
+                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
+                                }`}
+                              >
+                                <div className="pt-0.5">
+                                  <div
+                                    className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                                      extractComments ? "bg-blue-600 border-blue-600 text-white" : "border-gray-400"
+                                    }`}
+                                  >
+                                    {extractComments && <RiCheckLine size={12} />}
+                                  </div>
+                                </div>
+                                <div>
+                                  <strong className="text-xs block">💬 Comentarios (Lead Magnets / Debates)</strong>
+                                  <span className="text-[10px] opacity-80 block">
+                                    Prospectos que escribieron pidiendo recursos o debatiendo problemas clave.
+                                  </span>
+                                </div>
+                              </label>
+
+                              <label
+                                onClick={() => handleToggleExtraction("reactions")}
+                                className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                  extractReactions
+                                    ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
+                                }`}
+                              >
+                                <div className="pt-0.5">
+                                  <div
+                                    className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                                      extractReactions ? "bg-amber-600 border-amber-600 text-white" : "border-gray-400"
+                                    }`}
+                                  >
+                                    {extractReactions && <RiCheckLine size={12} />}
+                                  </div>
+                                </div>
+                                <div>
+                                  <strong className="text-xs block">👍 Reacciones / Likes</strong>
+                                  <span className="text-[10px] opacity-80 block">
+                                    Decisores que dieron Like, Insightful, Celebrate o Support.
+                                  </span>
+                                </div>
+                              </label>
+                            </div>
+                            <p className="text-[10px] text-gray-400 pt-0.5">
+                              {extractComments && extractReactions
+                                ? "⚡ Modo Unificado Activo: Se captarán tanto comentaristas como personas que reaccionaron en un solo monitor sin duplicados."
+                                : extractComments
+                                ? "Se captarán únicamente comentaristas."
+                                : "Se captarán únicamente personas que dieron Like o reaccionaron."}
+                            </p>
                           </div>
                         </div>
                       )}
