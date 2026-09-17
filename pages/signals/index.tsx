@@ -44,6 +44,7 @@ import {
   RiFilter3Line,
   RiShareForwardLine,
   RiTimeLine,
+  RiEditLine,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -52,6 +53,11 @@ interface SignalMonitor {
   type: string;
   target_url: string | null;
   competitor_name: string | null;
+  keywords_json?: string | null;
+  icp_filters_json?: string | null;
+  account_id?: string | null;
+  target_list_id?: string | null;
+  target_workflow_id?: string | null;
   mode: "review" | "autopilot";
   status: "active" | "paused";
   last_checked_at: string | null;
@@ -522,6 +528,7 @@ export default function SignalsPage({
     score: number;
     checklist: Array<{ key: string; label: string; ok: boolean }>;
   } | null>(null);
+  const [editingMonitorId, setEditingMonitorId] = useState<string | null>(null);
 
   const handleAddKeyword = (kw: string) => {
     const k = kw.trim();
@@ -707,6 +714,125 @@ export default function SignalsPage({
   };
 
   const handleOpenNewWizard = () => {
+    setEditingMonitorId(null);
+    setWizardStep(1);
+    setNewName("");
+    setNewType("post_engagement");
+    setNewCompetitor("");
+    setNewTargetUrl("");
+    setSelectedPostUrls([]);
+    setDiscoveredPosts([]);
+    setPostSearchKeywords("");
+    setPostSearchCompetitor("");
+    setIcpTitle("CEO, Director, Gerente General");
+    setIcpCountry("Global / Todos");
+    setIcpCity("");
+    setIcpSizes([]);
+    setIcpCompany("");
+    setKeywordsList([
+      "automatización de ventas",
+      "crm",
+      "prospección b2b",
+      "cold outreach",
+    ]);
+    setExtractComments(true);
+    setExtractReactions(true);
+    setNewMode("review");
+    setScanIntervalMinutes(60);
+    setShowNewModal(true);
+  };
+
+  const handleOpenEditWizard = (monitor: SignalMonitor) => {
+    setEditingMonitorId(monitor.id);
+    setNewName(monitor.name || "");
+    setNewType(monitor.type || "post_engagement");
+    if (monitor.account_id) setSelectedAccountId(monitor.account_id);
+    if (monitor.target_list_id) setNewTargetList(monitor.target_list_id);
+    if (monitor.target_workflow_id) setNewTargetWorkflow(monitor.target_workflow_id);
+    setNewMode(monitor.mode || "review");
+    if (monitor.scan_interval_minutes) setScanIntervalMinutes(monitor.scan_interval_minutes);
+    setNewCompetitor(monitor.competitor_name || "");
+    setNewTargetUrl(monitor.target_url || "");
+
+    // Parsear target_url si son posts seleccionados
+    if (monitor.target_url) {
+      const trimmed = monitor.target_url.trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) setSelectedPostUrls(parsed.map(String));
+        } catch {
+          setSelectedPostUrls([trimmed]);
+        }
+      } else if (trimmed) {
+        setSelectedPostUrls([trimmed]);
+      }
+    } else {
+      setSelectedPostUrls([]);
+    }
+
+    if (monitor.type === "post_engagement") {
+      setExtractComments(true);
+      setExtractReactions(true);
+    } else if (monitor.type === "competitor_reactions") {
+      setExtractComments(false);
+      setExtractReactions(true);
+    } else if (monitor.type === "high_intent_comments") {
+      setExtractComments(true);
+      setExtractReactions(false);
+    }
+
+    // Parsear keywords_json
+    if (monitor.keywords_json) {
+      try {
+        const kws = JSON.parse(monitor.keywords_json);
+        if (Array.isArray(kws) && kws.length > 0) setKeywordsList(kws);
+      } catch {}
+    }
+
+    // Parsear icp_filters_json
+    if (monitor.icp_filters_json) {
+      try {
+        const icp = JSON.parse(monitor.icp_filters_json);
+        if (Array.isArray(icp.titles)) setIcpTitle(icp.titles.join(", "));
+        if (Array.isArray(icp.company_sizes)) setIcpSizes(icp.company_sizes);
+        if (icp.company) setIcpCompany(icp.company);
+        else if (Array.isArray(icp.industries) && icp.industries.length) setIcpCompany(icp.industries.join(", "));
+        if (icp.time_window_days) setTimeWindowDays(icp.time_window_days);
+        if (icp.source_strategy) setSourceStrategy(icp.source_strategy);
+
+        if (Array.isArray(icp.locations) && icp.locations.length > 0) {
+          const countryFound = COUNTRIES_LIST.find((c) =>
+            icp.locations.some((l: string) => typeof l === "string" && l.toLowerCase().trim() === c.name.toLowerCase().trim())
+          );
+          if (countryFound) {
+            setIcpCountry(countryFound.name);
+            const remaining = icp.locations.filter((l: string) => typeof l === "string" && l.toLowerCase().trim() !== countryFound.name.toLowerCase().trim());
+            if (remaining.length) setIcpCity(remaining.join(", "));
+            else setIcpCity("");
+          } else {
+            setIcpCountry("Global / Todos");
+            setIcpCity(icp.locations.join(", "));
+          }
+        } else {
+          setIcpCountry("Global / Todos");
+          setIcpCity("");
+        }
+      } catch {}
+    }
+
+    // Parsear message_config_json
+    if (monitor.message_config_json) {
+      try {
+        const msg = JSON.parse(monitor.message_config_json);
+        if (msg.objective) setMsgObjective(msg.objective);
+        if (msg.tone) setMsgTone(msg.tone);
+        if (msg.language) setMsgLanguage(msg.language);
+        if (msg.max_words) setMsgMaxWords(msg.max_words);
+        if (msg.custom_template) setCustomTemplate(msg.custom_template);
+      } catch {}
+    }
+
     setWizardStep(1);
     setShowNewModal(true);
   };
@@ -825,6 +951,58 @@ export default function SignalsPage({
 
     setCreatingMonitor(true);
     try {
+      if (editingMonitorId) {
+        const res = await fetch(`/api/signals/${editingMonitorId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: monitorName,
+            competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
+            target_url: targetUrlToSend,
+            keywords: keywordsList,
+            icp_filters: {
+              titles: icpTitles,
+              locations: icpLocations,
+              company_sizes: icpSizes,
+              company: icpCompany.trim() || undefined,
+              industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
+              time_window_days: timeWindowDays,
+              source_strategy: sourceStrategy,
+              event_kinds: [effectiveType],
+            },
+            mode: newMode,
+            account_id: selectedAccountId || undefined,
+            target_list_id: newTargetList || undefined,
+            target_workflow_id: newTargetWorkflow || null,
+            scan_interval_minutes: scanIntervalMinutes,
+            message_config: {
+              objective: msgObjective,
+              tone: msgTone,
+              language: msgLanguage,
+              max_words: msgMaxWords,
+              custom_template: customTemplate.trim() || undefined,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          toast.success(`Monitor "${updated.name}" actualizado con éxito`);
+          setShowNewModal(false);
+          setEditingMonitorId(null);
+          setWizardStep(1);
+          setNewName("");
+          // Refrescar lista de monitores
+          const mRes = await fetch("/api/signals");
+          const mData = await mRes.json();
+          if (mData.items) setMonitors(mData.items);
+        } else {
+          const err = await res.json();
+          toast.error(err.error || "Error al actualizar monitor");
+        }
+        return;
+      }
+
       const res = await fetch("/api/signals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1695,6 +1873,15 @@ export default function SignalsPage({
                         <button
                           type="button"
                           disabled={m.scan_state === "running" || deletingMonitorId === m.id}
+                          onClick={() => handleOpenEditWizard(m)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
+                          title="Editar configuración y criterios de este monitor"
+                        >
+                          <RiEditLine size={14} /> Editar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={m.scan_state === "running" || deletingMonitorId === m.id}
                           onClick={() => handleDeleteMonitor(m)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50"
                           title={m.scan_state === "running" ? "Espera a que termine el escaneo" : "Eliminar monitor"}
@@ -1852,10 +2039,10 @@ export default function SignalsPage({
                   </span>
                   <div>
                     <h3 className="font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight">
-                      Configurar Monitor de Señales de Intención
+                      {editingMonitorId ? "Reconfigurar Monitor de Señales" : "Configurar Monitor de Señales de Intención"}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Asistente guiado de InHubFlow para prospección basada en señales reales
+                      {editingMonitorId ? "Modifica el ICP, publicaciones monitoreadas, mensaje IA o modo operativo" : "Asistente guiado de InHubFlow para prospección basada en señales reales"}
                     </p>
                   </div>
                 </div>
@@ -3332,11 +3519,13 @@ export default function SignalsPage({
                     >
                       {creatingMonitor ? (
                         <>
-                          <RiRefreshLine className="animate-spin" size={16} /> Lanzando Monitor...
+                          <RiRefreshLine className="animate-spin" size={16} />{" "}
+                          {editingMonitorId ? "Guardando Cambios..." : "Lanzando Monitor..."}
                         </>
                       ) : (
                         <>
-                          <RiRadarLine size={16} /> Lanzar Monitor de Señales
+                          {editingMonitorId ? <RiCheckLine size={16} /> : <RiRadarLine size={16} />}
+                          {editingMonitorId ? "Guardar Cambios del Monitor" : "Lanzar Monitor de Señales"}
                         </>
                       )}
                     </button>
