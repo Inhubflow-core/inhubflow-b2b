@@ -2109,7 +2109,7 @@ export default function SignalsPage({
                 <div className="flex items-center justify-between max-w-3xl mx-auto">
                   {[
                     { num: 1, label: "Definir ICP", icon: RiUserSearchLine },
-                    { num: 2, label: "Señales", icon: RiRadarLine },
+                    { num: 2, label: "Buscador de Posts", icon: RiRadarLine },
                     { num: 3, label: "Mensaje IA", icon: RiSparklingLine },
                     { num: 4, label: "Lanzar", icon: RiPlayLine },
                   ].map((step, idx) => {
@@ -2371,820 +2371,552 @@ export default function SignalsPage({
                 )}
 
                 {/* =========================================================
-                    PASO 2: SELECCIÓN DE SEÑAL DE INTENCIÓN (3 NIVELES)
+                    PASO 2: BUSCADOR DE POSTS (LIKES + COMENTARIOS)
                    ========================================================= */}
                 {wizardStep === 2 && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                        <RiRadarLine size={13} /> Paso 2 de 4: Señales de Intención
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <RiRadarLine className="text-brand-500" /> Buscador de Posts (Likes + Comentarios)
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 2 de 4</span>
+                    </div>
+
+                    {/* Selector de modo: Buscador Inteligente vs Manual */}
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
+                      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setPostSearchMode("search")}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
+                            postSearchMode === "search"
+                              ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
+                              : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                          }`}
+                        >
+                          <RiSearchLine size={13} /> Buscador de Posts en LinkedIn (Recomendado)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPostSearchMode("manual");
+                            setNewTargetUrl(selectedPostUrls.join("\n"));
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
+                            postSearchMode === "manual"
+                              ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
+                              : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                          }`}
+                        >
+                          <RiFileList3Line size={13} /> Pegar URL(s) Manualmente
+                        </button>
                       </div>
-                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
-                        Selecciona el Disparador de Compra
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Elige qué comportamiento o evento en LinkedIn activará la captura de prospectos según su temperatura.
-                      </p>
+                      <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+                        <RiSparklingLine className="text-amber-500" size={13} /> Motor Unipile en tiempo real
+                      </span>
                     </div>
 
-                    {/* Segmented Filter Bar por Niveles */}
-                    <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800/80 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setSignalLevelFilter("ALL")}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                          signalLevelFilter === "ALL"
-                            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-2xs"
-                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                        }`}
-                      >
-                        Todas las Señales ({SIGNAL_DEFINITIONS.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSignalLevelFilter(1)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                          signalLevelFilter === 1
-                            ? "bg-white dark:bg-gray-700 text-amber-700 dark:text-amber-300 shadow-2xs"
-                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                        }`}
-                      >
-                        🔥 Nivel 1: Máxima Intención (Calientes)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSignalLevelFilter(2)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                          signalLevelFilter === 2
-                            ? "bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-300 shadow-2xs"
-                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                        }`}
-                      >
-                        ⚡ Nivel 2: Momento de Compra (Triggers)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSignalLevelFilter(3)}
-                        className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                          signalLevelFilter === 3
-                            ? "bg-white dark:bg-gray-700 text-teal-700 dark:text-teal-300 shadow-2xs"
-                            : "text-gray-500 hover:text-gray-800 dark:text-gray-400"
-                        }`}
-                      >
-                        🟢 Nivel 3: Actividad & Búsquedas
-                      </button>
-                    </div>
-
-                    {/* Grid de Cards de Señales */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
-                      {SIGNAL_DEFINITIONS.filter(
-                        (s) => signalLevelFilter === "ALL" || s.level === signalLevelFilter
-                      ).map((sig) => {
-                        const isSelected = newType === sig.id;
-                        const unsupported = Boolean(accountCapabilities && !accountCapabilities.supportedSignals.includes(sig.id));
-                        const SigIcon = sig.icon;
-                        return (
-                          <button
-                            key={sig.id}
-                            type="button"
-                            disabled={unsupported}
-                            onClick={() => !unsupported && handleSelectSignalType(sig.id)}
-                            className={`p-3.5 rounded-2xl border text-left transition-all relative flex flex-col justify-between gap-2 ${unsupported ? "opacity-50 cursor-not-allowed" : ""} ${
-                              isSelected
-                                ? "border-brand-500 bg-brand-50/50 dark:bg-brand-950/40 ring-2 ring-brand-500/20"
-                                : "border-gray-200 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-850"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between w-full">
-                              <div className="flex items-center gap-2.5">
-                                <span className={`p-2 rounded-xl bg-gray-100 dark:bg-gray-800 ${sig.color}`}>
-                                  <SigIcon size={18} />
-                                </span>
-                                <div>
-                                  <h5 className="font-bold text-xs text-gray-900 dark:text-white leading-tight">
-                                    {sig.title}
-                                  </h5>
-                                  <span className="text-[10px] text-gray-400 font-medium">
-                                    {sig.levelTitle}
-                                  </span>
-                                </div>
-                              </div>
-                              {isSelected && (
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white shrink-0">
-                                  <RiCheckLine size={13} />
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">
-                              {sig.description}
-                            </p>
-                            <div className="pt-1 flex items-center justify-between">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${sig.badgeBg}`}>
-                                {unsupported ? "No disponible para esta cuenta" : sig.badge}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">Fuentes de evidencia</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {[
-                          { id: "linkedin", label: "LinkedIn", description: "Actividad y datos profesionales" },
-                          { id: "hybrid", label: "Automática (recomendado)", description: "Web pública + verificación en LinkedIn" },
-                          { id: "web", label: "Web + LinkedIn", description: "Descubrimiento web con identidad verificada" },
-                        ].map((source) => (
-                          <button
-                            key={source.id}
-                            type="button"
-                            onClick={() => setSourceStrategy(source.id as "linkedin" | "web" | "hybrid")}
-                            className={`p-2.5 rounded-xl border text-left text-xs ${sourceStrategy === source.id
-                              ? "border-brand-500 bg-brand-50 dark:bg-brand-950/30"
-                              : "border-gray-200 dark:border-gray-700"}`}
-                          >
-                            <strong className="block">{source.label}</strong>
-                            <span className="text-[10px] text-gray-500">{source.description}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-gray-400">Las fuentes web aportan noticias públicas; todo prospecto se verifica después contra su perfil profesional.</p>
-                    </div>
-
-                    {/* Parámetros Contextuales según la señal seleccionada */}
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-900 dark:text-white">
-                          Parámetros para:{" "}
-                          <span className="text-brand-600">
-                            {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
-                          </span>
-                        </span>
-                      </div>
-
-                      {(["funding_round", "acquisition_event", "company_news", "industry_event"] as string[]).includes(newType) && (
-                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800 dark:bg-blue-950/30 dark:border-blue-900 dark:text-blue-200">
-                          Se buscarán fuentes públicas reales y se verificará la identidad profesional antes de crear cualquier lead. La fuente, fecha y contexto quedarán guardados para revisión.
-                        </div>
-                      )}
-
-                      {/* Si es engagement en publicaciones (Buscador Inteligente de Posts + Modo Manual) */}
-                      {(["post_engagement", "competitor_reactions", "high_intent_comments"] as string[]).includes(newType) && (
-                        <div className="space-y-4 pt-1">
-                          {/* Selector de modo: Buscador vs Manual */}
-                          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
-                            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-200/70 dark:bg-gray-800 text-xs">
-                              <button
-                                type="button"
-                                onClick={() => setPostSearchMode("search")}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
-                                  postSearchMode === "search"
-                                    ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
-                                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
-                                }`}
-                              >
-                                <RiSearchLine size={13} /> Buscador de Posts en LinkedIn (Recomendado)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPostSearchMode("manual");
-                                  setNewTargetUrl(selectedPostUrls.join("\n"));
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
-                                  postSearchMode === "manual"
-                                    ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
-                                    : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
-                                }`}
-                              >
-                                <RiFileList3Line size={13} /> Pegar URL(s) Manualmente
-                              </button>
-                            </div>
-                            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
-                              <RiSparklingLine className="text-amber-500" size={13} /> Motor Unipile en tiempo real
+                    {/* Publicaciones actualmente configuradas en el monitor */}
+                    {selectedPostUrls.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/80 dark:border-brand-900/60 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                              {selectedPostUrls.length}
+                            </span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-white">
+                              {selectedPostUrls.length === 1
+                                ? "1 Publicación activa configurada"
+                                : `${selectedPostUrls.length} Publicaciones activas configuradas`}
+                            </span>
+                            <span className="text-[10px] text-brand-700 dark:text-brand-300 font-medium hidden sm:inline">
+                              (Señales que serán escaneadas)
                             </span>
                           </div>
-
-                          {/* MODO BUSCADOR INTELIGENTE */}
-                          {postSearchMode === "search" && (
-                            <div className="space-y-4">
-                              {/* Publicaciones actualmente configuradas en el monitor */}
-                              {selectedPostUrls.length > 0 && (
-                                <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/80 dark:border-brand-900/60 space-y-2.5">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold">
-                                        {selectedPostUrls.length}
-                                      </span>
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                        {selectedPostUrls.length === 1
-                                          ? "1 Publicación activa configurada"
-                                          : `${selectedPostUrls.length} Publicaciones activas configuradas`}
-                                      </span>
-                                      <span className="text-[10px] text-brand-700 dark:text-brand-300 font-medium hidden sm:inline">
-                                        (Señales que serán escaneadas)
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedPostUrls([]);
-                                        setNewTargetUrl("");
-                                      }}
-                                      className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
-                                    >
-                                      Limpiar todas
-                                    </button>
-                                  </div>
-
-                                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-                                    {selectedPostUrls.map((url, idx) => (
-                                      <div
-                                        key={url + idx}
-                                        className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs shadow-2xs"
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                          <RiLinkedinBoxFill className="text-brand-600 shrink-0" size={16} />
-                                          <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={url}>
-                                            {url}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                          <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
-                                          >
-                                            Ver post <RiExternalLinkLine size={10} />
-                                          </a>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const nextUrls = selectedPostUrls.filter((_, i) => i !== idx);
-                                              setSelectedPostUrls(nextUrls);
-                                              setNewTargetUrl(nextUrls.join("\n"));
-                                            }}
-                                            className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                            title="Quitar esta publicación"
-                                          >
-                                            <RiCloseLine size={14} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3.5">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  {/* Campo 1: Competidor o Marca */}
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                      Competidor, Marca o Creador
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={postSearchCompetitor}
-                                      onChange={(e) => {
-                                        setPostSearchCompetitor(e.target.value);
-                                        setNewCompetitor(e.target.value);
-                                      }}
-                                      placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
-                                    />
-                                  </div>
-
-                                  {/* Campo 2: Fecha de Publicación */}
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                      Fecha de Publicación
-                                    </label>
-                                    <select
-                                      value={postSearchDate}
-                                      onChange={(e) => setPostSearchDate(e.target.value as any)}
-                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                                    >
-                                      <option value="past_week">Esta semana (Más recientes)</option>
-                                      <option value="past_month">Último mes (Mayor volumen)</option>
-                                      <option value="past_24h">Últimas 24 horas (Inmediato)</option>
-                                    </select>
-                                  </div>
-
-                                  {/* Campo 3: Ordenar por */}
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                      Priorizar Resultados Por
-                                    </label>
-                                    <select
-                                      value={postSearchSortBy}
-                                      onChange={(e) => setPostSearchSortBy(e.target.value as any)}
-                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                                    >
-                                      <option value="engagement">🔥 Mayor Viralidad (Likes + Comentarios)</option>
-                                      <option value="date">🕒 Más Recientes</option>
-                                    </select>
-                                  </div>
-                                </div>
-
-                                {/* Palabras clave de búsqueda */}
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                    Palabras Clave en la Publicación *
-                                  </label>
-                                  <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                      <input
-                                        type="text"
-                                        value={postSearchKeywords}
-                                        onChange={(e) => setPostSearchKeywords(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            handleSearchLinkedInPosts();
-                                          }
-                                        }}
-                                        placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
-                                        className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                                      />
-                                      {postSearchKeywords && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setPostSearchKeywords("")}
-                                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                          <RiCloseLine size={13} />
-                                        </button>
-                                      )}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={handleSearchLinkedInPosts}
-                                      disabled={isSearchingPosts}
-                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 shadow-xs transition-all shrink-0"
-                                    >
-                                      {isSearchingPosts ? (
-                                        <>
-                                          <RiRefreshLine className="animate-spin" size={14} /> Buscando en LinkedIn...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <RiSearchLine size={14} /> Buscar Posts
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-
-                                  {/* Chips sugeridos de 1 clic */}
-                                  <div className="space-y-1.5 mt-2">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-[10px] font-medium text-gray-400">Temas recomendados:</span>
-                                      {[
-                                        "Prospección B2B",
-                                        "Inteligencia Artificial",
-                                        "Automatización",
-                                        "Cold Outreach",
-                                        "Generación de Leads",
-                                        "SaaS",
-                                      ].map((sug) => {
-                                        const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
-                                        return (
-                                          <button
-                                            key={sug}
-                                            type="button"
-                                            onClick={() => {
-                                              if (isChipActive) {
-                                                setPostSearchKeywords("");
-                                              } else {
-                                                setPostSearchKeywords(sug);
-                                              }
-                                            }}
-                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
-                                              isChipActive
-                                                ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
-                                                : "bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-200 dark:border-gray-600"
-                                            }`}
-                                          >
-                                            {isChipActive ? `✓ ${sug}` : sug}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                    <p className="text-[10px] text-gray-400">
-                                      💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* RESULTADOS DE BÚSQUEDA */}
-                              {isSearchingPosts && (
-                                <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-3">
-                                  <RiRefreshLine className="animate-spin text-brand-500 mx-auto" size={28} />
-                                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                    Conectando con LinkedIn y ordenando publicaciones por viralidad...
-                                  </p>
-                                  <p className="text-[11px] text-gray-400">
-                                    Esto toma unos segundos mientras calculamos reacciones y comentarios reales.
-                                  </p>
-                                </div>
-                              )}
-
-                              {!isSearchingPosts && discoveredPosts.length > 0 && (
-                                <div className="space-y-3">
-                                  {/* Barra de control de publicaciones */}
-                                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-200/80 dark:border-brand-900/60">
-                                    <div className="flex items-center gap-2">
-                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-bold">
-                                        {selectedPostUrls.length}
-                                      </span>
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                        {selectedPostUrls.length === 1
-                                          ? "1 publicación seleccionada"
-                                          : `${selectedPostUrls.length} publicaciones seleccionadas`}
-                                      </span>
-                                      <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                        (de {discoveredPosts.length} encontradas)
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSelectTopPosts(3)}
-                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-700 bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-800 hover:bg-brand-100/50 transition-colors"
-                                      >
-                                        ⭐ Seleccionar Top 3 Virales
-                                      </button>
-                                      {selectedPostUrls.length > 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSelectTopPosts(0)}
-                                          className="px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
-                                        >
-                                          Limpiar
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Grid de Tarjetas de Posts */}
-                                  <div className="grid grid-cols-1 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
-                                    {discoveredPosts.map((post) => {
-                                      const isSelected = selectedPostUrls.includes(post.shareUrl);
-                                      return (
-                                        <div
-                                          key={post.id || post.shareUrl}
-                                          onClick={() => toggleSelectPost(post.shareUrl)}
-                                          className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
-                                            isSelected
-                                              ? "border-brand-500 bg-brand-50/40 dark:bg-brand-950/40 shadow-xs ring-1 ring-brand-500"
-                                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/80 hover:border-brand-300 dark:hover:border-brand-700"
-                                          }`}
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            {/* Checkbox + Autor */}
-                                            <div className="flex items-start gap-3 min-w-0">
-                                              <div className="pt-0.5 shrink-0">
-                                                <div
-                                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
-                                                    isSelected
-                                                      ? "bg-brand-500 border-brand-500 text-white"
-                                                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
-                                                  }`}
-                                                >
-                                                  {isSelected && <RiCheckLine size={12} />}
-                                                </div>
-                                              </div>
-
-                                              {/* Avatar */}
-                                              {post.author.profilePictureUrl ? (
-                                                <img
-                                                  src={post.author.profilePictureUrl}
-                                                  alt={post.author.name}
-                                                  className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-700"
-                                                />
-                                              ) : (
-                                                <div className="w-9 h-9 rounded-full bg-linear-to-br from-brand-400 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
-                                                  {post.author.name ? post.author.name.slice(0, 2).toUpperCase() : "IN"}
-                                                </div>
-                                              )}
-
-                                              {/* Info Autor */}
-                                              <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                  <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
-                                                    {post.author.name}
-                                                  </span>
-                                                  {post.author.isCompany && (
-                                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                                                      Empresa
-                                                    </span>
-                                                  )}
-                                                </div>
-                                                {post.author.headline && (
-                                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
-                                                    {post.author.headline}
-                                                  </p>
-                                                )}
-                                              </div>
-                                            </div>
-
-                                            {/* Enlace para ver en LinkedIn */}
-                                            {post.shareUrl && (
-                                              <a
-                                                href={post.shareUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 transition-colors shrink-0"
-                                              >
-                                                Ver en LinkedIn <RiExternalLinkLine size={11} />
-                                              </a>
-                                            )}
-                                          </div>
-
-                                          {/* Snippet del texto */}
-                                          {post.text && (
-                                            <p className="mt-2.5 text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
-                                              {post.text}
-                                            </p>
-                                          )}
-
-                                          {/* Métricas de Engagement */}
-                                          <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">
-                                              <RiThumbUpLine size={12} /> {post.reactionCount} reacciones
-                                            </span>
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
-                                              <RiChat1Line size={12} /> {post.commentCount} comentarios
-                                            </span>
-                                            {post.repostCount > 0 && (
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-gray-500 bg-gray-100 dark:bg-gray-700/60">
-                                                <RiShareForwardLine size={12} /> {post.repostCount}
-                                              </span>
-                                            )}
-                                            {post.date && (
-                                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 ml-auto">
-                                                <RiTimeLine size={11} /> {post.date}
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {!isSearchingPosts && discoveredPosts.length === 0 && (
-                                <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border border-dashed border-gray-300 dark:border-gray-700 space-y-2">
-                                  <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
-                                    <RiFireLine size={20} />
-                                  </div>
-                                  <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                                    Descubre publicaciones virales de competidores en 1 clic
-                                  </h5>
-                                  <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                                    Escribe el nombre de un competidor o temas clave de tu nicho arriba y pulsa <strong>Buscar Posts</strong> para ver publicaciones reales con alto volumen de comentarios y reacciones.
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* MODO MANUAL (Pegar URLs) */}
-                          {postSearchMode === "manual" && (
-                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 space-y-3">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                    Nombre del Competidor o Referente (Opcional)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={newCompetitor}
-                                    onChange={(e) => {
-                                      setNewCompetitor(e.target.value);
-                                      setPostSearchCompetitor(e.target.value);
-                                    }}
-                                    placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                                  />
-                                </div>
-                                <div>
-                                  <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                                      URL(s) de Publicaciones en LinkedIn *
-                                    </label>
-                                    <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">
-                                      {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "publicación detectada" : "publicaciones detectadas"}
-                                    </span>
-                                  </div>
-                                  <textarea
-                                    rows={3}
-                                    value={newTargetUrl}
-                                    onChange={(e) => {
-                                      setNewTargetUrl(e.target.value);
-                                      const urls = e.target.value
-                                        .split(/[\n,]+/)
-                                        .map((u) => u.trim())
-                                        .filter((u) => u.startsWith("http"));
-                                      setSelectedPostUrls(urls);
-                                    }}
-                                    placeholder="Pega una o más URLs de LinkedIn (una por línea)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-[10px] text-gray-400">
-                                Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Opciones de Extracción Dual (Comentarios + Reacciones) */}
-                          <div className="p-3.5 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2">
-                            <span className="block text-[11px] font-bold text-gray-800 dark:text-gray-200">
-                              ¿Qué perfiles deseas captar de las publicaciones seleccionadas?
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                              <label
-                                onClick={() => handleToggleExtraction("comments")}
-                                className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                                  extractComments
-                                    ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200"
-                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
-                                }`}
-                              >
-                                <div className="pt-0.5">
-                                  <div
-                                    className={`w-4 h-4 rounded-md border flex items-center justify-center ${
-                                      extractComments ? "bg-blue-600 border-blue-600 text-white" : "border-gray-400"
-                                    }`}
-                                  >
-                                    {extractComments && <RiCheckLine size={12} />}
-                                  </div>
-                                </div>
-                                <div>
-                                  <strong className="text-xs block">💬 Comentarios (Lead Magnets / Debates)</strong>
-                                  <span className="text-[10px] opacity-80 block">
-                                    Prospectos que escribieron pidiendo recursos o debatiendo problemas clave.
-                                  </span>
-                                </div>
-                              </label>
-
-                              <label
-                                onClick={() => handleToggleExtraction("reactions")}
-                                className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                                  extractReactions
-                                    ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
-                                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
-                                }`}
-                              >
-                                <div className="pt-0.5">
-                                  <div
-                                    className={`w-4 h-4 rounded-md border flex items-center justify-center ${
-                                      extractReactions ? "bg-amber-600 border-amber-600 text-white" : "border-gray-400"
-                                    }`}
-                                  >
-                                    {extractReactions && <RiCheckLine size={12} />}
-                                  </div>
-                                </div>
-                                <div>
-                                  <strong className="text-xs block">👍 Reacciones / Likes</strong>
-                                  <span className="text-[10px] opacity-80 block">
-                                    Decisores que dieron Like, Insightful, Celebrate o Support.
-                                  </span>
-                                </div>
-                              </label>
-                            </div>
-                            <p className="text-[10px] text-gray-400 pt-0.5">
-                              {extractComments && extractReactions
-                                ? "⚡ Modo Unificado Activo: Se captarán tanto comentaristas como personas que reaccionaron en un solo monitor sin duplicados."
-                                : extractComments
-                                ? "Se captarán únicamente comentaristas."
-                                : "Se captarán únicamente personas que dieron Like o reaccionaron."}
-                            </p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPostUrls([]);
+                              setNewTargetUrl("");
+                            }}
+                            className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+                          >
+                            Limpiar todas
+                          </button>
                         </div>
-                      )}
 
-                      {/* Audiencia activa alrededor de un competidor o referente */}
-                      {newType === "competitor_audience" && (
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                            Competidor, marca o referente a analizar *
-                          </label>
-                          <input
-                            type="text"
-                            value={newCompetitor}
-                            onChange={(e) => setNewCompetitor(e.target.value)}
-                            placeholder="Ej: HubSpot, Apollo, referente del sector..."
-                            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                          />
-                          <p className="text-[10px] text-gray-400 mt-1">Se analizará engagement público reciente; no se accede a listas privadas de seguidores.</p>
-                        </div>
-                      )}
-
-                      {/* Si es palabras clave de intención (Keyword Intent) */}
-                      {newType === "keyword_intent" && (
-                        <div className="space-y-2">
-                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                            Palabras Clave de Búsqueda de Compra (Chips interactivos)
-                          </label>
-                          <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                            {keywordsList.map((kw) => (
-                              <span
-                                key={kw}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800/60"
-                              >
-                                {kw}
+                        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                          {selectedPostUrls.map((url, idx) => (
+                            <div
+                              key={url + idx}
+                              className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <RiLinkedinBoxFill className="text-brand-600 shrink-0" size={16} />
+                                <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={url}>
+                                  {url}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
+                                >
+                                  Ver post <RiExternalLinkLine size={10} />
+                                </a>
                                 <button
                                   type="button"
-                                  onClick={() => handleRemoveKeyword(kw)}
-                                  className="hover:text-red-500"
+                                  onClick={() => {
+                                    const nextUrls = selectedPostUrls.filter((_, i) => i !== idx);
+                                    setSelectedPostUrls(nextUrls);
+                                    setNewTargetUrl(nextUrls.join("\n"));
+                                  }}
+                                  className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                  title="Quitar esta publicación"
                                 >
-                                  <RiCloseLine size={13} />
+                                  <RiCloseLine size={14} />
                                 </button>
-                              </span>
-                            ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MODO BUSCADOR INTELIGENTE */}
+                    {postSearchMode === "search" && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3.5">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* Campo 1: Competidor o Marca */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                Competidor, Marca o Creador
+                              </label>
+                              <input
+                                type="text"
+                                value={postSearchCompetitor}
+                                onChange={(e) => {
+                                  setPostSearchCompetitor(e.target.value);
+                                  setNewCompetitor(e.target.value);
+                                }}
+                                placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                                className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                              />
+                            </div>
+
+                            {/* Campo 2: Fecha de Publicación */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                Fecha de Publicación
+                              </label>
+                              <select
+                                value={postSearchDate}
+                                onChange={(e) => setPostSearchDate(e.target.value as any)}
+                                className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                              >
+                                <option value="past_week">Esta semana (Más recientes)</option>
+                                <option value="past_month">Último mes (Mayor volumen)</option>
+                                <option value="past_24h">Últimas 24 horas (Inmediato)</option>
+                              </select>
+                            </div>
+
+                            {/* Campo 3: Ordenar por */}
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                Priorizar Resultados Por
+                              </label>
+                              <select
+                                value={postSearchSortBy}
+                                onChange={(e) => setPostSearchSortBy(e.target.value as any)}
+                                className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                              >
+                                <option value="engagement">🔥 Mayor Viralidad (Likes + Comentarios)</option>
+                                <option value="date">🕒 Más Recientes</option>
+                              </select>
+                            </div>
                           </div>
-                          <div className="flex gap-2">
+
+                          {/* Palabras clave de búsqueda */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                              Palabras Clave en la Publicación *
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <input
+                                  type="text"
+                                  value={postSearchKeywords}
+                                  onChange={(e) => setPostSearchKeywords(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleSearchLinkedInPosts();
+                                    }
+                                  }}
+                                  placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
+                                  className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                />
+                                {postSearchKeywords && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPostSearchKeywords("")}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                  >
+                                    <RiCloseLine size={13} />
+                                  </button>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleSearchLinkedInPosts}
+                                disabled={isSearchingPosts}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 shadow-xs transition-all shrink-0"
+                              >
+                                {isSearchingPosts ? (
+                                  <>
+                                    <RiRefreshLine className="animate-spin" size={14} /> Buscando en LinkedIn...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RiSearchLine size={14} /> Buscar Posts
+                                  </>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Chips sugeridos de 1 clic */}
+                            <div className="space-y-1.5 mt-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[10px] font-medium text-gray-400">Temas recomendados:</span>
+                                {[
+                                  "Prospección B2B",
+                                  "Inteligencia Artificial",
+                                  "Automatización",
+                                  "Cold Outreach",
+                                  "Generación de Leads",
+                                  "SaaS",
+                                ].map((sug) => {
+                                  const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
+                                  return (
+                                    <button
+                                      key={sug}
+                                      type="button"
+                                      onClick={() => {
+                                        if (isChipActive) {
+                                          setPostSearchKeywords("");
+                                        } else {
+                                          setPostSearchKeywords(sug);
+                                        }
+                                      }}
+                                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                                        isChipActive
+                                          ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
+                                          : "bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-200 dark:border-gray-600"
+                                      }`}
+                                    >
+                                      {isChipActive ? `✓ ${sug}` : sug}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="text-[10px] text-gray-400">
+                                💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* RESULTADOS DE BÚSQUEDA */}
+                        {isSearchingPosts && (
+                          <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-3">
+                            <RiRefreshLine className="animate-spin text-brand-500 mx-auto" size={28} />
+                            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                              Conectando con LinkedIn y ordenando publicaciones por viralidad...
+                            </p>
+                            <p className="text-[11px] text-gray-400">
+                              Esto toma unos segundos mientras calculamos reacciones y comentarios reales.
+                            </p>
+                          </div>
+                        )}
+
+                        {!isSearchingPosts && discoveredPosts.length > 0 && (
+                          <div className="space-y-3">
+                            {/* Barra de control de publicaciones */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-200/80 dark:border-brand-900/60">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                                  {selectedPostUrls.length}
+                                </span>
+                                <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                  {selectedPostUrls.length === 1
+                                    ? "1 publicación seleccionada"
+                                    : `${selectedPostUrls.length} publicaciones seleccionadas`}
+                                </span>
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  (de {discoveredPosts.length} encontradas)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectTopPosts(3)}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-700 bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-800 hover:bg-brand-100/50 transition-colors"
+                                >
+                                  ⭐ Seleccionar Top 3 Virales
+                                </button>
+                                {selectedPostUrls.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectTopPosts(0)}
+                                    className="px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
+                                  >
+                                    Limpiar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Grid de Tarjetas de Posts */}
+                            <div className="grid grid-cols-1 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                              {discoveredPosts.map((post) => {
+                                const isSelected = selectedPostUrls.includes(post.shareUrl);
+                                return (
+                                  <div
+                                    key={post.id || post.shareUrl}
+                                    onClick={() => toggleSelectPost(post.shareUrl)}
+                                    className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                                      isSelected
+                                        ? "border-brand-500 bg-brand-50/40 dark:bg-brand-950/40 shadow-xs ring-1 ring-brand-500"
+                                        : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/80 hover:border-brand-300 dark:hover:border-brand-700"
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      {/* Checkbox + Autor */}
+                                      <div className="flex items-start gap-3 min-w-0">
+                                        <div className="pt-0.5 shrink-0">
+                                          <div
+                                            className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                                              isSelected
+                                                ? "bg-brand-500 border-brand-500 text-white"
+                                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                                            }`}
+                                          >
+                                            {isSelected && <RiCheckLine size={12} />}
+                                          </div>
+                                        </div>
+
+                                        {/* Avatar */}
+                                        {post.author.profilePictureUrl ? (
+                                          <img
+                                            src={post.author.profilePictureUrl}
+                                            alt={post.author.name}
+                                            className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-700"
+                                          />
+                                        ) : (
+                                          <div className="w-9 h-9 rounded-full bg-linear-to-br from-brand-400 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                                            {post.author.name ? post.author.name.slice(0, 2).toUpperCase() : "IN"}
+                                          </div>
+                                        )}
+
+                                        {/* Info Autor */}
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                                              {post.author.name}
+                                            </span>
+                                            {post.author.isCompany && (
+                                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                Empresa
+                                              </span>
+                                            )}
+                                          </div>
+                                          {post.author.headline && (
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                                              {post.author.headline}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Enlace para ver en LinkedIn */}
+                                      {post.shareUrl && (
+                                        <a
+                                          href={post.shareUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 transition-colors shrink-0"
+                                        >
+                                          Ver en LinkedIn <RiExternalLinkLine size={11} />
+                                        </a>
+                                      )}
+                                    </div>
+
+                                    {/* Snippet del texto */}
+                                    {post.text && (
+                                      <p className="mt-2.5 text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+                                        {post.text}
+                                      </p>
+                                    )}
+
+                                    {/* Métricas de Engagement */}
+                                    <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">
+                                        <RiThumbUpLine size={12} /> {post.reactionCount} reacciones
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                                        <RiChat1Line size={12} /> {post.commentCount} comentarios
+                                      </span>
+                                      {post.repostCount > 0 && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium text-gray-500 bg-gray-100 dark:bg-gray-700/60">
+                                          <RiShareForwardLine size={12} /> {post.repostCount}
+                                        </span>
+                                      )}
+                                      {post.date && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 ml-auto">
+                                          <RiTimeLine size={11} /> {post.date}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {!isSearchingPosts && discoveredPosts.length === 0 && (
+                          <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border border-dashed border-gray-300 dark:border-gray-700 space-y-2">
+                            <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
+                              <RiFireLine size={20} />
+                            </div>
+                            <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                              Descubre publicaciones virales de competidores en 1 clic
+                            </h5>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                              Escribe el nombre de un competidor o temas clave de tu nicho arriba y pulsa <strong>Buscar Posts</strong> para ver publicaciones reales con alto volumen de comentarios y reacciones.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* MODO MANUAL (Pegar URLs) */}
+                    {postSearchMode === "manual" && (
+                      <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                              Nombre del Competidor o Referente (Opcional)
+                            </label>
                             <input
                               type="text"
-                              value={customKeywordInput}
-                              onChange={(e) => setCustomKeywordInput(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  handleAddKeyword(customKeywordInput);
-                                }
+                              value={newCompetitor}
+                              onChange={(e) => {
+                                setNewCompetitor(e.target.value);
+                                setPostSearchCompetitor(e.target.value);
                               }}
-                              placeholder="Escribe palabra clave y pulsa Enter (ej: 'busco CRM', 'alternativa a Lemlist')..."
-                              className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                              placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                             />
-                            <button
-                              type="button"
-                              onClick={() => handleAddKeyword(customKeywordInput)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:text-teal-300 transition-colors shrink-0"
-                            >
-                              + Añadir
-                            </button>
                           </div>
-                          <div className="flex flex-wrap gap-1 text-[11px]">
-                            <span className="text-gray-400">Sugerencias:</span>
-                            {[
-                              "automatización de ventas",
-                              "crm",
-                              "prospección b2b",
-                              "cold outreach",
-                              "contratar sdrs",
-                              "alternativas a hubspot",
-                            ].map((kwSugg) => (
-                              <button
-                                key={kwSugg}
-                                type="button"
-                                onClick={() => handleAddKeyword(kwSugg)}
-                                className="text-brand-600 hover:underline px-1"
-                              >
-                                + {kwSugg}
-                              </button>
-                            ))}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                URL(s) de Publicaciones en LinkedIn *
+                              </label>
+                              <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                                {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "publicación detectada" : "publicaciones detectadas"}
+                              </span>
+                            </div>
+                            <textarea
+                              rows={3}
+                              value={newTargetUrl}
+                              onChange={(e) => {
+                                setNewTargetUrl(e.target.value);
+                                const urls = e.target.value
+                                  .split(/[\n,]+/)
+                                  .map((u) => u.trim())
+                                  .filter((u) => u.startsWith("http"));
+                                setSelectedPostUrls(urls);
+                              }}
+                              placeholder="Pega una o más URLs de LinkedIn (una por línea)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
+                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
+                            />
                           </div>
                         </div>
-                      )}
+                        <p className="text-[10px] text-gray-400">
+                          Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
+                        </p>
+                      </div>
+                    )}
 
-                      {/* Si es nuevo en el rol o cambio de puesto */}
-                      {(newType === "new_in_role" || newType === "internal_promotion") && (
-                        <div className="space-y-1.5">
-                          <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                            Ventana Dorada de Presupuesto (Antigüedad máxima en el nuevo cargo)
-                          </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              { days: 30, label: "Últimos 30 días", sub: "Recién llegado" },
-                              { days: 60, label: "Últimos 60 días", sub: "Evaluando stack" },
-                              { days: 90, label: "Últimos 90 días", sub: "Ventana Dorada (Recomendado)" },
-                            ].map((win) => (
-                              <button
-                                key={win.days}
-                                type="button"
-                                onClick={() => setTimeWindowDays(win.days)}
-                                className={`p-2.5 rounded-xl border text-center text-xs transition-all ${
-                                  timeWindowDays === win.days
-                                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 font-bold ring-2 ring-emerald-500/20"
-                                    : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-                                }`}
-                              >
-                                <div>{win.label}</div>
-                                <div className="text-[10px] text-gray-400 font-normal">{win.sub}</div>
-                              </button>
-                            ))}
+                    {/* Opciones de Extracción Dual (Comentarios + Reacciones) */}
+                    <div className="p-3.5 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2">
+                      <span className="block text-[11px] font-bold text-gray-800 dark:text-gray-200">
+                        ¿Qué perfiles deseas captar de las publicaciones seleccionadas?
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <label
+                          onClick={() => handleToggleExtraction("comments")}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            extractComments
+                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200"
+                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
+                          }`}
+                        >
+                          <div className="pt-0.5">
+                            <div
+                              className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                                extractComments ? "bg-blue-600 border-blue-600 text-white" : "border-gray-400"
+                              }`}
+                            >
+                              {extractComments && <RiCheckLine size={12} />}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                          <div>
+                            <strong className="text-xs block">💬 Comentarios (Lead Magnets / Debates)</strong>
+                            <span className="text-[10px] opacity-80 block">
+                              Prospectos que escribieron pidiendo recursos o debatiendo problemas clave.
+                            </span>
+                          </div>
+                        </label>
+
+                        <label
+                          onClick={() => handleToggleExtraction("reactions")}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                            extractReactions
+                              ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
+                              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
+                          }`}
+                        >
+                          <div className="pt-0.5">
+                            <div
+                              className={`w-4 h-4 rounded-md border flex items-center justify-center ${
+                                extractReactions ? "bg-amber-600 border-amber-600 text-white" : "border-gray-400"
+                              }`}
+                            >
+                              {extractReactions && <RiCheckLine size={12} />}
+                            </div>
+                          </div>
+                          <div>
+                            <strong className="text-xs block">👍 Reacciones / Likes</strong>
+                            <span className="text-[10px] opacity-80 block">
+                              Decisores que dieron Like, Insightful, Celebrate o Support.
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-gray-400 pt-0.5">
+                        {extractComments && extractReactions
+                          ? "⚡ Modo Unificado Activo: Se captarán tanto comentaristas como personas que reaccionaron en un solo monitor sin duplicados."
+                          : extractComments
+                          ? "Se captarán únicamente comentaristas."
+                          : "Se captarán únicamente personas que dieron Like o reaccionaron."}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -3673,7 +3405,7 @@ export default function SignalsPage({
                     >
                       Siguiente:{" "}
                       {wizardStep === 1
-                        ? "Señales de Intención"
+                        ? "Buscador de Posts"
                         : wizardStep === 2
                         ? "Mensaje IA Anti-Stalker"
                         : "Revisar & Lanzar"}{" "}
