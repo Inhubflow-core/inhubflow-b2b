@@ -1781,7 +1781,7 @@ export default function SignalsPage({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {monitors.map((m) => {
                 const def = SIGNAL_DEFINITIONS.find((d) => d.id === m.type);
                 const IconComp = def ? def.icon : RiRadarLine;
@@ -1861,12 +1861,12 @@ export default function SignalsPage({
                     </div>
 
                     <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center flex-wrap gap-2">
                         <button
                           type="button"
                           disabled={m.scan_state === "running" || deletingMonitorId === m.id}
                           onClick={() => handleScanMonitor(m.id, m.name)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/40 dark:text-brand-300 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/40 dark:text-brand-300 transition-colors disabled:opacity-50 shrink-0"
                         >
                           <RiRefreshLine className={m.scan_state === "running" ? "animate-spin" : ""} size={14} /> Escanear ahora
                         </button>
@@ -1874,7 +1874,7 @@ export default function SignalsPage({
                           type="button"
                           disabled={m.scan_state === "running" || deletingMonitorId === m.id}
                           onClick={() => handleOpenEditWizard(m)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 transition-colors disabled:opacity-50 shrink-0"
                           title="Editar configuración y criterios de este monitor"
                         >
                           <RiEditLine size={14} /> Editar
@@ -1883,7 +1883,7 @@ export default function SignalsPage({
                           type="button"
                           disabled={m.scan_state === "running" || deletingMonitorId === m.id}
                           onClick={() => handleDeleteMonitor(m)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50 shrink-0"
                           title={m.scan_state === "running" ? "Espera a que termine el escaneo" : "Eliminar monitor"}
                         >
                           {deletingMonitorId === m.id ? <RiRefreshLine className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
