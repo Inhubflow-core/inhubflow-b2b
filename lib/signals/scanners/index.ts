@@ -10,6 +10,7 @@ import type {
   UnipileSearchPerson,
   UnipileSearchPost,
 } from "@/lib/unipile/types";
+import type { SignalType } from "@/lib/signals/schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
 import { canonicalLinkedInProfileUrl, evidenceFingerprint } from "./scoring";
@@ -614,30 +615,55 @@ export async function scanRealSignals(
     throw reason instanceof Error ? reason : new SignalScanError("Las fuentes híbridas no respondieron", "provider_error", true);
   }
 
-  switch (context.monitor.type) {
+  const nonWebEventKinds = (context.icp.event_kinds || []).filter((k) => !webTypes.includes(k));
+  if (nonWebEventKinds.length > 1) {
+    const results = await Promise.allSettled(
+      nonWebEventKinds.map((type) => scanSingleSignalType(client, context, type))
+    );
+    const successful = results
+      .filter((r): r is PromiseFulfilledResult<SignalScanResult> => r.status === "fulfilled")
+      .map((r) => r.value);
+    if (successful.length > 0) return mergeScanResults(successful, context.limit);
+    const reason = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+    throw reason?.reason instanceof Error ? reason.reason : new SignalScanError("Ninguna de las fuentes de señales seleccionadas respondió", "provider_error", true);
+  }
+
+  return scanSingleSignalType(client, context, context.monitor.type);
+}
+
+async function scanSingleSignalType(
+  client: SignalScannerClient,
+  context: SignalScannerContext,
+  signalType: string,
+): Promise<SignalScanResult> {
+  const currentContext: SignalScannerContext = {
+    ...context,
+    monitor: { ...context.monitor, type: signalType as SignalType },
+  };
+  switch (signalType) {
     case "competitor_reactions":
     case "high_intent_comments":
     case "post_engagement":
-      return scanPostEngagement(client, context);
+      return scanPostEngagement(client, currentContext);
     case "competitor_followers":
     case "competitor_audience":
-      return scanCompetitorAudience(client, context);
+      return scanCompetitorAudience(client, currentContext);
     case "keyword_intent":
-      return scanPosts(client, context, false);
+      return scanPosts(client, currentContext, false);
     case "active_poster":
-      return scanPosts(client, context, true);
+      return scanPosts(client, currentContext, true);
     case "new_in_role":
     case "job_changes":
     case "internal_promotion":
-      return scanRoleChanges(client, context);
+      return scanRoleChanges(client, currentContext);
     case "hiring_spree":
-      return scanCompanies(client, context, false);
+      return scanCompanies(client, currentContext, false);
     case "company_growth":
-      return scanCompanies(client, context, true);
+      return scanCompanies(client, currentContext, true);
     case "profile_viewers":
-      return scanSalesNavigatorPeople(client, context);
+      return scanSalesNavigatorPeople(client, currentContext);
     default:
-      throw new SignalScanError(`El tipo de señal ${context.monitor.type} aún no tiene una fuente real compatible`, "unsupported_capability", false);
+      throw new SignalScanError(`El tipo de señal ${signalType} aún no tiene una fuente real compatible`, "unsupported_capability", false);
   }
 }
 

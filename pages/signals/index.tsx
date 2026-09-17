@@ -460,12 +460,18 @@ export default function SignalsPage({
     return locs;
   })();
 
-  // Paso 2: Señales de Intención (Pestañas de Navegación: "posts" vs "keywords")
-  const [signalCategoryTab, setSignalCategoryTab] = useState<"posts" | "keywords">("posts");
+  // Paso 2: Señales de Intención (Pestañas de Navegación: "posts" vs "keywords" vs "icp_triggers")
+  const [signalCategoryTab, setSignalCategoryTab] = useState<"posts" | "keywords" | "icp_triggers">("posts");
   const [selectedMarketEvents, setSelectedMarketEvents] = useState<string[]>([]);
   const handleToggleMarketEvent = (id: string) => {
     setSelectedMarketEvents((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+  const [selectedIcpSignals, setSelectedIcpSignals] = useState<string[]>(["new_in_role"]);
+  const handleToggleIcpSignal = (id: string) => {
+    setSelectedIcpSignals((prev) =>
+      prev.includes(id) ? (prev.length > 1 ? prev.filter((item) => item !== id) : prev) : [...prev, id]
     );
   };
   const [newType, setNewType] = useState<string>("post_engagement");
@@ -653,6 +659,11 @@ export default function SignalsPage({
           toast.error("Añade al menos una palabra clave, un competidor o activa al menos un evento");
           return;
         }
+      } else if (signalCategoryTab === "icp_triggers") {
+        if (selectedIcpSignals.length === 0) {
+          toast.error("Selecciona al menos una señal disparadora de ICP");
+          return;
+        }
       }
     }
     if (wizardStep === 3 && customTemplate.trim() && customTemplate.trim().length < 20) {
@@ -710,6 +721,7 @@ export default function SignalsPage({
     setNewName("");
     setSignalCategoryTab("posts");
     setSelectedMarketEvents([]);
+    setSelectedIcpSignals(["new_in_role"]);
     setNewType("post_engagement");
     setSignalLevelFilter("ALL");
     setNewCompetitor("");
@@ -748,7 +760,9 @@ export default function SignalsPage({
     const monitorType = monitor.type || "post_engagement";
     setNewType(monitorType);
 
+    const icpSignalTypes = ["new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers", "active_poster"];
     let initialEvents: string[] = [];
+    let initialIcpSignals: string[] = [];
     if (monitor.icp_filters_json) {
       try {
         const icp = JSON.parse(monitor.icp_filters_json);
@@ -756,15 +770,24 @@ export default function SignalsPage({
           initialEvents = icp.event_kinds.filter((k: string) =>
             ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(k)
           );
+          initialIcpSignals = icp.event_kinds.filter((k: string) =>
+            icpSignalTypes.includes(k)
+          );
         }
       } catch {}
     }
     if (initialEvents.length === 0 && ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
       initialEvents = [monitorType];
     }
+    if (initialIcpSignals.length === 0 && icpSignalTypes.includes(monitorType)) {
+      initialIcpSignals = [monitorType];
+    }
     setSelectedMarketEvents(initialEvents);
+    setSelectedIcpSignals(initialIcpSignals.length > 0 ? initialIcpSignals : ["new_in_role"]);
 
-    if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType) || initialEvents.length > 0) {
+    if (icpSignalTypes.includes(monitorType) || initialIcpSignals.length > 0) {
+      setSignalCategoryTab("icp_triggers");
+    } else if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType) || initialEvents.length > 0) {
       setSignalCategoryTab("keywords");
     } else {
       setSignalCategoryTab("posts");
@@ -1004,6 +1027,8 @@ export default function SignalsPage({
       } else {
         effectiveType = "keyword_intent";
       }
+    } else if (signalCategoryTab === "icp_triggers") {
+      effectiveType = selectedIcpSignals[0] || "new_in_role";
     }
 
     const def = SIGNAL_DEFINITIONS.find((d) => d.id === effectiveType) || SIGNAL_DEFINITIONS.find((d) => d.id === newType);
@@ -1023,7 +1048,9 @@ export default function SignalsPage({
     }
     const monitorName =
       newName.trim() ||
-      `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`;
+      (signalCategoryTab === "icp_triggers"
+        ? `${def?.title || "Radar ICP"} - ${icpTitles.slice(0, 2).join(", ") || icpCountry}`
+        : `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`);
 
     const targetUrlToSend = selectedPostUrls.length > 1
       ? JSON.stringify(selectedPostUrls)
@@ -1040,7 +1067,7 @@ export default function SignalsPage({
             type: effectiveType,
             competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
             target_url: targetUrlToSend,
-            keywords: keywordsList,
+            keywords: signalCategoryTab === "icp_triggers" ? [] : keywordsList,
             icp_filters: {
               titles: icpTitles,
               locations: icpLocations,
@@ -1048,8 +1075,10 @@ export default function SignalsPage({
               company: icpCompany.trim() || undefined,
               industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
               time_window_days: timeWindowDays,
-              source_strategy: selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
-              event_kinds: selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType],
+              source_strategy: signalCategoryTab === "icp_triggers" ? "linkedin" : (selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy),
+              event_kinds: signalCategoryTab === "icp_triggers"
+                ? selectedIcpSignals
+                : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
             },
             mode: newMode,
             account_id: selectedAccountId || undefined,
@@ -1092,7 +1121,7 @@ export default function SignalsPage({
           type: effectiveType,
           competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
           target_url: targetUrlToSend,
-          keywords: keywordsList,
+          keywords: signalCategoryTab === "icp_triggers" ? [] : keywordsList,
           icp_filters: {
             titles: icpTitles,
             locations: icpLocations,
@@ -1100,8 +1129,10 @@ export default function SignalsPage({
             company: icpCompany.trim() || undefined,
             industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
             time_window_days: timeWindowDays,
-            source_strategy: selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
-            event_kinds: selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType],
+            source_strategy: signalCategoryTab === "icp_triggers" ? "linkedin" : (selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy),
+            event_kinds: signalCategoryTab === "icp_triggers"
+              ? selectedIcpSignals
+              : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
@@ -2418,14 +2449,14 @@ export default function SignalsPage({
                     </div>
 
                     {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
-                    <div className="grid grid-cols-2 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 text-xs gap-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 text-xs gap-1">
                       <button
                         type="button"
                         onClick={() => {
                           setSignalCategoryTab("posts");
                           setNewType("post_engagement");
                         }}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all ${
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
                           signalCategoryTab === "posts"
                             ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
                             : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
@@ -2434,7 +2465,7 @@ export default function SignalsPage({
                         <span className="text-sm">🎯</span>
                         <div className="text-left">
                           <span className="block leading-tight font-bold">Posts en LinkedIn</span>
-                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Likes + Comentarios de posts</span>
+                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Likes y Comentarios</span>
                         </div>
                       </button>
 
@@ -2444,7 +2475,7 @@ export default function SignalsPage({
                           setSignalCategoryTab("keywords");
                           setNewType("keyword_intent");
                         }}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all ${
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
                           signalCategoryTab === "keywords"
                             ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
                             : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
@@ -2452,8 +2483,30 @@ export default function SignalsPage({
                       >
                         <span className="text-sm">🔍</span>
                         <div className="text-left">
-                          <span className="block leading-tight font-bold">Palabras Clave & Competidores</span>
-                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Menciones, Marcas y Noticias</span>
+                          <span className="block leading-tight font-bold">Palabras Clave & Mercado</span>
+                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Menciones y Noticias</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignalCategoryTab("icp_triggers");
+                          if (selectedIcpSignals.length === 0) {
+                            setSelectedIcpSignals(["new_in_role"]);
+                          }
+                          setNewType(selectedIcpSignals[0] || "new_in_role");
+                        }}
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                          signalCategoryTab === "icp_triggers"
+                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
+                            : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                        }`}
+                      >
+                        <span className="text-sm">⚡</span>
+                        <div className="text-left">
+                          <span className="block leading-tight font-bold">Disparadores de ICP</span>
+                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">100% Automático (Cero URLs)</span>
                         </div>
                       </button>
                     </div>
@@ -3209,6 +3262,187 @@ export default function SignalsPage({
                             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
                               ✓ Se detectarán {selectedMarketEvents.length === 3 ? "los 3 tipos de noticias públicas" : `${selectedMarketEvents.length} tipo(s) de noticias públicas`} y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
                             </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* =========================================================
+                        PESTAÑA 3: DISPARADORES AUTOMÁTICOS DE ICP (NIVEL 3)
+                       ========================================================= */}
+                    {signalCategoryTab === "icp_triggers" && (
+                      <div className="space-y-4 animate-in fade-in duration-150">
+                        {/* Resumen del ICP activo que alimenta estos disparadores */}
+                        <div className="p-3.5 rounded-2xl bg-linear-to-r from-emerald-50/80 via-teal-50/50 to-blue-50/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-blue-950/20 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">🎯</span>
+                              <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                                Filtros ICP del Paso 1 en Ejecución Automática
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
+                              Cero URLs requeridas
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-gray-700 dark:text-gray-300">
+                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Cargos Objetivo:</strong>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
+                                {icpTitles.length > 0 ? icpTitles.slice(0, 2).join(", ") + (icpTitles.length > 2 ? ` (+${icpTitles.length - 2})` : "") : "Todos los cargos"}
+                              </span>
+                            </div>
+                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Ubicación:</strong>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
+                                {icpCountry} {icpCity ? `(${icpCity})` : ""}
+                              </span>
+                            </div>
+                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Empresas / Tamaño:</strong>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
+                                {icpCompany.trim() || (icpSizes.length > 0 ? icpSizes.slice(0, 2).join(", ") : "Cualquier tamaño")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cabecera de los 6 disparadores */}
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <span>⚡</span> Señales Automáticas de Decisores (Nivel 3)
+                              </h4>
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                Selecciona 1 o más eventos. El sistema rastreará periódicamente LinkedIn buscando personas que cumplan estas condiciones:
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (selectedIcpSignals.length === 6) {
+                                    setSelectedIcpSignals(["new_in_role"]);
+                                  } else {
+                                    setSelectedIcpSignals([
+                                      "new_in_role",
+                                      "internal_promotion",
+                                      "hiring_spree",
+                                      "company_growth",
+                                      "profile_viewers",
+                                      "active_poster",
+                                    ]);
+                                  }
+                                }}
+                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                              >
+                                {selectedIcpSignals.length === 6 ? "Restablecer (1)" : "Seleccionar los 6"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Grid de las 6 Señales Automáticas de ICP */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {[
+                              {
+                                id: "new_in_role",
+                                icon: "🚀",
+                                title: "Just Hired / Nuevo Cargo (<90 Días)",
+                                badge: "Ventana Dorada",
+                                badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+                                desc: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días tienen presupuesto fresco para nuevos proveedores.",
+                              },
+                              {
+                                id: "internal_promotion",
+                                icon: "📈",
+                                title: "Ascenso Interno a Decisor",
+                                badge: "Poder de Firma",
+                                badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+                                desc: "Profesionales promovidos internamente a puestos de liderazgo con capacidad de contratación y cambio de stack.",
+                              },
+                              {
+                                id: "hiring_spree",
+                                icon: "💼",
+                                title: "Hiring Intent (Contratación Activa)",
+                                badge: "Presupuesto Abierto",
+                                badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+                                desc: "Empresas de tu sector que han publicado vacantes comerciales o de operaciones. Si contratan personal, necesitan herramientas.",
+                              },
+                              {
+                                id: "company_growth",
+                                icon: "📊",
+                                title: "Empresas en Hipercrecimiento (+20%)",
+                                badge: "Expansión Rápida",
+                                badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+                                desc: "Empresas cuya plantilla esté creciendo rápidamente (+20% anual) según métricas de contratación en LinkedIn.",
+                              },
+                              {
+                                id: "profile_viewers",
+                                icon: "👁️",
+                                title: "Visitantes Recientes de tu Perfil",
+                                badge: "Interés Directo",
+                                badgeBg: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
+                                desc: "Prospectos y decisores que han visitado tu perfil de LinkedIn recientemente. Requiere Sales Navigator.",
+                              },
+                              {
+                                id: "active_poster",
+                                icon: "🔥",
+                                title: "Más Activos en tu ICP (<48h)",
+                                badge: "Bandeja Caliente",
+                                badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+                                desc: "Decisores que publican o comentan activamente en LinkedIn, garantizando que su bandeja de mensajes está activa.",
+                              },
+                            ].map((sig) => {
+                              const isSelected = selectedIcpSignals.includes(sig.id);
+                              return (
+                                <button
+                                  key={sig.id}
+                                  type="button"
+                                  onClick={() => handleToggleIcpSignal(sig.id)}
+                                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                                    isSelected
+                                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/40 shadow-xs"
+                                      : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                                      <span className="text-base">{sig.icon}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
+                                          {sig.badge}
+                                        </span>
+                                        <div
+                                          className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+                                            isSelected
+                                              ? "bg-emerald-600 text-white shadow-xs"
+                                              : "border border-gray-300 dark:border-gray-600 text-transparent"
+                                          }`}
+                                        >
+                                          ✓
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
+                                      {sig.title}
+                                    </strong>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                      {sig.desc}
+                                    </p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Mensaje de Confirmación */}
+                          {selectedIcpSignals.length > 0 && (
+                            <div className="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-[11px]">
+                              <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                ✓ <strong>{selectedIcpSignals.length} señal(es) activa(s):</strong> InHubFlow buscará continuamente perfiles y los agregará con su evidencia a la lista de destino.
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>
