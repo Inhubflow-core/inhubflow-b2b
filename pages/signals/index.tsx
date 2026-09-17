@@ -565,11 +565,12 @@ export default function SignalsPage({
       if (!res.ok) {
         throw new Error(data.error || "Error al buscar publicaciones");
       }
-      setDiscoveredPosts(data.posts || []);
-      if ((data.posts || []).length === 0) {
-        toast.info("No se encontraron publicaciones con esos criterios. Prueba ampliando la fecha o con otras palabras clave.");
+      const postsFound = data.posts || data.items || [];
+      setDiscoveredPosts(postsFound);
+      if (postsFound.length === 0) {
+        toast.info("No se encontraron publicaciones con esos criterios. Prueba con una palabra clave individual más amplia (ej: 'Prospección', 'IA' o el nombre de un competidor).");
       } else {
-        toast.success(`Se encontraron ${data.posts.length} publicaciones con alto engagement`);
+        toast.success(`Se encontraron ${postsFound.length} publicaciones con alto engagement`);
       }
     } catch (err: any) {
       toast.error(err.message || "Error al buscar publicaciones");
@@ -2410,32 +2411,43 @@ export default function SignalsPage({
                                   </div>
 
                                   {/* Chips sugeridos de 1 clic */}
-                                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                    <span className="text-[10px] font-medium text-gray-400">Sugerencias rápidas:</span>
-                                    {[
-                                      "Prospección B2B",
-                                      "Inteligencia Artificial",
-                                      "Automatización",
-                                      "Cold Outreach",
-                                      "Generación de Leads",
-                                      "SaaS",
-                                    ].map((sug) => (
-                                      <button
-                                        key={sug}
-                                        type="button"
-                                        onClick={() => {
-                                          const current = postSearchKeywords.trim();
-                                          if (!current) {
-                                            setPostSearchKeywords(sug);
-                                          } else if (!current.toLowerCase().includes(sug.toLowerCase())) {
-                                            setPostSearchKeywords(`${current}, ${sug}`);
-                                          }
-                                        }}
-                                        className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-600 border border-gray-200 dark:border-gray-600 transition-colors"
-                                      >
-                                        + {sug}
-                                      </button>
-                                    ))}
+                                  <div className="space-y-1.5 mt-2">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="text-[10px] font-medium text-gray-400">Temas recomendados:</span>
+                                      {[
+                                        "Prospección B2B",
+                                        "Inteligencia Artificial",
+                                        "Automatización",
+                                        "Cold Outreach",
+                                        "Generación de Leads",
+                                        "SaaS",
+                                      ].map((sug) => {
+                                        const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
+                                        return (
+                                          <button
+                                            key={sug}
+                                            type="button"
+                                            onClick={() => {
+                                              if (isChipActive) {
+                                                setPostSearchKeywords("");
+                                              } else {
+                                                setPostSearchKeywords(sug);
+                                              }
+                                            }}
+                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                                              isChipActive
+                                                ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
+                                                : "bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-200 dark:border-gray-600"
+                                            }`}
+                                          >
+                                            {isChipActive ? `✓ ${sug}` : sug}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400">
+                                      💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
+                                    </p>
                                   </div>
                                 </div>
                               </div>

@@ -79,22 +79,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       unipileDatePosted = undefined;
     }
 
-    const searchParams: Record<string, unknown> = {
-      account_id: resolved.unipileAccountId,
-      api: "classic",
-      category: "posts",
-      limit: numericLimit,
-      keywords: queryString,
-      ...(unipileDatePosted ? { date_posted: unipileDatePosted } : {}),
-      ...(sort_by === "date" ? { sort_by: "date" } : {}),
+    // Procesar términos si vienen separados por comas
+    const rawKeywords = typeof keywords === "string" ? keywords.trim() : "";
+    const splitTerms = rawKeywords
+      .split(/[,;\n]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    // Formatear query con OR si son varios términos
+    let formattedKeywords = rawKeywords;
+    if (splitTerms.length > 1) {
+      formattedKeywords = splitTerms
+        .slice(0, 3)
+        .map((t) => (t.includes(" ") ? `"${t}"` : t))
+        .join(" OR ");
+    }
+
+    const queryParts: string[] = [];
+    if (competitor && typeof competitor === "string" && competitor.trim()) {
+      queryParts.push(competitor.trim());
+    }
+    if (formattedKeywords) {
+      queryParts.push(formattedKeywords);
+    }
+    const finalQuery = queryParts.join(" ").trim() || rawKeywords;
+
+    const executeSearch = async (q: string, dPosted?: "past_24h" | "past_week" | "past_month") => {
+      const searchParams: Record<string, unknown> = {
+        account_id: resolved.unipileAccountId,
+        api: "classic",
+        category: "posts",
+        limit: numericLimit,
+        keywords: q,
+        ...(dPosted ? { date_posted: dPosted } : {}),
+        ...(sort_by === "date" ? { sort_by: "date" } : {}),
+      };
+      const response = await unipile.searchLinkedIn(searchParams as any);
+      return (response.items || []).filter(
+        (item): item is UnipileSearchPost =>
+          Boolean(item && typeof item === "object" && (item as { type?: string }).type === "POST")
+      );
     };
 
-    const response = await unipile.searchLinkedIn(searchParams as any);
+    // 1º intento con los parámetros solicitados
+    let rawPosts = await executeSearch(finalQuery, unipileDatePosted).catch(() => []);
 
-    const rawPosts = (response.items || []).filter(
-      (item): item is UnipileSearchPost =>
-        Boolean(item && typeof item === "object" && (item as { type?: string }).type === "POST")
-    );
+    // Fallback 1: Si no hay resultados y había filtro de fecha, intentar sin filtro de fecha
+    if (rawPosts.length === 0 && unipileDatePosted) {
+      rawPosts = await executeSearch(finalQuery, undefined).catch(() => []);
+    }
+
+    // Fallback 2: Si aún no hay resultados y había múltiples términos, probar con el primer término individual
+    if (rawPosts.length === 0 && splitTerms.length > 0) {
+      const singleTerm = splitTerms[0];
+      const fallbackQuery = competitor ? `${competitor} ${singleTerm}` : singleTerm;
+      rawPosts = await executeSearch(fallbackQuery, undefined).catch(() => []);
+    }
+
+    // Fallback 3: Si sigue vacío y hay competidor solo, buscar publicaciones sobre el competidor
+    if (rawPosts.length === 0 && competitor && typeof competitor === "string" && competitor.trim()) {
+      rawPosts = await executeSearch(competitor.trim(), undefined).catch(() => []);
+    }
 
     const formattedPosts: DiscoveredPostItem[] = rawPosts.map((post) => ({
       id: post.id || post.social_id || "",
@@ -122,8 +167,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       success: true,
-      query: queryString,
+      query: finalQuery,
       count: formattedPosts.length,
+      posts: formattedPosts,
       items: formattedPosts,
     });
   } catch (error) {
