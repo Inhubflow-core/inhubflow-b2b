@@ -52,6 +52,7 @@ export const SignalLeadStatusSchema = z.enum(["pending", "approved", "rejected",
 
 export const SignalMonitorPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
+  type: z.string().optional(),
   status: z.enum(["active", "paused", "completed"]).optional(),
   mode: z.enum(["review", "autopilot"]).optional(),
   target_url: z.string().trim().max(10_000).nullable().optional(),

@@ -215,7 +215,7 @@ export class SignalRadarService {
     const current = this.getMonitor(id, actor);
     if (!current) return null;
     const allowed = [
-      "name", "status", "mode", "target_url", "competitor_name", "keywords_json",
+      "name", "type", "status", "mode", "target_url", "competitor_name", "keywords_json",
       "icp_filters_json", "target_list_id", "target_workflow_id", "message_config_json",
       "scan_interval_minutes", "next_scan_at", "account_id",
     ] as const;

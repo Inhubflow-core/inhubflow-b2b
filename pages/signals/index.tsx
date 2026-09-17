@@ -45,6 +45,7 @@ import {
   RiShareForwardLine,
   RiTimeLine,
   RiEditLine,
+  RiLinkedinBoxFill,
 } from "react-icons/ri";
 
 interface SignalMonitor {
@@ -590,13 +591,7 @@ export default function SignalsPage({
     setSelectedPostUrls((prev) => {
       const exists = prev.includes(shareUrl);
       const next = exists ? prev.filter((u) => u !== shareUrl) : [...prev, shareUrl];
-      if (next.length === 0) {
-        setNewTargetUrl("");
-      } else if (next.length === 1) {
-        setNewTargetUrl(next[0]);
-      } else {
-        setNewTargetUrl(JSON.stringify(next));
-      }
+      setNewTargetUrl(next.join("\n"));
       return next;
     });
   };
@@ -604,13 +599,7 @@ export default function SignalsPage({
   const handleSelectTopPosts = (count: number = 3) => {
     const top = discoveredPosts.slice(0, count).map((p) => p.shareUrl).filter(Boolean);
     setSelectedPostUrls(top);
-    if (top.length === 0) {
-      setNewTargetUrl("");
-    } else if (top.length === 1) {
-      setNewTargetUrl(top[0]);
-    } else {
-      setNewTargetUrl(JSON.stringify(top));
-    }
+    setNewTargetUrl(top.join("\n"));
   };
 
   const handleToggleExtraction = (kind: "comments" | "reactions") => {
@@ -718,12 +707,13 @@ export default function SignalsPage({
     setWizardStep(1);
     setNewName("");
     setNewType("post_engagement");
+    setSignalLevelFilter("ALL");
     setNewCompetitor("");
+    setPostSearchCompetitor("");
     setNewTargetUrl("");
     setSelectedPostUrls([]);
     setDiscoveredPosts([]);
     setPostSearchKeywords("");
-    setPostSearchCompetitor("");
     setIcpTitle("CEO, Director, Gerente General");
     setIcpCountry("Global / Todos");
     setIcpCity("");
@@ -737,6 +727,11 @@ export default function SignalsPage({
     ]);
     setExtractComments(true);
     setExtractReactions(true);
+    setMsgObjective("conversation");
+    setMsgTone("consultive");
+    setMsgLanguage("es");
+    setMsgMaxWords(90);
+    setCustomTemplate("");
     setNewMode("review");
     setScanIntervalMinutes(60);
     setShowNewModal(true);
@@ -744,32 +739,41 @@ export default function SignalsPage({
 
   const handleOpenEditWizard = (monitor: SignalMonitor) => {
     setEditingMonitorId(monitor.id);
+    setWizardStep(1);
     setNewName(monitor.name || "");
     setNewType(monitor.type || "post_engagement");
+    setSignalLevelFilter("ALL");
     if (monitor.account_id) setSelectedAccountId(monitor.account_id);
     if (monitor.target_list_id) setNewTargetList(monitor.target_list_id);
-    if (monitor.target_workflow_id) setNewTargetWorkflow(monitor.target_workflow_id);
+    setNewTargetWorkflow(monitor.target_workflow_id || "");
     setNewMode(monitor.mode || "review");
-    if (monitor.scan_interval_minutes) setScanIntervalMinutes(monitor.scan_interval_minutes);
-    setNewCompetitor(monitor.competitor_name || "");
-    setNewTargetUrl(monitor.target_url || "");
+    setScanIntervalMinutes(monitor.scan_interval_minutes || 60);
+
+    const compName = monitor.competitor_name || "";
+    setNewCompetitor(compName);
+    setPostSearchCompetitor(compName);
 
     // Parsear target_url si son posts seleccionados
+    let urls: string[] = [];
     if (monitor.target_url) {
       const trimmed = monitor.target_url.trim();
       if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
         try {
           const parsed = JSON.parse(trimmed);
-          if (Array.isArray(parsed)) setSelectedPostUrls(parsed.map(String));
+          if (Array.isArray(parsed)) {
+            urls = parsed.map(String).map((u) => u.trim()).filter(Boolean);
+          }
         } catch {
-          setSelectedPostUrls([trimmed]);
+          urls = [trimmed];
         }
       } else if (trimmed) {
-        setSelectedPostUrls([trimmed]);
+        const splitUrls = trimmed.split(/[\n,]+/).map((u) => u.trim()).filter((u) => u.startsWith("http"));
+        urls = splitUrls.length > 0 ? splitUrls : [trimmed];
       }
-    } else {
-      setSelectedPostUrls([]);
     }
+    setSelectedPostUrls(urls);
+    setNewTargetUrl(urls.join("\n"));
+    setDiscoveredPosts([]);
 
     if (monitor.type === "post_engagement") {
       setExtractComments(true);
@@ -780,60 +784,101 @@ export default function SignalsPage({
     } else if (monitor.type === "high_intent_comments") {
       setExtractComments(true);
       setExtractReactions(false);
+    } else {
+      setExtractComments(true);
+      setExtractReactions(true);
     }
 
     // Parsear keywords_json
     if (monitor.keywords_json) {
       try {
         const kws = JSON.parse(monitor.keywords_json);
-        if (Array.isArray(kws) && kws.length > 0) setKeywordsList(kws);
-      } catch {}
+        if (Array.isArray(kws) && kws.length > 0) {
+          setKeywordsList(kws);
+          setPostSearchKeywords(kws.join(", "));
+        } else {
+          setKeywordsList([]);
+          setPostSearchKeywords("");
+        }
+      } catch {
+        setKeywordsList([]);
+        setPostSearchKeywords("");
+      }
+    } else {
+      setKeywordsList([]);
+      setPostSearchKeywords("");
     }
 
     // Parsear icp_filters_json
     if (monitor.icp_filters_json) {
       try {
         const icp = JSON.parse(monitor.icp_filters_json);
-        if (Array.isArray(icp.titles)) setIcpTitle(icp.titles.join(", "));
-        if (Array.isArray(icp.company_sizes)) setIcpSizes(icp.company_sizes);
-        if (icp.company) setIcpCompany(icp.company);
-        else if (Array.isArray(icp.industries) && icp.industries.length) setIcpCompany(icp.industries.join(", "));
-        if (icp.time_window_days) setTimeWindowDays(icp.time_window_days);
-        if (icp.source_strategy) setSourceStrategy(icp.source_strategy);
+        setIcpTitle(Array.isArray(icp.titles) && icp.titles.length > 0 ? icp.titles.join(", ") : "");
+        setIcpSizes(Array.isArray(icp.company_sizes) ? icp.company_sizes : []);
+        setIcpCompany(icp.company || (Array.isArray(icp.industries) && icp.industries.length > 0 ? icp.industries.join(", ") : ""));
+        setTimeWindowDays(icp.time_window_days || 90);
+        setSourceStrategy(icp.source_strategy || "linkedin");
 
         if (Array.isArray(icp.locations) && icp.locations.length > 0) {
-          const countryFound = COUNTRIES_LIST.find((c) =>
-            icp.locations.some((l: string) => typeof l === "string" && l.toLowerCase().trim() === c.name.toLowerCase().trim())
-          );
-          if (countryFound) {
-            setIcpCountry(countryFound.name);
-            const remaining = icp.locations.filter((l: string) => typeof l === "string" && l.toLowerCase().trim() !== countryFound.name.toLowerCase().trim());
-            if (remaining.length) setIcpCity(remaining.join(", "));
-            else setIcpCity("");
+          const firstLoc = String(icp.locations[0]).trim();
+          const match = COUNTRIES_LIST.find((c) => {
+            if (c.name === "Global / Todos") return false;
+            const cNameLower = c.name.toLowerCase();
+            const locLower = firstLoc.toLowerCase();
+            return locLower === cNameLower || locLower.endsWith(`, ${cNameLower}`) || locLower.endsWith(` ${cNameLower}`);
+          });
+
+          if (match) {
+            setIcpCountry(match.name);
+            const cityPart = firstLoc.replace(new RegExp(`,?\\s*${match.name}$`, "i"), "").trim();
+            setIcpCity(cityPart);
           } else {
             setIcpCountry("Global / Todos");
-            setIcpCity(icp.locations.join(", "));
+            setIcpCity(firstLoc);
           }
         } else {
           setIcpCountry("Global / Todos");
           setIcpCity("");
         }
-      } catch {}
+      } catch {
+        setIcpTitle("");
+        setIcpCountry("Global / Todos");
+        setIcpCity("");
+        setIcpSizes([]);
+        setIcpCompany("");
+      }
+    } else {
+      setIcpTitle("");
+      setIcpCountry("Global / Todos");
+      setIcpCity("");
+      setIcpSizes([]);
+      setIcpCompany("");
     }
 
     // Parsear message_config_json
     if (monitor.message_config_json) {
       try {
         const msg = JSON.parse(monitor.message_config_json);
-        if (msg.objective) setMsgObjective(msg.objective);
-        if (msg.tone) setMsgTone(msg.tone);
-        if (msg.language) setMsgLanguage(msg.language);
-        if (msg.max_words) setMsgMaxWords(msg.max_words);
-        if (msg.custom_template) setCustomTemplate(msg.custom_template);
-      } catch {}
+        setMsgObjective(msg.objective || "conversation");
+        setMsgTone(msg.tone || "consultive");
+        setMsgLanguage(msg.language || "es");
+        setMsgMaxWords(msg.max_words || 90);
+        setCustomTemplate(msg.custom_template || "");
+      } catch {
+        setMsgObjective("conversation");
+        setMsgTone("consultive");
+        setMsgLanguage("es");
+        setMsgMaxWords(90);
+        setCustomTemplate("");
+      }
+    } else {
+      setMsgObjective("conversation");
+      setMsgTone("consultive");
+      setMsgLanguage("es");
+      setMsgMaxWords(90);
+      setCustomTemplate("");
     }
 
-    setWizardStep(1);
     setShowNewModal(true);
   };
 
@@ -957,6 +1002,7 @@ export default function SignalsPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: monitorName,
+            type: effectiveType,
             competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
             target_url: targetUrlToSend,
             keywords: keywordsList,
@@ -1598,7 +1644,7 @@ export default function SignalsPage({
                   Crea un monitor de señales para buscar evidencias reales o usa «Escanear ahora» en la pestaña de monitores.
                 </p>
                 <button
-                  onClick={() => setShowNewModal(true)}
+                  onClick={handleOpenNewWizard}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 transition-all shadow-xs"
                 >
                   <RiAddLine size={16} /> Crear Primer Monitor
@@ -2048,7 +2094,10 @@ export default function SignalsPage({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowNewModal(false)}
+                  onClick={() => {
+                    setShowNewModal(false);
+                    setEditingMonitorId(null);
+                  }}
                   className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <RiCloseLine size={22} />
@@ -2066,25 +2115,26 @@ export default function SignalsPage({
                   ].map((step, idx) => {
                     const isCurrent = wizardStep === step.num;
                     const isPast = wizardStep > step.num;
+                    const canNavigate = Boolean(editingMonitorId) || step.num <= wizardStep;
                     const StepIcon = step.icon;
                     return (
                       <div key={step.num} className="flex items-center flex-1 last:flex-none">
                         <button
                           type="button"
-                          disabled={step.num > wizardStep}
-                          onClick={() => step.num <= wizardStep && setWizardStep(step.num as 1 | 2 | 3 | 4)}
+                          disabled={!canNavigate}
+                          onClick={() => canNavigate && setWizardStep(step.num as 1 | 2 | 3 | 4)}
                           className="flex items-center gap-2 group text-left focus:outline-none"
                         >
                           <span
                             className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all ${
                               isCurrent
                                 ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500/30"
-                                : isPast
+                                : isPast || Boolean(editingMonitorId)
                                 ? "bg-emerald-500 text-white"
                                 : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-gray-300"
                             }`}
                           >
-                            {isPast ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
+                            {isPast || Boolean(editingMonitorId) ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
                           </span>
                           <div className="hidden sm:block">
                             <span
@@ -2498,7 +2548,10 @@ export default function SignalsPage({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setPostSearchMode("manual")}
+                                onClick={() => {
+                                  setPostSearchMode("manual");
+                                  setNewTargetUrl(selectedPostUrls.join("\n"));
+                                }}
                                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
                                   postSearchMode === "manual"
                                     ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
@@ -2516,6 +2569,75 @@ export default function SignalsPage({
                           {/* MODO BUSCADOR INTELIGENTE */}
                           {postSearchMode === "search" && (
                             <div className="space-y-4">
+                              {/* Publicaciones actualmente configuradas en el monitor */}
+                              {selectedPostUrls.length > 0 && (
+                                <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/80 dark:border-brand-900/60 space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                                        {selectedPostUrls.length}
+                                      </span>
+                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                        {selectedPostUrls.length === 1
+                                          ? "1 Publicación activa configurada"
+                                          : `${selectedPostUrls.length} Publicaciones activas configuradas`}
+                                      </span>
+                                      <span className="text-[10px] text-brand-700 dark:text-brand-300 font-medium hidden sm:inline">
+                                        (Señales que serán escaneadas)
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPostUrls([]);
+                                        setNewTargetUrl("");
+                                      }}
+                                      className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+                                    >
+                                      Limpiar todas
+                                    </button>
+                                  </div>
+
+                                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                                    {selectedPostUrls.map((url, idx) => (
+                                      <div
+                                        key={url + idx}
+                                        className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs shadow-2xs"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                          <RiLinkedinBoxFill className="text-brand-600 shrink-0" size={16} />
+                                          <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={url}>
+                                            {url}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
+                                          >
+                                            Ver post <RiExternalLinkLine size={10} />
+                                          </a>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const nextUrls = selectedPostUrls.filter((_, i) => i !== idx);
+                                              setSelectedPostUrls(nextUrls);
+                                              setNewTargetUrl(nextUrls.join("\n"));
+                                            }}
+                                            className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                            title="Quitar esta publicación"
+                                          >
+                                            <RiCloseLine size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3.5">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                   {/* Campo 1: Competidor o Marca */}
@@ -2843,31 +2965,41 @@ export default function SignalsPage({
                                   <input
                                     type="text"
                                     value={newCompetitor}
-                                    onChange={(e) => setNewCompetitor(e.target.value)}
+                                    onChange={(e) => {
+                                      setNewCompetitor(e.target.value);
+                                      setPostSearchCompetitor(e.target.value);
+                                    }}
                                     placeholder="Ej: HubSpot, Lemlist, Salesforce..."
                                     className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                    URL(s) de Publicaciones en LinkedIn *
-                                  </label>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
+                                      URL(s) de Publicaciones en LinkedIn *
+                                    </label>
+                                    <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                                      {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "publicación detectada" : "publicaciones detectadas"}
+                                    </span>
+                                  </div>
                                   <textarea
-                                    rows={2}
+                                    rows={3}
                                     value={newTargetUrl}
                                     onChange={(e) => {
                                       setNewTargetUrl(e.target.value);
-                                      // Si pega múltiples URLs
-                                      const urls = e.target.value.split(/[\n,]+/).map((u) => u.trim()).filter((u) => u.startsWith("http"));
+                                      const urls = e.target.value
+                                        .split(/[\n,]+/)
+                                        .map((u) => u.trim())
+                                        .filter((u) => u.startsWith("http"));
                                       setSelectedPostUrls(urls);
                                     }}
-                                    placeholder="Pega 1 o varias URLs de posts (separadas por saltos de línea)..."
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    placeholder="Pega una o más URLs de LinkedIn (una por línea)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
                                   />
                                 </div>
                               </div>
                               <p className="text-[10px] text-gray-400">
-                                Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...).
+                                Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
                               </p>
                             </div>
                           )}
@@ -3468,6 +3600,40 @@ export default function SignalsPage({
                           </strong>
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-200/60 dark:border-gray-700/60">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Disparador / Posts</span>
+                          <strong className="text-gray-800 dark:text-gray-200 truncate block" title={selectedPostUrls.join(", ")}>
+                            {selectedPostUrls.length > 0
+                              ? `${selectedPostUrls.length} publicación(es)`
+                              : newCompetitor.trim() || keywordsList[0] || "Configurado"}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Cuenta Remitente</span>
+                          <strong className="text-gray-800 dark:text-gray-200 truncate block">
+                            {accounts.find((a) => a.id === selectedAccountId)?.name || "Cuenta activa"}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Lista de Destino</span>
+                          <strong className="text-gray-800 dark:text-gray-200 truncate block">
+                            {lists.find((l) => l.id === newTargetList)?.name || "Sin lista"}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block">Frecuencia</span>
+                          <strong className="text-gray-800 dark:text-gray-200 block">
+                            {scanIntervalMinutes === 60
+                              ? "Cada 1 hora"
+                              : scanIntervalMinutes === 360
+                              ? "Cada 6 horas"
+                              : scanIntervalMinutes === 720
+                              ? "Cada 12 horas"
+                              : "Cada 24 horas"}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3479,7 +3645,10 @@ export default function SignalsPage({
                   {wizardStep === 1 ? (
                     <button
                       type="button"
-                      onClick={() => setShowNewModal(false)}
+                      onClick={() => {
+                        setShowNewModal(false);
+                        setEditingMonitorId(null);
+                      }}
                       className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
                     >
                       Cancelar
