@@ -28,27 +28,50 @@ export interface SignalScannerClient {
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
 }
 
+function cleanSingleUrl(str: string): string {
+  return str.replace(/^["'\[\s\\]+|["'\]\s\\]+$/g, "").trim();
+}
+
 function postIdentifier(value: string): string | null {
-  if (!value || !value.trim()) return null;
-  const decoded = decodeURIComponent(value.trim());
-  if (/^[0-9]+$/.test(decoded)) return decoded;
-  const urn = decoded.match(/urn:li:(?:activity|share|ugcPost):([0-9]+)/i);
-  if (urn) return urn[1];
-  const activity = decoded.match(/(?:activity-|activity:)([0-9]+)/i);
-  if (activity) return activity[1];
-  const generalId = decoded.match(/(?:posts\/|detail\/recent-activity\/shares\/|update\/urn:li:activity:)([0-9]+)/i);
-  if (generalId) return generalId[1];
+  if (!value || typeof value !== "string") return null;
+  const cleaned = cleanSingleUrl(value);
+  if (!cleaned) return null;
+  const decoded = decodeURIComponent(cleaned);
+
+  // 1. ID puramente numérico (10 a 25 dígitos)
+  if (/^[0-9]{10,25}$/.test(decoded)) return decoded;
+
+  // 2. Formato URN estándar (activity, share, ugcPost)
+  const urnMatch = decoded.match(/urn:li:(?:activity|share|ugcPost):([0-9]{10,25})/i);
+  if (urnMatch) return urnMatch[1];
+
+  // 3. Prefijos en URLs con guión o dos puntos (activity-724..., ugcPost-724..., share-724...)
+  const prefixMatch = decoded.match(/(?:activity|share|ugcPost)[-:_]([0-9]{10,25})/i);
+  if (prefixMatch) return prefixMatch[1];
+
+  // 4. URLs de updates, posts, shares
+  const updateMatch = decoded.match(/(?:update|posts|shares)\/(?:urn:li:[a-z]+:)?([0-9]{10,25})/i);
+  if (updateMatch) return updateMatch[1];
+
+  // 5. Fallback por longitud típica de LinkedIn Activity/Post IDs (16 a 22 dígitos)
+  const longDigits = decoded.match(/([0-9]{16,22})/);
+  if (longDigits) return longDigits[1];
+
+  // 6. Fallback general: cualquier secuencia de 10 a 25 dígitos
+  const digitsMatch = decoded.match(/([0-9]{10,25})/);
+  if (digitsMatch) return digitsMatch[1];
+
   return null;
 }
 
 function parseTargetUrls(raw?: string | null): string[] {
-  if (!raw || !raw.trim()) return [];
+  if (!raw || typeof raw !== "string" || !raw.trim()) return [];
   const trimmed = raw.trim();
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter(Boolean);
+        return parsed.map((item) => cleanSingleUrl(String(item))).filter(Boolean);
       }
     } catch {
       // fallback to delimiter split
@@ -56,7 +79,7 @@ function parseTargetUrls(raw?: string | null): string[] {
   }
   return trimmed
     .split(/[\n,]+/)
-    .map((item) => item.trim())
+    .map((item) => cleanSingleUrl(item))
     .filter(Boolean);
 }
 
@@ -178,12 +201,40 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
     const shouldFetchReactions = context.monitor.type !== "high_intent_comments";
 
     const [comments, reactions] = await Promise.all([
-      shouldFetchComments
-        ? client.getPostComments(id, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }))
-        : Promise.resolve({ items: [] }),
-      shouldFetchReactions
-        ? client.getPostReactions(id, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }))
-        : Promise.resolve({ items: [] }),
+      (async () => {
+        if (!shouldFetchComments) return { items: [] };
+        try {
+          const res = await client.getPostComments(id, context.remoteAccountId, limitPerPost);
+          if (res?.items?.length) return res;
+          if (/^[0-9]+$/.test(id)) {
+            const urnRes = await client.getPostComments(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
+            if (urnRes?.items?.length) return urnRes;
+          }
+          return res || { items: [] };
+        } catch {
+          if (/^[0-9]+$/.test(id)) {
+            return client.getPostComments(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
+          }
+          return { items: [] };
+        }
+      })(),
+      (async () => {
+        if (!shouldFetchReactions) return { items: [] };
+        try {
+          const res = await client.getPostReactions(id, context.remoteAccountId, limitPerPost);
+          if (res?.items?.length) return res;
+          if (/^[0-9]+$/.test(id)) {
+            const urnRes = await client.getPostReactions(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
+            if (urnRes?.items?.length) return urnRes;
+          }
+          return res || { items: [] };
+        } catch {
+          if (/^[0-9]+$/.test(id)) {
+            return client.getPostReactions(`urn:li:activity:${id}`, context.remoteAccountId, limitPerPost).catch(() => ({ items: [] }));
+          }
+          return { items: [] };
+        }
+      })(),
     ]);
 
     for (const comment of comments.items || []) {

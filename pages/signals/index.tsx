@@ -1647,16 +1647,34 @@ export default function SignalsPage({
                         </p>
                       )}
 
-                      {m.target_url && (
-                        <a
-                          href={m.target_url.startsWith("http") ? m.target_url : `https://${m.target_url}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 truncate"
-                        >
-                          <RiExternalLinkLine size={12} className="shrink-0" /> {m.target_url}
-                        </a>
-                      )}
+                      {m.target_url && (() => {
+                        let displayUrl = m.target_url.trim();
+                        let isMulti = false;
+                        let count = 1;
+                        if (displayUrl.startsWith("[") && displayUrl.endsWith("]")) {
+                          try {
+                            const parsed = JSON.parse(displayUrl);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                              count = parsed.length;
+                              displayUrl = String(parsed[0]);
+                              isMulti = count > 1;
+                            }
+                          } catch {}
+                        }
+                        displayUrl = displayUrl.replace(/^["'\[\s\\]+|["'\]\s\\]+$/g, "");
+                        const href = displayUrl.startsWith("http") ? displayUrl : `https://${displayUrl}`;
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1 truncate"
+                          >
+                            <RiExternalLinkLine size={12} className="shrink-0" />
+                            {isMulti ? `${count} publicaciones monitoreadas` : displayUrl}
+                          </a>
+                        );
+                      })()}
 
                       <div className="pt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800">
                         <span>Total captados: <strong className="text-gray-900 dark:text-white">{m.total_leads || 0}</strong></span>
