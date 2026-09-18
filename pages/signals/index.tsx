@@ -48,6 +48,7 @@ import {
   RiUserAddLine,
   RiArrowUpLine,
   RiEyeLine,
+  RiMegaphoneLine,
   RiLinkedinBoxFill,
 } from "react-icons/ri";
 
@@ -2818,8 +2819,8 @@ export default function SignalsPage({
                                     onChange={(e) => setPostSearchSortBy(e.target.value as any)}
                                     className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                                   >
-                                    <option value="engagement">🔥 Mayor Viralidad (Likes + Comentarios)</option>
-                                    <option value="date">🕒 Más Recientes</option>
+                                    <option value="engagement">Mayor Viralidad (Likes + Comentarios)</option>
+                                    <option value="date">Más Recientes</option>
                                   </select>
                                 </div>
                               </div>
@@ -3310,11 +3311,30 @@ export default function SignalsPage({
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             {[
-                              { id: "funding_round", icon: "💰", title: "Rondas de Inversión", desc: "Financiamiento reciente" },
-                              { id: "company_news", icon: "📢", title: "Expansión / Noticias", desc: "Nuevas aperturas y lanzamientos" },
-                              { id: "acquisition_event", icon: "🤝", title: "Fusiones & Compras", desc: "Reestructuración y nuevo stack" },
+                              {
+                                id: "funding_round",
+                                icon: RiLineChartLine,
+                                iconColor: "text-emerald-500",
+                                title: "Rondas de Inversión",
+                                desc: "Financiamiento reciente",
+                              },
+                              {
+                                id: "company_news",
+                                icon: RiMegaphoneLine,
+                                iconColor: "text-rose-500",
+                                title: "Expansión / Noticias",
+                                desc: "Nuevas aperturas y lanzamientos",
+                              },
+                              {
+                                id: "acquisition_event",
+                                icon: RiExchangeLine,
+                                iconColor: "text-indigo-500",
+                                title: "Fusiones & Compras",
+                                desc: "Reestructuración y nuevo stack",
+                              },
                             ].map((ev) => {
                               const isActive = selectedMarketEvents.includes(ev.id);
+                              const Icon = ev.icon;
                               return (
                                 <button
                                   key={ev.id}
@@ -3327,7 +3347,7 @@ export default function SignalsPage({
                                   }`}
                                 >
                                   <div className="flex items-center justify-between">
-                                    <span className="text-sm">{ev.icon}</span>
+                                    <Icon size={18} className={`${ev.iconColor} shrink-0`} />
                                     <div
                                       className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
                                         isActive
