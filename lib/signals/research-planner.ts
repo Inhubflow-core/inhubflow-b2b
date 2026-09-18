@@ -117,10 +117,10 @@ export function deterministicSignalResearchPlan(query: string): SignalResearchPl
     window = 30;
   } else if (/fondos?|inversi[oó]n|ronda|funding|capital/i.test(normalized)) {
     signalType = "funding_round";
-    keywords = ["levantó inversión", "ronda de inversión", "funding round", "capital levantado"];
+    keywords = ["levantó inversión", "ronda de inversión", "funding round", "capital levantado", "Serie A", "capital semilla"];
     eventKinds = ["funding_round"];
     sourceStrategy = "hybrid";
-    window = 30;
+    window = 180;
   }
 
   if (keywords.length === 0) {
@@ -200,6 +200,7 @@ export async function planSignalResearch(query: string): Promise<SignalResearchP
 No inventes resultados ni nombres de personas. Sólo define filtros.
 Elige keyword_intent para publicaciones con dolor o compra; funding_round para inversión/rondas; company_news para anuncios/lanzamientos; acquisition_event para adquisiciones; industry_event para eventos; active_poster para autores recientes; new_in_role/internal_promotion para cambios profesionales; hiring_spree/company_growth para empresas; profile_viewers sólo si se solicita explícitamente.
 Usa source_strategy=hybrid para funding/noticias/adquisiciones/eventos, linkedin para señales sociales, y web sólo si el usuario pide expresamente investigación exclusivamente web.
+Para funding_round o rondas de inversión, usa time_window_days entre 180 y 365 días para capturar suficientes empresas reales en crecimiento.
 Conserva el número máximo solicitado por el usuario en result_limit (1-100), event_kinds, keywords útiles y separa cargos, ubicaciones, tamaños y exclusiones.`,
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,

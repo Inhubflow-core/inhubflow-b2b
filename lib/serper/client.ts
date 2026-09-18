@@ -75,7 +75,7 @@ export class WebSearchClient {
 
   async search(input: WebSearchInput): Promise<WebSearchResponse> {
     if (!this.apiKey) throw new WebSearchProviderError("La fuente web no está configurada", "missing_credentials", false);
-    const limit = Math.max(1, Math.min(input.limit || 10, 10));
+    const limit = Math.max(1, Math.min(input.limit || 10, 50));
     const payload: Record<string, unknown> = {
       q: input.query,
       gl: input.country || "us",

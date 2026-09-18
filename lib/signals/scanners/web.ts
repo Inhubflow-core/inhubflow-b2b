@@ -180,11 +180,27 @@ function locationCode(icp: SignalIcpFilters): string {
   return codes[value] || "us";
 }
 
+function locationQueryTerm(location: string): string {
+  const norm = normalize(location);
+  const DEMONYMS: Record<string, string> = {
+    chile: '("Chile" OR "chilena" OR "chileno")',
+    colombia: '("Colombia" OR "colombiana" OR "colombiano")',
+    mexico: '("México" OR "mexicana" OR "mexicano" OR "Mexico")',
+    argentina: '("Argentina" OR "argentina" OR "argentino")',
+    espana: '("España" OR "española" OR "español" OR "Spain")',
+    spain: '("España" OR "española" OR "español" OR "Spain")',
+    peru: '("Perú" OR "peruana" OR "peruano" OR "Peru")',
+    brasil: '("Brasil" OR "brasileña" OR "Brazil")',
+    brazil: '("Brasil" OR "brasileña" OR "Brazil")',
+  };
+  return DEMONYMS[norm] || `"${location}"`;
+}
+
 function webQuery(context: SignalScannerContext): string {
   const titles = context.icp.titles?.length ? `(${context.icp.titles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
-  const location = context.icp.locations?.length ? `"${context.icp.locations[0]}"` : "";
+  const location = context.icp.locations?.length ? locationQueryTerm(context.icp.locations[0]) : "";
   const terms: Record<string, string> = {
-    funding_round: '("funding round" OR "raised funding" OR "ronda de inversión" OR "levantó inversión" OR "recaudó")',
+    funding_round: '("ronda de inversión" OR "levantó inversión" OR "financiamiento" OR "capital semilla" OR "Serie A" OR "funding round" OR "raised funding")',
     acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió)',
     industry_event: '(conference OR summit OR event OR conferencia OR feria)',
     company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión)',
@@ -210,7 +226,7 @@ function webQuery(context: SignalScannerContext): string {
   return [queryTerms, titles, location].filter(Boolean).join(" ");
 }
 
-const MAX_SERPER_SEARCHES_PER_SCAN = 4;
+const MAX_SERPER_SEARCHES_PER_SCAN = 8;
 const SERPER_COURTESY_DELAY_MS = 350;
 const MAX_LEADS_PER_ARTICLE = 2;
 
@@ -287,12 +303,17 @@ export async function scanWebSignals(
   if (!web.isConfigured()) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);
   const query = webQuery(context);
   if (!query.trim()) throw new SignalScanError("La búsqueda web necesita palabras clave", "invalid_configuration", false);
+  const articleLimit = Math.max(20, Math.min(context.limit * 3, 30));
+  const effectiveWindowDays = context.icp.time_window_days && context.icp.time_window_days > 30
+    ? context.icp.time_window_days
+    : (context.monitor.type === "funding_round" ? 180 : (context.icp.time_window_days || 60));
+
   const response = await web.search({
     query,
     country: locationCode(context.icp),
     language: "es",
-    limit: 10,
-    timeRange: timeRange(context.icp.time_window_days || 30),
+    limit: articleLimit,
+    timeRange: timeRange(effectiveWindowDays),
   });
   const articles = response.items.filter(acceptableSource);
   const leads: DiscoveredSignalLead[] = [];
