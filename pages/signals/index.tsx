@@ -3358,7 +3358,7 @@ export default function SignalsPage({
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
+                                        <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
                                           {ev.badge}
                                         </span>
                                         <div
@@ -3372,9 +3372,9 @@ export default function SignalsPage({
                                         </div>
                                       </div>
                                     </div>
-                                    <span className="text-xs block leading-tight font-normal text-gray-900 dark:text-white">
+                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {ev.title}
-                                    </span>
+                                    </strong>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {ev.desc}
                                     </p>
@@ -3510,7 +3510,7 @@ export default function SignalsPage({
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className={`${sig.iconColor} shrink-0`} size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
+                                        <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
                                           {sig.badge}
                                         </span>
                                         <div
@@ -3524,9 +3524,9 @@ export default function SignalsPage({
                                         </div>
                                       </div>
                                     </div>
-                                    <span className="text-xs block leading-tight font-normal text-gray-900 dark:text-white">
+                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {sig.title}
-                                    </span>
+                                    </strong>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {sig.desc}
                                     </p>
