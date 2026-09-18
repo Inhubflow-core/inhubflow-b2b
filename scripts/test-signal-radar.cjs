@@ -26,7 +26,7 @@ const { SignalRadarService } = require("../lib/signals/service.ts");
 const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/scanners/index.ts");
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
-const { scanWebSignals, companyMatches } = require("../lib/signals/scanners/web.ts");
+const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
 const { extractCompanyFromHeadline } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
@@ -381,6 +381,22 @@ async function run() {
     assert.equal(companyMatches("Integral Inc", "Integral"), true);
     assert.equal(companyMatches("Integral Tech S.P.A.", "Integral"), true);
     assert.equal(companyMatches("Betterfly Health", "Betterfly"), true);
+  }
+
+  console.log("▶ Detección de co-fundadores y socios desde artículos de noticias");
+  {
+    const founders = extractFoundersFromArticle(
+      "Latin American Legal AI Startup Magnar Announces $8M Series A. La legaltech fundada por Andrés Arellano, Nicolás López y Andrés Rodríguez levantó capital liderado por fondos globales."
+    );
+    assert.ok(founders.includes("Andrés Arellano"), "Debe incluir a Andrés Arellano");
+    assert.ok(founders.includes("Nicolás López"), "Debe incluir a Nicolás López");
+    assert.ok(founders.includes("Andrés Rodríguez"), "Debe incluir a Andrés Rodríguez");
+
+    const titles = effectiveTitles(["CEO"], "funding_round");
+    assert.ok(titles.includes("CEO"), "Debe incluir CEO");
+    assert.ok(titles.includes("Co-Founder"), "Debe incluir Co-Founder");
+    assert.ok(titles.includes("Founder"), "Debe incluir Founder");
+    assert.ok(titles.includes("Socio Fundador"), "Debe incluir Socio Fundador");
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

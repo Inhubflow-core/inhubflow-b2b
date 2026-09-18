@@ -97,10 +97,49 @@ function extractAmount(text: string): string | null {
   return match?.[0] || null;
 }
 
-function titleMatches(headline: string | null | undefined, titles: string[]): boolean {
+export function extractFoundersFromArticle(text: string): string[] {
+  const founders: string[] = [];
+  const patterns = [
+    /(?:fundad[oa] por|founded by|co-founders?|cofundadores?|socios?)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?(?:\s*,\s*[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)*(?:\s+(?:y|and)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?))/gi,
+    /(?:co-founder and CEO|CEO and co-founder|founder and CEO|co-founder|founder|CEO|fundador(?:a)? y CEO|director(?:a)? ejecutivo|fundador(?:a)?|co-fundador(?:a)?)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,2})/gi,
+  ];
+
+  for (const pattern of patterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      if (match[1]) {
+        const rawNames = match[1].split(/\s*(?:,| y | and )\s*/i);
+        for (const raw of rawNames) {
+          const clean = raw.replace(/[^\w\sÁÉÍÓÚÑáéíóúñ]/g, "").trim();
+          if (clean.length >= 4 && clean.split(/\s+/).length >= 2 && !founders.includes(clean)) {
+            founders.push(clean);
+          }
+        }
+      }
+    }
+  }
+  return founders;
+}
+
+export function effectiveTitles(requestedTitles: string[] | undefined, signalType: string): string[] {
+  const base = requestedTitles && requestedTitles.length > 0 ? [...requestedTitles] : ["CEO", "Founder"];
+  const isFounderQuery = base.some((t) => /ceo|founder|fundador|director|socio|co-founder|cofundador/i.test(t));
+  if (isFounderQuery || ["funding_round", "company_growth", "acquisition_event"].includes(signalType)) {
+    const founderVariants = ["CEO", "Founder", "Co-Founder", "Cofundador", "Co-Fundador", "Socio Fundador", "Partner"];
+    for (const v of founderVariants) {
+      if (!base.some((b) => b.toLowerCase() === v.toLowerCase())) {
+        base.push(v);
+      }
+    }
+  }
+  return base;
+}
+
+function titleMatches(headline: string | null | undefined, titles: string[], signalType = "funding_round"): boolean {
   if (titles.length === 0) return true;
   const normalized = normalize(headline);
-  return titles.some((title) => normalized.includes(normalize(title)));
+  const effTitles = effectiveTitles(titles, signalType);
+  return effTitles.some((title) => normalized.includes(normalize(title)));
 }
 
 const CORPORATE_SUFFIXES = new Set([
@@ -228,7 +267,7 @@ function webQuery(context: SignalScannerContext): string {
 
 const MAX_SERPER_SEARCHES_PER_SCAN = 8;
 const SERPER_COURTESY_DELAY_MS = 350;
-const MAX_LEADS_PER_ARTICLE = 2;
+const MAX_LEADS_PER_ARTICLE = 3;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -246,9 +285,34 @@ async function findPeople(
   company: string,
   locationIds: string[] = [],
   budget?: SerperBudget,
+  namedFounders: string[] = [],
 ): Promise<Array<{ url: string; name: string; providerId?: string | null; company?: string }>> {
-  const titles = context.icp.titles?.length ? context.icp.titles : ["CEO", "Founder"];
+  const titles = effectiveTitles(context.icp.titles, context.monitor.type);
   const candidates: Array<{ url: string; name: string; providerId?: string | null; company?: string }> = [];
+
+  // Paso 1: Si la noticia menciona socios o co-fundadores por nombre, buscarlos directamente en LinkedIn
+  for (const founderName of namedFounders) {
+    const parts = founderName.split(/\s+/);
+    if (parts.length < 2) continue;
+    try {
+      const resp = await linkedIn.searchLinkedIn({
+        account_id: context.remoteAccountId,
+        api: "classic",
+        category: "people",
+        limit: 3,
+        advanced_keywords: { title: titles.join(" OR "), company, first_name: parts[0], last_name: parts.slice(1).join(" ") },
+        ...(locationIds.length ? { location: locationIds } : {}),
+      });
+      for (const person of resp.items.filter(personCandidate)) {
+        const url = person.profile_url || person.public_profile_url || (person.public_identifier ? `https://www.linkedin.com/in/${person.public_identifier}/` : "");
+        if (url && person.name && !candidates.some((c) => c.url === url)) {
+          candidates.push({ url, name: person.name, providerId: person.id, company });
+        }
+      }
+    } catch {}
+  }
+
+  // Paso 2: Búsqueda amplia en LinkedIn para el comité fundador / socios
   try {
     const response = await linkedIn.searchLinkedIn({
       account_id: context.remoteAccountId,
@@ -260,14 +324,16 @@ async function findPeople(
     });
     for (const person of response.items.filter(personCandidate)) {
       const url = person.profile_url || person.public_profile_url || (person.public_identifier ? `https://www.linkedin.com/in/${person.public_identifier}/` : "");
-      if (url && person.name) candidates.push({ url, name: person.name, providerId: person.id, company });
+      if (url && person.name && !candidates.some((c) => c.url === url)) {
+        candidates.push({ url, name: person.name, providerId: person.id, company });
+      }
     }
   } catch {
     // X-Ray fallback below still verifies every candidate through LinkedIn profile retrieval.
   }
   if (candidates.length > 0) return candidates;
 
-  // Límite de presupuesto Serper por scan run para proteger créditos y evitar 429
+  // Paso 3: Fallback X-Ray para la empresa y socios
   if (budget && budget.searchesUsed >= budget.maxSearches) {
     return candidates;
   }
@@ -288,7 +354,9 @@ async function findPeople(
       const match = url.pathname.match(/\/in\/([^/]+)/i);
       if (!match) continue;
       const rawName = result.title.replace(/\s*[-|].*$/, "").trim();
-      if (rawName) candidates.push({ url: `https://www.linkedin.com/in/${match[1]}/`, name: rawName, company });
+      if (rawName && !candidates.some((c) => c.url.includes(match[1]))) {
+        candidates.push({ url: `https://www.linkedin.com/in/${match[1]}/`, name: rawName, company });
+      }
     } catch {}
   }
   return candidates;
@@ -337,8 +405,9 @@ export async function scanWebSignals(
     seenArticles.add(canonical);
     const company = extractCompany(article, context.monitor.type);
     if (!company) continue;
+    const namedFounders = extractFoundersFromArticle(`${article.title} ${article.snippet || ""}`);
     let people: Awaited<ReturnType<typeof findPeople>>;
-    try { people = await findPeople(linkedIn, web, context, company, locationIds, budget); }
+    try { people = await findPeople(linkedIn, web, context, company, locationIds, budget, namedFounders); }
     catch { continue; }
     let articleLeadsCount = 0;
     for (const candidate of people) {
@@ -357,7 +426,7 @@ export async function scanWebSignals(
 
         if (!companyVerified) continue;
         const headline = profile.headline || current?.position || null;
-        if (!titleMatches(headline, context.icp.titles || [])) continue;
+        if (!titleMatches(headline, context.icp.titles || [], context.monitor.type)) continue;
         const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || candidate.name;
         const profileUrl = profile.public_profile_url || profile.profile_url || candidate.url;
         const snippet = [article.title, article.snippet].filter(Boolean).join(" — ").slice(0, 500);
