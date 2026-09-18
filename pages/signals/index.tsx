@@ -45,6 +45,9 @@ import {
   RiShareForwardLine,
   RiTimeLine,
   RiEditLine,
+  RiUserAddLine,
+  RiArrowUpLine,
+  RiEyeLine,
   RiLinkedinBoxFill,
 } from "react-icons/ri";
 
@@ -2275,7 +2278,7 @@ export default function SignalsPage({
         {/* Modal: Wizard de Creación de Monitor */}
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
-            <div className="w-full max-w-4xl max-h-[92vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+            <div className="w-full max-w-5xl xl:max-w-6xl h-[88vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
               {/* 1. Cabecera Principal del Modal */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                 <div className="flex items-center gap-3">
@@ -2305,7 +2308,7 @@ export default function SignalsPage({
 
               {/* 2. Barra de Progreso del Wizard (Stepper) */}
               <div className="px-6 py-3.5 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/60 dark:bg-gray-850/50">
-                <div className="flex items-center justify-between max-w-3xl mx-auto">
+                <div className="flex items-center justify-between max-w-4xl mx-auto">
                   {[
                     { num: 1, label: "Definir ICP", icon: RiUserSearchLine },
                     { num: 2, label: "Disparador", icon: RiRadarLine },
@@ -3135,71 +3138,6 @@ export default function SignalsPage({
                             </p>
                           </div>
                         )}
-
-                        {/* Opciones de Extracción Dual (Comentarios + Reacciones) */}
-                        <div className="p-3.5 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2">
-                          <span className="block text-[11px] font-bold text-gray-800 dark:text-gray-200">
-                            ¿Qué perfiles deseas captar de las publicaciones seleccionadas?
-                          </span>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            <label
-                              onClick={() => handleToggleExtraction("comments")}
-                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                                extractComments
-                                  ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200"
-                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
-                              }`}
-                            >
-                              <div className="pt-0.5">
-                                <div
-                                  className={`w-4 h-4 rounded-md border flex items-center justify-center ${
-                                    extractComments ? "bg-blue-600 border-blue-600 text-white" : "border-gray-400"
-                                  }`}
-                                >
-                                  {extractComments && <RiCheckLine size={12} />}
-                                </div>
-                              </div>
-                              <div>
-                                <strong className="text-xs block">💬 Comentarios (Lead Magnets / Debates)</strong>
-                                <span className="text-[10px] opacity-80 block">
-                                  Prospectos que escribieron pidiendo recursos o debatiendo problemas clave.
-                                </span>
-                              </div>
-                            </label>
-
-                            <label
-                              onClick={() => handleToggleExtraction("reactions")}
-                              className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                                extractReactions
-                                  ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200"
-                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/60 text-gray-500 opacity-70"
-                              }`}
-                            >
-                              <div className="pt-0.5">
-                                <div
-                                  className={`w-4 h-4 rounded-md border flex items-center justify-center ${
-                                    extractReactions ? "bg-amber-600 border-amber-600 text-white" : "border-gray-400"
-                                  }`}
-                                >
-                                  {extractReactions && <RiCheckLine size={12} />}
-                                </div>
-                              </div>
-                              <div>
-                                <strong className="text-xs block">👍 Reacciones / Likes</strong>
-                                <span className="text-[10px] opacity-80 block">
-                                  Decisores que dieron Like, Insightful, Celebrate o Support.
-                                </span>
-                              </div>
-                            </label>
-                          </div>
-                          <p className="text-[10px] text-gray-400 pt-0.5">
-                            {extractComments && extractReactions
-                              ? "⚡ Modo Unificado Activo: Se captarán tanto comentaristas como personas que reaccionaron en un solo monitor sin duplicados."
-                              : extractComments
-                              ? "Se captarán únicamente comentaristas."
-                              : "Se captarán únicamente personas que dieron Like o reaccionaron."}
-                          </p>
-                        </div>
                       </div>
                     )}
 
@@ -3424,7 +3362,6 @@ export default function SignalsPage({
                         <div className="p-3.5 rounded-2xl bg-linear-to-r from-emerald-50/80 via-teal-50/50 to-blue-50/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-blue-950/20 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs space-y-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-base">🎯</span>
                               <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
                                 Filtros ICP del Paso 1 en Ejecución Automática
                               </span>
@@ -3459,8 +3396,8 @@ export default function SignalsPage({
                         <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                                <span>⚡</span> Señales Automáticas de Decisores (Nivel 3)
+                              <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                                Señales Automáticas de Decisores (Nivel 3)
                               </h4>
                               <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
                                 Selecciona 1 o más eventos. El sistema rastreará periódicamente LinkedIn buscando personas que cumplan estas condiciones:
@@ -3495,7 +3432,8 @@ export default function SignalsPage({
                             {[
                               {
                                 id: "new_in_role",
-                                icon: "🚀",
+                                icon: RiUserAddLine,
+                                iconColor: "text-emerald-500",
                                 title: "Just Hired / Nuevo Cargo (<90 Días)",
                                 badge: "Ventana Dorada",
                                 badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
@@ -3503,7 +3441,8 @@ export default function SignalsPage({
                               },
                               {
                                 id: "internal_promotion",
-                                icon: "📈",
+                                icon: RiArrowUpLine,
+                                iconColor: "text-purple-500",
                                 title: "Ascenso Interno a Decisor",
                                 badge: "Poder de Firma",
                                 badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
@@ -3511,7 +3450,8 @@ export default function SignalsPage({
                               },
                               {
                                 id: "hiring_spree",
-                                icon: "💼",
+                                icon: RiBriefcaseLine,
+                                iconColor: "text-orange-500",
                                 title: "Hiring Intent (Contratación Activa)",
                                 badge: "Presupuesto Abierto",
                                 badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
@@ -3519,7 +3459,8 @@ export default function SignalsPage({
                               },
                               {
                                 id: "company_growth",
-                                icon: "📊",
+                                icon: RiLineChartLine,
+                                iconColor: "text-teal-500",
                                 title: "Empresas en Hipercrecimiento (+20%)",
                                 badge: "Expansión Rápida",
                                 badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
@@ -3527,7 +3468,8 @@ export default function SignalsPage({
                               },
                               {
                                 id: "profile_viewers",
-                                icon: "👁️",
+                                icon: RiEyeLine,
+                                iconColor: "text-fuchsia-500",
                                 title: "Visitantes Recientes de tu Perfil",
                                 badge: "Interés Directo",
                                 badgeBg: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
@@ -3535,7 +3477,8 @@ export default function SignalsPage({
                               },
                               {
                                 id: "active_poster",
-                                icon: "🔥",
+                                icon: RiFireLine,
+                                iconColor: "text-rose-500",
                                 title: "Más Activos en tu ICP (<48h)",
                                 badge: "Bandeja Caliente",
                                 badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
@@ -3543,6 +3486,7 @@ export default function SignalsPage({
                               },
                             ].map((sig) => {
                               const isSelected = selectedIcpSignals.includes(sig.id);
+                              const Icon = sig.icon;
                               return (
                                 <button
                                   key={sig.id}
@@ -3556,7 +3500,7 @@ export default function SignalsPage({
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                                      <span className="text-base">{sig.icon}</span>
+                                      <Icon className={`${sig.iconColor} shrink-0`} size={18} />
                                       <div className="flex items-center gap-1.5">
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
                                           {sig.badge}
