@@ -3285,12 +3285,17 @@ export default function SignalsPage({
                         </div>
 
                         {/* 3. Eventos Disparadores de Mercado (Trigger Events) */}
-                        <div className="space-y-2">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                              Eventos Disparadores de Mercado (Trigger Events)
-                            </label>
-                            <div className="flex items-center gap-2">
+                            <div>
+                              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                Eventos Disparadores de Mercado (Trigger Events)
+                              </span>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3300,38 +3305,39 @@ export default function SignalsPage({
                                     setSelectedMarketEvents(["funding_round", "company_news", "acquisition_event"]);
                                   }
                                 }}
-                                className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
                                 {selectedMarketEvents.length === 3 ? "Deseleccionar todos" : "Seleccionar los 3"}
                               </button>
                               <span className="text-gray-300 dark:text-gray-600">|</span>
-                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
                             </div>
                           </div>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
-                          </p>
+
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             {[
                               {
                                 id: "funding_round",
                                 icon: RiLineChartLine,
-                                iconColor: "text-emerald-500",
                                 title: "Rondas de Inversión",
+                                badge: "Rondas de Capital",
+                                badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
                                 desc: "Financiamiento reciente",
                               },
                               {
                                 id: "company_news",
                                 icon: RiMegaphoneLine,
-                                iconColor: "text-rose-500",
                                 title: "Expansión / Noticias",
+                                badge: "Expansión Rápida",
+                                badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
                                 desc: "Nuevas aperturas y lanzamientos",
                               },
                               {
                                 id: "acquisition_event",
                                 icon: RiExchangeLine,
-                                iconColor: "text-indigo-500",
                                 title: "Fusiones & Compras",
+                                badge: "Fusiones / M&A",
+                                badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
                                 desc: "Reestructuración y nuevo stack",
                               },
                             ].map((ev) => {
@@ -3342,38 +3348,48 @@ export default function SignalsPage({
                                   key={ev.id}
                                   type="button"
                                   onClick={() => handleToggleMarketEvent(ev.id)}
-                                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
+                                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
                                     isActive
-                                      ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs"
-                                      : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
+                                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/40 shadow-xs"
+                                      : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                                   }`}
                                 >
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <Icon size={18} className={`${ev.iconColor} shrink-0`} />
-                                    <div
-                                      className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
-                                        isActive
-                                          ? "bg-brand-500 text-white shadow-xs"
-                                          : "border border-gray-300 dark:border-gray-600 text-transparent"
-                                      }`}
-                                    >
-                                      ✓
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                                      <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
+                                          {ev.badge}
+                                        </span>
+                                        <div
+                                          className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+                                            isActive
+                                              ? "bg-emerald-600 text-white shadow-xs"
+                                              : "border border-gray-400 dark:border-gray-500 text-transparent"
+                                          }`}
+                                        >
+                                          ✓
+                                        </div>
+                                      </div>
                                     </div>
+                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
+                                      {ev.title}
+                                    </strong>
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                      {ev.desc}
+                                    </p>
                                   </div>
-                                  <strong className="text-xs block font-bold text-gray-900 dark:text-white">
-                                    {ev.title}
-                                  </strong>
-                                  <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-0.5">
-                                    {ev.desc}
-                                  </span>
                                 </button>
                               );
                             })}
                           </div>
+
                           {selectedMarketEvents.length > 0 && (
-                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              ✓ Se detectarán {selectedMarketEvents.length === 3 ? "los 3 tipos de noticias públicas" : `${selectedMarketEvents.length} tipo(s) de noticias públicas`} y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
-                            </p>
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[11px]">
+                              <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                ✓ <strong>{selectedMarketEvents.length === 3 ? "Los 3 tipos de noticias activas:" : `${selectedMarketEvents.length} tipo(s) de noticias activas:`}</strong> Se detectarán noticias públicas y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>
