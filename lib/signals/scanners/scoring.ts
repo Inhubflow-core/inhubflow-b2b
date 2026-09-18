@@ -48,6 +48,27 @@ export function evidenceFingerprint(input: {
     .digest("hex");
 }
 
+export function extractCompanyFromHeadline(headline: string | null | undefined): string | null {
+  if (!headline) return null;
+  const cleaned = headline.trim();
+  const atMatch = cleaned.match(/(?:^|\s)(?:at|en|@)\s+([^|•,\n/-]+)/i);
+  if (atMatch?.[1]?.trim()) {
+    const candidate = atMatch[1].trim();
+    if (candidate.length >= 2 && candidate.length <= 60) return candidate;
+  }
+  const pipeMatch = cleaned.match(/\|\s*([^|•,\n]+)$/);
+  if (pipeMatch?.[1]?.trim()) {
+    const candidate = pipeMatch[1].trim();
+    if (candidate.length >= 2 && candidate.length <= 60) return candidate;
+  }
+  const dashMatch = cleaned.match(/\s+[-–—]\s+([^|•,\n]+)$/);
+  if (dashMatch?.[1]?.trim()) {
+    const candidate = dashMatch[1].trim();
+    if (candidate.length >= 2 && candidate.length <= 60) return candidate;
+  }
+  return null;
+}
+
 function containsAny(value: string | null | undefined, expected: string[]): boolean {
   const normalized = normalize(value);
   return expected.some((item) => normalized.includes(normalize(item)));
@@ -178,11 +199,13 @@ export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilter
 }
 
 export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): boolean {
+  const effectiveCompany = lead.company || extractCompanyFromHeadline(lead.headline);
+
   // 1. Exclusiones obligatorias: si coincide con una exclusión, se descarta siempre
   if (icp.exclusions?.length && (
     containsAny(lead.fullName, icp.exclusions)
     || containsAny(lead.headline, icp.exclusions)
-    || containsAny(lead.company, icp.exclusions)
+    || containsAny(effectiveCompany, icp.exclusions)
   )) return false;
 
   const isDirectPostSignal = [
@@ -219,10 +242,10 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
   // 5. Industria o empresa
   const targetIndustries = [icp.company, ...(icp.industries || [])].filter(Boolean) as string[];
   if (targetIndustries.length > 0) {
-    const matchesIndustry = containsAny(lead.company, targetIndustries)
+    const matchesIndustry = containsAny(effectiveCompany, targetIndustries)
       || containsAny(lead.headline, targetIndustries)
       || containsAny(lead.evidence.snippet, targetIndustries);
-    if (!matchesIndustry && (lead.company || lead.headline)) {
+    if (!matchesIndustry && (effectiveCompany || lead.headline)) {
       if (!isDirectPostSignal) return false;
     }
   }

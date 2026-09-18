@@ -13,7 +13,7 @@ import type {
 import type { SignalType } from "@/lib/signals/schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { canonicalLinkedInProfileUrl, evidenceFingerprint } from "./scoring";
+import { canonicalLinkedInProfileUrl, evidenceFingerprint, extractCompanyFromHeadline } from "./scoring";
 import { scanWebSignals } from "./web";
 
 export interface SignalScannerClient {
@@ -174,12 +174,15 @@ function isCompany(item: unknown): item is UnipileSearchCompany {
   return Boolean(item && typeof item === "object" && (item as { type?: string }).type === "COMPANY");
 }
 
+// Límite máximo seguro por página para búsquedas de posts en Unipile (evita sobrepasar límites del proveedor)
+const MAX_POST_SEARCH_LIMIT = 49;
+
 async function postSearch(client: SignalScannerClient, context: SignalScannerContext, body: Record<string, unknown>): Promise<{ posts: UnipileSearchPost[]; cursor?: string | null }> {
   const response = await client.searchLinkedIn({
     account_id: context.remoteAccountId,
     api: "classic",
     category: "posts",
-    limit: Math.min(context.limit, 49),
+    limit: Math.min(context.limit, MAX_POST_SEARCH_LIMIT),
     cursor: context.cursor?.cursor || undefined,
     ...body,
   });
@@ -207,8 +210,9 @@ async function fetchPostItemsWithFallback<T>(
       if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
         return res;
       }
-    } catch {
-      // Probar siguiente variante si da error 400 o 404
+    } catch (err) {
+      const status = typeof err === "object" && err !== null && "status" in err ? (err as { status?: number }).status : undefined;
+      console.warn(`[SignalRadar] Fallback URN error en ${variant} (status ${status || "unknown"}):`, err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -350,10 +354,22 @@ async function scanPosts(client: SignalScannerClient, context: SignalScannerCont
   const keywords = context.keywords.filter(Boolean);
   const targetIndustries = [context.icp.company, ...(context.icp.industries || [])].filter(Boolean) as string[];
   const query = keywords.join(" OR ") || targetIndustries.join(" OR ") || context.monitor.competitor_name || context.icp.titles?.join(" OR ") || "B2B";
+
+  let datePosted: "past_24h" | "past_week" | "past_month" | undefined;
+  if (activeOnly) {
+    datePosted = "past_week";
+  } else {
+    const days = context.icp.time_window_days || 30;
+    if (days <= 1) datePosted = "past_24h";
+    else if (days <= 7) datePosted = "past_week";
+    else if (days <= 30) datePosted = "past_month";
+    else datePosted = undefined;
+  }
+
   const { posts, cursor } = await postSearch(client, context, {
     keywords: query,
     sort_by: "date",
-    date_posted: activeOnly ? "past_week" : "past_week",
+    ...(datePosted ? { date_posted: datePosted } : {}),
     ...(context.icp.titles?.length ? { author: { keywords: context.icp.titles.join(" OR ") } } : {}),
   });
   const cutoff = Date.now() - (activeOnly ? 48 : Math.max(1, context.icp.time_window_days || 7) * 24) * 3_600_000;
@@ -386,6 +402,8 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
     date_posted: "past_month",
   });
   const leads: DiscoveredSignalLead[] = [];
+  const seenFingerprints = new Set<string>();
+
   for (const post of posts.slice(0, 3)) {
     const postUrn = postIdentifier(post.social_id || post.share_url || post.id);
     if (!postUrn) continue;
@@ -402,7 +420,10 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
         post.share_url || "",
         `Comentó en contenido relacionado con ${subject}`
       );
-      if (lead) leads.push(lead);
+      if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        seenFingerprints.add(lead.evidence.fingerprint);
+        leads.push(lead);
+      }
     }
     for (const reaction of reactions.items || []) {
       const lead = parseReactionLead(
@@ -414,7 +435,10 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
         post.share_url || "",
         `Interactuó con contenido relacionado con ${subject}`
       );
-      if (lead) leads.push(lead);
+      if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        seenFingerprints.add(lead.evidence.fingerprint);
+        leads.push(lead);
+      }
     }
   }
   return { leads, cursor: { cursor } };
@@ -449,8 +473,24 @@ async function scanRoleChanges(client: SignalScannerClient, context: SignalScann
       const prior = profile.work_experience?.find((item) => item !== current);
       const started = parseExperienceStart(current?.start);
       if (started && Date.now() - started > maxAge) continue;
-      const internal = Boolean(current?.company && prior?.company && current.company.toLowerCase() === prior.company.toLowerCase());
+
+      const headline = profile.headline || post.author?.headline || "";
+      const inferredCompany = extractCompanyFromHeadline(headline);
+      const company = current?.company || inferredCompany || null;
+
+      // Determinación de promoción interna:
+      // 1. Por historial de work_experience si está disponible
+      // 2. O por texto del post si anuncia explícitamente ascenso interno cuando la experiencia está vacía
+      let internal = false;
+      if (current?.company && prior?.company) {
+        internal = current.company.toLowerCase() === prior.company.toLowerCase();
+      } else {
+        const postText = (post.text || "").toLowerCase();
+        internal = /promoted\s+to|ascendido\s+a|promovido\s+a|nuevo\s+rol\s+dentro\s+de|nueva\s+posici[oó]n\s+en/i.test(postText);
+      }
+
       if (context.monitor.type === "internal_promotion" && !internal) continue;
+
       const lead = authorLead({
         monitorId: context.monitor.id,
         signalType: context.monitor.type,
@@ -460,14 +500,20 @@ async function scanRoleChanges(client: SignalScannerClient, context: SignalScann
         occurredAt: post.parsed_datetime || (started ? new Date(started).toISOString() : null),
         snippet: post.text?.slice(0, 300) || (internal ? "Ascenso interno reciente" : "Cambio de cargo reciente"),
         id: profile.provider_id,
-        publicIdentifier: profile.public_identifier || post.author.public_identifier,
-        name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || post.author.name,
-        headline: profile.headline || post.author.headline,
+        publicIdentifier: profile.public_identifier || post.author?.public_identifier,
+        name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || post.author?.name,
+        headline: headline || current?.position || null,
         explicitProfileUrl: profile.public_profile_url || profile.profile_url || url,
-        metadata: { currentRole: current || null, previousRole: prior || null, internalPromotion: internal },
+        metadata: {
+          currentRole: current || null,
+          previousRole: prior || null,
+          internalPromotion: internal,
+          throttledExperience: Boolean(profile.throttled_sections?.includes("experience") || !profile.work_experience?.length),
+          resolvedProfile: profile,
+        },
       });
       if (lead) {
-        lead.company = current?.company || null;
+        lead.company = company;
         lead.location = profile.location || current?.location || null;
         leads.push(lead);
       }
@@ -478,7 +524,7 @@ async function scanRoleChanges(client: SignalScannerClient, context: SignalScann
   return { leads, cursor: { cursor } };
 }
 
-async function resolveLocationIds(client: SignalScannerClient, context: SignalScannerContext): Promise<string[]> {
+export async function resolveLocationIds(client: SignalScannerClient, context: SignalScannerContext): Promise<string[]> {
   const ids: string[] = [];
   for (const location of (context.icp.locations || []).slice(0, 5)) {
     const response = await client.listLinkedInSearchParameters({
@@ -492,7 +538,13 @@ async function resolveLocationIds(client: SignalScannerClient, context: SignalSc
   return ids;
 }
 
-async function peopleAtCompanies(client: SignalScannerClient, context: SignalScannerContext, companies: UnipileSearchCompany[], signalType: string): Promise<DiscoveredSignalLead[]> {
+async function peopleAtCompanies(
+  client: SignalScannerClient,
+  context: SignalScannerContext,
+  companies: UnipileSearchCompany[],
+  signalType: string,
+  locationIds: string[] = []
+): Promise<DiscoveredSignalLead[]> {
   const leads: DiscoveredSignalLead[] = [];
   for (const company of companies.slice(0, 5)) {
     const response = await client.searchLinkedIn({
@@ -501,8 +553,16 @@ async function peopleAtCompanies(client: SignalScannerClient, context: SignalSca
       category: "people",
       limit: Math.min(10, context.limit),
       ...(context.hasSalesNavigator
-        ? { company: { include: [company.id] }, ...(context.icp.titles?.length ? { keywords: context.icp.titles.join(" OR ") } : {}) }
-        : { company: [company.id], ...(context.icp.titles?.length ? { advanced_keywords: { title: context.icp.titles.join(" OR ") } } : {}) }),
+        ? {
+            company: { include: [company.id] },
+            ...(context.icp.titles?.length ? { keywords: context.icp.titles.join(" OR ") } : {}),
+            ...(locationIds.length ? { location: { include: locationIds } } : {}),
+          }
+        : {
+            company: [company.id],
+            ...(context.icp.titles?.length ? { advanced_keywords: { title: context.icp.titles.join(" OR ") } } : {}),
+            ...(locationIds.length ? { location: locationIds } : {}),
+          }),
     });
     for (const person of response.items.filter(isPerson)) {
       const lead = searchPersonLead(context.monitor.id, signalType, person, `${company.name} tiene vacantes o crecimiento activo`);
@@ -545,7 +605,7 @@ async function scanCompanies(client: SignalScannerClient, context: SignalScanner
     ...(growth ? { headcount_growth: { min: 20 } } : { has_job_offers: true }),
   });
   const companies = response.items.filter(isCompany);
-  const leads = await peopleAtCompanies(client, context, companies, growth ? "company_growth" : "hiring_spree");
+  const leads = await peopleAtCompanies(client, context, companies, growth ? "company_growth" : "hiring_spree", locationIds);
   return { leads, cursor: { cursor: response.cursor } };
 }
 
@@ -668,6 +728,15 @@ async function scanSingleSignalType(
 }
 
 export function accountHasSalesNavigator(connectionParams?: Record<string, unknown>): boolean {
-  const serialized = JSON.stringify(connectionParams || {}).toLowerCase();
-  return serialized.includes("sales_navigator") || serialized.includes("sales navigator");
+  if (!connectionParams || typeof connectionParams !== "object") return false;
+  // 1. Verificación precisa en premiumFeatures o premium_features de Unipile
+  const features = connectionParams.premiumFeatures || connectionParams.premium_features;
+  if (Array.isArray(features)) {
+    return features.some((f) => typeof f === "string" && f.toLowerCase().includes("sales_navigator"));
+  }
+  // 2. Flags booleanos explícitos
+  if (connectionParams.sales_navigator === true || connectionParams.salesNavigator === true) {
+    return true;
+  }
+  return false;
 }

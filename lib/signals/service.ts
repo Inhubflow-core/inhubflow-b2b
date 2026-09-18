@@ -17,7 +17,9 @@ import {
 } from "./schema";
 import { scanRealSignals, accountHasSalesNavigator, type SignalScannerClient } from "./scanners";
 import { SignalScanError, type DiscoveredSignalLead, type SignalScanCursor } from "./scanners/contracts";
-import { canonicalLinkedInProfileUrl, passesIcp, scoreSignalLead, signalIdentity } from "./scanners/scoring";
+import { canonicalLinkedInProfileUrl, extractCompanyFromHeadline, passesIcp, scoreSignalLead, signalIdentity } from "./scanners/scoring";
+import { isExperienceThrottled } from "./scanners/identity";
+import type { UnipileProfile } from "@/lib/unipile/types";
 import { generateSignalMessage } from "./message-generator";
 import { promoteSignalLead, signalAutopilotReadiness } from "./promotion";
 import { planSignalResearch } from "./research-planner";
@@ -376,20 +378,49 @@ export class SignalRadarService {
         limit: requestedLimit,
         hasSalesNavigator: capabilities.salesNavigator,
       }, this.webClient);
+      const profileCache = new Map<string, UnipileProfile>();
+      for (const candidate of raw.leads) {
+        const p = candidate.evidence?.metadata?.resolvedProfile as UnipileProfile | undefined;
+        const cUrl = canonicalLinkedInProfileUrl(candidate.linkedinUrl);
+        if (p && cUrl) profileCache.set(cUrl, p);
+      }
+
+      let throttledDetected = false;
+      for (const candidate of raw.leads) {
+        const p = (candidate.evidence?.metadata?.resolvedProfile as UnipileProfile | undefined) || profileCache.get(canonicalLinkedInProfileUrl(candidate.linkedinUrl) || "");
+        if (p && isExperienceThrottled(p)) {
+          throttledDetected = true;
+          break;
+        }
+      }
+
       const enriched: DiscoveredSignalLead[] = [];
       for (const candidate of raw.leads.slice(0, requestedLimit)) {
-        const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId);
+        const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId, profileCache);
         if (lead && passesIcp(lead, icp)) enriched.push(lead);
       }
+
+      if (throttledDetected) {
+        this.logEvent(monitor.id, "scan_throttled", {
+          scanRunId,
+          section: "experience",
+          message: "LinkedIn limitó las secciones de experiencia de perfiles externos. Se utilizó inferencia desde headline.",
+        });
+      }
+
       const persisted = await this.persistDiscoveredLeads(monitor, enriched, scanRunId, icp);
       const completedAt = new Date(this.now()).toISOString();
       const next = nextScanAt(monitor.scan_interval_minutes, this.now());
       const state = enriched.length === 0 ? "no_results" : "completed";
+      const throttledNotice = (enriched.length === 0 && throttledDetected)
+        ? "LinkedIn limitó las secciones de experiencia durante este escaneo. Sugerimos agregar más palabras clave."
+        : null;
+
       db.transaction(() => {
         db.prepare(`
           UPDATE signal_scan_runs SET state = ?, cursor_after = ?, found_count = ?,
-            new_lead_count = ?, new_observation_count = ?, completed_at = ? WHERE id = ?
-        `).run(state, JSON.stringify(raw.cursor || null), enriched.length, persisted.newLeads, persisted.newObservations, completedAt, scanRunId);
+            new_lead_count = ?, new_observation_count = ?, error_message = ?, completed_at = ? WHERE id = ?
+        `).run(state, JSON.stringify(raw.cursor || null), enriched.length, persisted.newLeads, persisted.newObservations, throttledNotice, completedAt, scanRunId);
         db.prepare(`
           UPDATE signal_monitors SET scan_state = 'idle', scan_lease_owner = NULL,
             scan_lease_expires_at = NULL, cursor_json = ?, capabilities_json = ?,
@@ -408,15 +439,23 @@ export class SignalRadarService {
         promoted: persisted.promoted,
         message: enriched.length
           ? `Escaneo completado: ${enriched.length} señales reales verificadas, ${persisted.newLeads} nuevos prospectos.`
-          : "Escaneo completado sin nuevas señales reales.",
+          : throttledNotice || "Escaneo completado sin nuevas señales reales.",
       };
     } catch (error) {
-      const code = providerErrorCode(error);
-      const message = error instanceof Error ? error.message : String(error);
-      const retryable = error instanceof SignalScanError ? error.retryable : true;
-      const failures = monitor.consecutive_failures + 1;
+      const isFeatureNotSubscribed =
+        (typeof error === "object" && error !== null && ("status" in error && (error as { status?: number }).status === 403)) ||
+        (error instanceof Error && (error.message.includes("feature_not_subscribed") || error.message.includes("403")));
+
+      const code = isFeatureNotSubscribed ? "unsupported_capability" : providerErrorCode(error);
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const message = isFeatureNotSubscribed
+        ? "Esta señal requiere Sales Navigator en tu suscripción de Unipile."
+        : rawMessage;
+      const retryable = isFeatureNotSubscribed ? false : (error instanceof SignalScanError ? error.retryable : true);
+      const failures = isFeatureNotSubscribed ? 0 : (monitor.consecutive_failures + 1);
       const backoffMinutes = retryable ? Math.min(24 * 60, 15 * 2 ** Math.min(failures, 6)) : monitor.scan_interval_minutes;
-      const state = error instanceof SignalScanError && error.code === "unsupported_capability" ? "unsupported" : "failed";
+      const state = (isFeatureNotSubscribed || (error instanceof SignalScanError && error.code === "unsupported_capability")) ? "unsupported" : "failed";
+
       db.transaction(() => {
         db.prepare(`
           UPDATE signal_scan_runs SET state = ?, error_code = ?, error_message = ?, completed_at = datetime('now') WHERE id = ?
@@ -433,19 +472,34 @@ export class SignalRadarService {
     }
   }
 
-  private async enrichCandidate(candidate: DiscoveredSignalLead, remoteAccountId: string): Promise<DiscoveredSignalLead | null> {
+  private async enrichCandidate(
+    candidate: DiscoveredSignalLead,
+    remoteAccountId: string,
+    profileCache?: Map<string, UnipileProfile>,
+  ): Promise<DiscoveredSignalLead | null> {
     const canonical = canonicalLinkedInProfileUrl(candidate.linkedinUrl);
     if (!canonical) return null;
     try {
-      const profile = await this.client!.resolveProfile(canonical, remoteAccountId);
+      let profile = candidate.evidence?.metadata?.resolvedProfile as UnipileProfile | undefined;
+      if (!profile && profileCache?.has(canonical)) {
+        profile = profileCache.get(canonical);
+      }
+      if (!profile) {
+        // Retardo preventivo con jitter para proteger la cuenta contra detección de bots
+        await new Promise((resolve) => setTimeout(resolve, 350 + Math.floor(Math.random() * 350)));
+        profile = await this.client!.resolveProfile(canonical, remoteAccountId);
+        if (profileCache) profileCache.set(canonical, profile);
+      }
       const current = profile.work_experience?.find((item) => item.current) || profile.work_experience?.[0];
+      const headline = profile.headline || candidate.headline || current?.position || null;
+      const company = current?.company || candidate.company || extractCompanyFromHeadline(headline) || null;
       return {
         ...candidate,
         linkedinUrl: profile.public_profile_url || profile.profile_url || canonical,
         providerId: profile.provider_id || candidate.providerId,
         fullName: fullName(profile, candidate.fullName),
-        headline: profile.headline || candidate.headline || current?.position || null,
-        company: current?.company || candidate.company || null,
+        headline,
+        company,
         location: profile.location || candidate.location || current?.location || null,
       };
     } catch {

@@ -1,8 +1,8 @@
 import type { SignalIcpFilters } from "../schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { evidenceFingerprint } from "./scoring";
-import type { SignalScannerClient } from "./index";
+import { evidenceFingerprint, extractCompanyFromHeadline } from "./scoring";
+import { type SignalScannerClient, resolveLocationIds } from "./index";
 import type { WebSearchClient, WebSearchResult } from "@/lib/serper/client";
 import type { UnipileSearchPerson } from "@/lib/unipile/types";
 
@@ -151,9 +151,10 @@ async function findPeople(
   web: WebSearchClient,
   context: SignalScannerContext,
   company: string,
-): Promise<Array<{ url: string; name: string; providerId?: string | null }>> {
+  locationIds: string[] = []
+): Promise<Array<{ url: string; name: string; providerId?: string | null; company?: string }>> {
   const titles = context.icp.titles?.length ? context.icp.titles : ["CEO", "Founder"];
-  const candidates: Array<{ url: string; name: string; providerId?: string | null }> = [];
+  const candidates: Array<{ url: string; name: string; providerId?: string | null; company?: string }> = [];
   try {
     const response = await linkedIn.searchLinkedIn({
       account_id: context.remoteAccountId,
@@ -161,10 +162,11 @@ async function findPeople(
       category: "people",
       limit: Math.min(10, context.limit),
       advanced_keywords: { title: titles.join(" OR "), company },
+      ...(locationIds.length ? { location: locationIds } : {}),
     });
     for (const person of response.items.filter(personCandidate)) {
       const url = person.profile_url || person.public_profile_url || (person.public_identifier ? `https://www.linkedin.com/in/${person.public_identifier}/` : "");
-      if (url && person.name) candidates.push({ url, name: person.name, providerId: person.id });
+      if (url && person.name) candidates.push({ url, name: person.name, providerId: person.id, company });
     }
   } catch {
     // X-Ray fallback below still verifies every candidate through LinkedIn profile retrieval.
@@ -182,7 +184,7 @@ async function findPeople(
       const match = url.pathname.match(/\/in\/([^/]+)/i);
       if (!match) continue;
       const rawName = result.title.replace(/\s*[-|].*$/, "").trim();
-      if (rawName) candidates.push({ url: `https://www.linkedin.com/in/${match[1]}/`, name: rawName });
+      if (rawName) candidates.push({ url: `https://www.linkedin.com/in/${match[1]}/`, name: rawName, company });
     } catch {}
   }
   return candidates;
@@ -207,6 +209,7 @@ export async function scanWebSignals(
   const articles = response.items.filter(acceptableSource);
   const leads: DiscoveredSignalLead[] = [];
   const seenArticles = new Set<string>();
+  const locationIds = await resolveLocationIds(linkedIn, context);
 
   for (const article of articles) {
     if (leads.length >= context.limit) break;
@@ -222,26 +225,36 @@ export async function scanWebSignals(
     const company = extractCompany(article, context.monitor.type);
     if (!company) continue;
     let people: Awaited<ReturnType<typeof findPeople>>;
-    try { people = await findPeople(linkedIn, web, context, company); }
+    try { people = await findPeople(linkedIn, web, context, company, locationIds); }
     catch { continue; }
     for (const candidate of people) {
       if (leads.length >= context.limit) break;
       try {
         const profile = await linkedIn.resolveProfile(candidate.url, context.remoteAccountId);
         const current = profile.work_experience?.find((role) => role.current) || profile.work_experience?.[0];
-        if (!companyMatches(current?.company, company)) continue;
+        const inferredFromHeadline = extractCompanyFromHeadline(profile.headline);
+
+        // Plan B: Si LinkedIn vacía work_experience por throttling, verificar contra headline o candidate.company
+        const companyVerified = companyMatches(current?.company, company)
+          || companyMatches(profile.headline, company)
+          || companyMatches(inferredFromHeadline, company)
+          || (candidate.company && companyMatches(candidate.company, company));
+
+        if (!companyVerified) continue;
         const headline = profile.headline || current?.position || null;
         if (!titleMatches(headline, context.icp.titles || [])) continue;
         const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || candidate.name;
         const profileUrl = profile.public_profile_url || profile.profile_url || candidate.url;
         const snippet = [article.title, article.snippet].filter(Boolean).join(" — ").slice(0, 500);
         const amount = extractAmount(`${article.title} ${article.snippet || ""}`);
+        const effectiveCompany = current?.company || inferredFromHeadline || candidate.company || company;
+
         leads.push({
           linkedinUrl: profileUrl,
           providerId: profile.provider_id || candidate.providerId || null,
           fullName: name,
           headline,
-          company: current?.company || company,
+          company: effectiveCompany,
           location: profile.location || current?.location || null,
           signalType: context.monitor.type,
           evidence: {
@@ -262,10 +275,12 @@ export async function scanWebSignals(
               evidenceTitle: article.title,
               evidenceSource: article.source || sourceDomain(article.link),
               evidenceDateLabel: article.date,
-              company,
+              company: effectiveCompany,
               amount,
               identityVerified: true,
               sourceStrategy: context.icp.source_strategy || "hybrid",
+              resolvedProfile: profile,
+              throttledExperience: Boolean(profile.throttled_sections?.includes("experience") || !profile.work_experience?.length),
             },
           },
         });

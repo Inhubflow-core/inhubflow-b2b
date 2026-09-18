@@ -23,10 +23,11 @@ Module._extensions[".ts"] = (module, filename) => {
 
 const { applySignalSchema } = require("../lib/signals/schema.ts");
 const { SignalRadarService } = require("../lib/signals/service.ts");
-const { scanRealSignals } = require("../lib/signals/scanners/index.ts");
+const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/scanners/index.ts");
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals } = require("../lib/signals/scanners/web.ts");
+const { extractCompanyFromHeadline } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -262,6 +263,112 @@ async function run() {
     assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_leads WHERE id='lead-delete'").get().c, 0);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM signal_observations WHERE id='obs-delete'").get().c, 0);
     assert.equal(db.prepare("SELECT COUNT(*) c FROM targets WHERE id='target-kept'").get().c, 1);
+    db.close();
+  }
+
+  console.log("▶ extractCompanyFromHeadline infiere empresas correctamente");
+  {
+    assert.equal(extractCompanyFromHeadline("VP of Sales at Acme Corp"), "Acme Corp");
+    assert.equal(extractCompanyFromHeadline("Founder & CEO @ TechStart"), "TechStart");
+    assert.equal(extractCompanyFromHeadline("Director Comercial en Globex"), "Globex");
+    assert.equal(extractCompanyFromHeadline("Head of Growth | InhubFlow"), "InhubFlow");
+    assert.equal(extractCompanyFromHeadline("Senior Developer - BigTech"), "BigTech");
+    assert.equal(extractCompanyFromHeadline("Just a title"), null);
+  }
+
+  console.log("▶ accountHasSalesNavigator evita falsos positivos por substring");
+  {
+    assert.equal(accountHasSalesNavigator({}), false);
+    assert.equal(accountHasSalesNavigator({ premiumFeatures: [] }), false);
+    assert.equal(accountHasSalesNavigator({ company: "sales_navigator_experts" }), false);
+    assert.equal(accountHasSalesNavigator({ premiumFeatures: ["sales_navigator"] }), true);
+    assert.equal(accountHasSalesNavigator({ salesNavigator: true }), true);
+  }
+
+  console.log("▶ Plan B: scanWebSignals rescata leads con work_experience vacío si el headline verifica");
+  {
+    const webMock = {
+      isConfigured: () => true,
+      search: async () => ({
+        items: [{
+          link: "https://techcrunch.com/article-1",
+          title: "FintechLab raises $5M Seed Round",
+          snippet: "FintechLab secured funding to expand in Europe",
+          source: "techcrunch.com",
+          date: "2 days ago",
+        }],
+      }),
+    };
+    const linkedInMock = {
+      searchLinkedIn: async () => ({
+        object: "LinkedinSearch",
+        items: [{
+          type: "PEOPLE",
+          id: "p-fl-1",
+          name: "Carlos Founder",
+          profile_url: "https://www.linkedin.com/in/carlos-founder/",
+        }],
+      }),
+      listLinkedInSearchParameters: async () => ({ items: [] }),
+      getPostComments: async () => ({ items: [] }),
+      getPostReactions: async () => ({ items: [] }),
+      resolveProfile: async () => ({
+        object: "UserProfile",
+        provider: "LINKEDIN",
+        provider_id: "p-fl-1",
+        public_profile_url: "https://www.linkedin.com/in/carlos-founder/",
+        first_name: "Carlos",
+        last_name: "Founder",
+        headline: "CEO at FintechLab",
+        work_experience: [], // throttled
+        throttled_sections: ["experience"],
+      }),
+    };
+    const context = {
+      monitor: { id: "m-web", type: "funding_round" },
+      remoteAccountId: "remote-1",
+      icp: { titles: ["CEO"], time_window_days: 30 },
+      keywords: ["FintechLab"],
+      cursor: null,
+      limit: 5,
+      hasSalesNavigator: false,
+    };
+    const result = await scanWebSignals(webMock, linkedInMock, context);
+    assert.equal(result.leads.length, 1);
+    assert.equal(result.leads[0].company, "FintechLab");
+    assert.equal(result.leads[0].headline, "CEO at FintechLab");
+    assert.equal(result.leads[0].evidence.metadata.throttledExperience, true);
+  }
+
+  console.log("▶ Manejo de error 403 feature_not_subscribed como no reintentable");
+  {
+    const db = baseDb(); applySignalSchema(db);
+    db.exec(`
+      INSERT INTO users (id) VALUES ('owner-1');
+      INSERT INTO accounts (id,name,email,owner_id,unipile_account_id,unipile_status,is_authenticated) VALUES ('a1','Cuenta','a@x.com','owner-1','remote-1','OK',1);
+      INSERT INTO signal_monitors (id,workspace_owner_id,name,type,mode,status,account_id,keywords_json,icp_filters_json,message_config_json,scan_state) VALUES ('m-403','owner-1','Growth','company_growth','review','active','a1','[]','{}','{}','idle');
+    `);
+    const failingClient = {
+      isConfigured: () => true,
+      getAccount: async () => ({ id: "remote-1", type: "LINKEDIN", sources: [{ status: "OK" }], connection_params: { premiumFeatures: [] } }),
+      searchLinkedIn: async () => {
+        const err = new Error("feature_not_subscribed");
+        err.status = 403;
+        throw err;
+      },
+      listLinkedInSearchParameters: async () => ({ items: [] }),
+      getPostComments: async () => ({ items: [] }),
+      getPostReactions: async () => ({ items: [] }),
+      resolveProfile: async () => ({ object: "UserProfile", provider_id: "x" }),
+    };
+    const service = new SignalRadarService({ getDatabase: () => db, client: failingClient });
+    await assert.rejects(
+      () => service.scanMonitor("m-403", "manual", { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false }),
+      (err) => err.message.includes("Sales Navigator") || err.message.includes("feature_not_subscribed")
+    );
+    const run = db.prepare("SELECT * FROM signal_scan_runs WHERE monitor_id='m-403'").get();
+    assert.equal(run.state, "unsupported");
+    assert.equal(run.error_code, "unsupported_capability");
     db.close();
   }
 

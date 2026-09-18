@@ -16,14 +16,14 @@ export const SIGNAL_TYPES = [
   "company_news",
   "acquisition_event",
   "industry_event",
-  "ask_query",
 ] as const;
 
 export type SignalType = typeof SIGNAL_TYPES[number]
   | "competitor_followers"
   | "post_engagement"
   | "influencer_activity"
-  | "job_changes";
+  | "job_changes"
+  | "ask_query";
 export type SignalMode = "review" | "autopilot";
 export type SignalStatus = "active" | "paused" | "completed";
 export type SignalScanState = "idle" | "running" | "error";
