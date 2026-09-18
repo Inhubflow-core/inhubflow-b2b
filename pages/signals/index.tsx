@@ -2585,7 +2585,7 @@ export default function SignalsPage({
                     </div>
 
                     {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1.5 rounded-2xl bg-gray-100/90 dark:bg-gray-800/90 text-xs gap-1.5 border border-gray-200/60 dark:border-gray-700/60">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1.5 rounded-2xl bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 text-xs gap-1.5 border border-brand-500/20 dark:border-brand-500/10">
                       <button
                         type="button"
                         onClick={() => {
