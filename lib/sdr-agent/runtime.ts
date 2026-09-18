@@ -37,7 +37,7 @@ function gatePassed(
   return row?.passed === 1;
 }
 
-function circuitClosed(
+export function circuitClosed(
   db: Database.Database,
   workspaceOwnerId: string | null,
   agentId: string,
@@ -75,6 +75,7 @@ export function resolveSdrOperationalStatus(
   db: Database.Database,
   agent: SdrAgentRecord,
   activeVersion: SdrAgentVersionRecord | null,
+  options?: { accountId?: string },
 ): SdrOperationalStatus {
   const blockers: string[] = [];
   const runtimeMaster = envEnabled("SDR_RUNTIME_ENABLED");
@@ -93,10 +94,12 @@ export function resolveSdrOperationalStatus(
   const modeCap = configuredModeCap();
   if (modeCap) {
     effectiveMode = lowerMode(effectiveMode, modeCap);
-    if (effectiveMode !== requestedMode) blockers.push("environment_mode_cap");
+    if (MODE_RANK[requestedMode] > MODE_RANK[effectiveMode]) {
+      blockers.push(`mode_capped_to_${effectiveMode}`);
+    }
   }
 
-  const providerNeeded = MODE_RANK[effectiveMode] >= MODE_RANK.shadow;
+  const providerNeeded = modeAllowsProvider(effectiveMode);
   const versionPublished = activeVersion?.publication_state === "published";
   const hasCredentials = Boolean(process.env.GEMINI_API_KEY?.trim());
   const providerCircuitClosed = circuitClosed(
@@ -141,10 +144,22 @@ export function resolveSdrOperationalStatus(
   }
 
   const agentOutbound = agent.outbound_enabled === 1;
+  let accountOutbound = true;
+  if (options?.accountId) {
+    const accRow = db.prepare(
+      "SELECT sdr_outbound_enabled FROM accounts WHERE id = ?",
+    ).get(options.accountId) as { sdr_outbound_enabled?: number } | undefined;
+    if (accRow && accRow.sdr_outbound_enabled === 0) {
+      accountOutbound = false;
+      blockers.push("account_outbound_disabled");
+    }
+  }
+
   const outboundEnabled =
     MODE_RANK[effectiveMode] >= MODE_RANK.approval &&
     outboundMaster &&
-    agentOutbound;
+    agentOutbound &&
+    accountOutbound;
   if (MODE_RANK[effectiveMode] >= MODE_RANK.approval && !outboundMaster) {
     blockers.push("outbound_master_disabled");
   }
@@ -168,7 +183,7 @@ export function resolveSdrOperationalStatus(
     outboundEnabled,
     linkedinOutboundEnabled: outboundEnabled && linkedinOutboundMaster,
     emailOutboundEnabled: outboundEnabled && emailOutboundMaster,
-    calendarEnabled: process.env.NATIVE_CALENDAR_ENABLED !== "false" && process.env.NATIVE_CALENDAR_ENABLED !== "0",
+    calendarEnabled: process.env.NATIVE_CALENDAR_ENABLED === "true" || process.env.NATIVE_CALENDAR_ENABLED === "1",
     reason: effectiveMode === "off" ? (requestedMode === "off" ? "disabled" : "module_unavailable") : "ready",
     blockers: [...new Set(blockers)],
     agentId: agent.id,

@@ -287,6 +287,7 @@ export function takeHumanControl(
         SET state = 'HUMAN_ACTIVE', control_epoch = control_epoch + 1,
           human_takeover_at = COALESCE(human_takeover_at, datetime('now')),
           human_takeover_by_user_id = ?, lock_reason = 'human_takeover',
+          ai_turn_count = 0,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(input.actorUserId, input.threadId);
@@ -347,6 +348,7 @@ export function releaseHumanControl(
       SET state = ?, control_epoch = control_epoch + 1,
         human_released_at = datetime('now'), human_released_by_user_id = ?,
         human_takeover_at = NULL, human_takeover_by_user_id = NULL,
+        ai_turn_count = 0,
         lock_reason = NULL, updated_at = datetime('now')
       WHERE id = ?
     `).run(nextState, input.actorUserId, input.threadId);
@@ -395,6 +397,24 @@ export function markThreadDoNotContact(
       SET state = 'cancelled', rejection_reason = ?, updated_at = datetime('now')
       WHERE thread_id = ? AND state IN ('proposed', 'waiting_approval', 'approved')
     `).run(input.reason, input.threadId);
+
+    // Stop campaign outreach immediately for this target
+    if (thread.target_id) {
+      try {
+        db.prepare(`
+          UPDATE targets SET do_not_contact = 1, updated_at = datetime('now')
+          WHERE id = ?
+        `).run(thread.target_id);
+        db.prepare(`
+          UPDATE run_profile_tracks
+          SET state = 'cancelled', reason = ?, updated_at = datetime('now')
+          WHERE target_id = ? AND state IN ('pending', 'running', 'queued')
+        `).run(`sdr_dnc:${input.reason}`, thread.target_id);
+      } catch {
+        // Safe execution if run_profile_tracks table is absent
+      }
+    }
+
     recordSdrAuditEvent(db, {
       workspaceOwnerId,
       actorType: "worker",

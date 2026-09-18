@@ -18,11 +18,17 @@ import {
   RiCheckLine,
   RiTimeLine,
   RiUserVoiceLine,
+  RiStopCircleLine,
+  RiCheckDoubleLine,
+  RiShieldKeyholeLine,
+  RiCloseLine,
+  RiToggleLine,
+  RiToggleFill,
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { SdrSimulationResult } from "@/lib/sdr-agent/simulation";
 
-type Tab = "overview" | "prompts" | "knowledge" | "simulator" | "history";
+type Tab = "overview" | "approvals" | "gates" | "prompts" | "knowledge" | "simulator" | "history";
 
 interface KnowledgeSource {
   id: string;
@@ -31,6 +37,34 @@ interface KnowledgeSource {
   status: string;
   content: string;
   created_at: string;
+}
+
+interface PendingAction {
+  id: string;
+  thread_id: string;
+  action_type: string;
+  state: string;
+  target_name: string | null;
+  target_company: string | null;
+  target_linkedin: string | null;
+  target_email: string | null;
+  channel: string;
+  ai_turn_count: number;
+  intent: string | null;
+  confidence: number | null;
+  risk_level: string | null;
+  reason_code: string | null;
+  suggested_reply: string;
+  created_at: string;
+}
+
+interface PromotionGate {
+  key: string;
+  label: string;
+  desc: string;
+  passed: boolean;
+  evidence: Record<string, unknown> | null;
+  verified_at: string | null;
 }
 
 interface SdrConfigData {
@@ -52,6 +86,9 @@ interface SdrConfigData {
     confidence_threshold: number;
     max_auto_turns: number;
     handoff_email: string | null;
+    runtime_enabled?: number;
+    provider_enabled?: number;
+    outbound_enabled?: number;
   };
   activeVersion: {
     id: string;
@@ -115,6 +152,22 @@ export default function SdrPage() {
   const [customInstructions, setCustomInstructions] = useState("");
   const [handoffRules, setHandoffRules] = useState("");
 
+  // Operational Switches State
+  const [runtimeEnabled, setRuntimeEnabled] = useState(true);
+  const [providerEnabled, setProviderEnabled] = useState(true);
+  const [outboundEnabled, setOutboundEnabled] = useState(true);
+
+  // Pending Actions & Approvals State
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [loadingActions, setLoadingActions] = useState(false);
+  const [editingDrafts, setEditingDrafts] = useState<Record<string, string>>({});
+  const [actionProcessingId, setActionProcessingId] = useState<string | null>(null);
+
+  // Promotion Gates State
+  const [promotionGates, setPromotionGates] = useState<PromotionGate[]>([]);
+  const [gatesAllPassed, setGatesAllPassed] = useState(false);
+  const [loadingGates, setLoadingGates] = useState(false);
+
   // Knowledge Sources State
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
   const [newSourceTitle, setNewSourceTitle] = useState("");
@@ -149,10 +202,44 @@ export default function SdrPage() {
       setCompanyContext(json.activeVersion?.policy?.company_context || "");
       setHandoffRules(json.activeVersion?.policy?.handoff_rules || "");
       setCustomInstructions(json.activeVersion?.config?.custom_instructions || "");
+
+      // Operational Switches
+      setRuntimeEnabled(json.agent.runtime_enabled !== 0);
+      setProviderEnabled(json.agent.provider_enabled !== 0);
+      setOutboundEnabled(json.agent.outbound_enabled !== 0);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al conectar con el servidor SDR");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadActions = useCallback(async () => {
+    try {
+      setLoadingActions(true);
+      const res = await fetch("/api/sdr/actions?status=pending");
+      if (res.ok) {
+        const json = await res.json();
+        setPendingActions(json.actions || []);
+      }
+    } catch {}
+    finally {
+      setLoadingActions(false);
+    }
+  }, []);
+
+  const loadGates = useCallback(async () => {
+    try {
+      setLoadingGates(true);
+      const res = await fetch("/api/sdr/gates");
+      if (res.ok) {
+        const json = await res.json();
+        setPromotionGates(json.gates || []);
+        setGatesAllPassed(Boolean(json.allPassed));
+      }
+    } catch {}
+    finally {
+      setLoadingGates(false);
     }
   }, []);
 
@@ -168,8 +255,10 @@ export default function SdrPage() {
 
   useEffect(() => {
     loadConfig();
+    loadActions();
+    loadGates();
     loadKnowledge();
-  }, [loadConfig, loadKnowledge]);
+  }, [loadConfig, loadActions, loadGates, loadKnowledge]);
 
   const handlePublish = async () => {
     if (!confirm("¿Publicar esta versión para el runtime SDR? Los envíos permanecen sujetos a todos los gates de seguridad.")) return;
@@ -204,6 +293,9 @@ export default function SdrPage() {
           company_context: companyContext,
           custom_instructions: customInstructions,
           handoff_rules: handoffRules,
+          runtime_enabled: runtimeEnabled ? 1 : 0,
+          provider_enabled: providerEnabled ? 1 : 0,
+          outbound_enabled: outboundEnabled ? 1 : 0,
         }),
       });
 
@@ -214,10 +306,106 @@ export default function SdrPage() {
 
       toast.success(t("sdr.toastConfigSaved"));
       loadConfig();
+      loadGates();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("sdr.toastGenericError"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleKillSwitch = async () => {
+    if (!confirm("⚠️ ¿ACTIVAR KILL SWITCH DE EMERGENCIA?\n\nEsto apagará de inmediato el asistente SDR, deshabilitará el motor IA y cancelará cualquier despacho saliente.")) {
+      return;
+    }
+    try {
+      setSaving(true);
+      const res = await fetch("/api/sdr/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "off",
+          runtime_enabled: 0,
+          provider_enabled: 0,
+          outbound_enabled: 0,
+        }),
+      });
+      if (!res.ok) throw new Error("Error al activar kill switch");
+      setMode("off");
+      setRuntimeEnabled(false);
+      setProviderEnabled(false);
+      setOutboundEnabled(false);
+      toast.error("🚨 Kill Switch activado: Agente SDR detenido por completo");
+      loadConfig();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al activar kill switch");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApproveAction = async (actionId: string) => {
+    try {
+      setActionProcessingId(actionId);
+      const overrideDraft = editingDrafts[actionId];
+      const res = await fetch(`/api/sdr/actions/${actionId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          overrideDraft: overrideDraft !== undefined ? overrideDraft : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo aprobar la acción");
+      toast.success("Respuesta aprobada y enviada");
+      loadActions();
+      loadConfig();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al aprobar acción");
+    } finally {
+      setActionProcessingId(null);
+    }
+  };
+
+  const handleRejectAction = async (actionId: string) => {
+    try {
+      setActionProcessingId(actionId);
+      const res = await fetch(`/api/sdr/actions/${actionId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Rechazado manualmente en la bandeja de aprobaciones" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo descartar la acción");
+      toast.success("Borrador descartado");
+      loadActions();
+      loadConfig();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al rechazar acción");
+    } finally {
+      setActionProcessingId(null);
+    }
+  };
+
+  const handleVerifyGate = async (gateKey: string) => {
+    try {
+      const res = await fetch("/api/sdr/gates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gate_key: gateKey,
+          evidence: {
+            manuallyCertified: true,
+            verifiedAt: new Date().toISOString(),
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("Error al certificar el gate");
+      toast.success("Gate de promoción verificado con éxito");
+      loadGates();
+      loadConfig();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al verificar gate");
     }
   };
 
@@ -366,6 +554,16 @@ export default function SdrPage() {
               <RiRefreshLine size={16} className={loading ? "animate-spin" : ""} />
               {t("common.refresh")}
             </button>
+            <button
+              type="button"
+              onClick={handleKillSwitch}
+              disabled={saving || loading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-semibold border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-all shadow-xs cursor-pointer"
+              title="Parada de Emergencia: Desactiva el agente SDR y todos los envíos de forma inmediata"
+            >
+              <RiStopCircleLine size={16} />
+              Kill Switch
+            </button>
             {data?.activeVersion?.publication_state === "draft" && (
               <button
                 type="button"
@@ -439,6 +637,40 @@ export default function SdrPage() {
           >
             <RiSettings4Line size={18} />
             {t("sdr.tabOverview")}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("approvals")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              activeTab === "approvals"
+                ? "bg-violet-600/10 text-violet-400 border border-violet-500/20"
+                : "text-base-content/60 hover:text-base-content hover:bg-base-200/50"
+            }`}
+          >
+            <RiCheckDoubleLine size={18} />
+            {t("sdr.tabApprovals", { count: pendingActions.length })}
+            {pendingActions.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                {pendingActions.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab("gates")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              activeTab === "gates"
+                ? "bg-violet-600/10 text-violet-400 border border-violet-500/20"
+                : "text-base-content/60 hover:text-base-content hover:bg-base-200/50"
+            }`}
+          >
+            <RiShieldKeyholeLine size={18} />
+            {t("sdr.tabGates")}
+            <span
+              className={`ml-1 w-2.5 h-2.5 rounded-full inline-block ${
+                gatesAllPassed ? "bg-emerald-500" : "bg-amber-500"
+              }`}
+            />
           </button>
 
           <button
@@ -618,6 +850,121 @@ export default function SdrPage() {
                   </p>
                 </div>
               </div>
+
+              {mode === "auto" && !gatesAllPassed && (
+                <div className="mt-3 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <RiAlertLine className="text-amber-500 shrink-0" size={20} />
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      {t("sdr.gatesSubtitle")} El agente operará en modo Aprobación hasta certificar todos los controles.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("gates")}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shrink-0 cursor-pointer self-start sm:self-auto"
+                  >
+                    Ver Gates
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Master Operational Switches */}
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
+                    <RiShieldCheckLine className="text-violet-400" /> {t("sdr.operationalControls")}
+                  </h3>
+                  <p className="text-xs text-base-content/60 mt-0.5">
+                    {t("sdr.operationalControlsDesc")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                {/* Switch 1: Runtime */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  runtimeEnabled
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : "bg-slate-500/5 border-slate-500/20"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-base-content">{t("sdr.runtimeToggle")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRuntimeEnabled(!runtimeEnabled)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        runtimeEnabled ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          runtimeEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    {t("sdr.runtimeToggleDesc")}
+                  </p>
+                </div>
+
+                {/* Switch 2: Provider */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  providerEnabled
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : "bg-slate-500/5 border-slate-500/20"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-base-content">{t("sdr.providerToggle")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setProviderEnabled(!providerEnabled)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        providerEnabled ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          providerEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    {t("sdr.providerToggleDesc")}
+                  </p>
+                </div>
+
+                {/* Switch 3: Outbound */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  outboundEnabled
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : "bg-slate-500/5 border-slate-500/20"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-base-content">{t("sdr.outboundToggle")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setOutboundEnabled(!outboundEnabled)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        outboundEnabled ? "bg-emerald-500" : "bg-gray-400 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          outboundEnabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-xs text-base-content/60">
+                    {t("sdr.outboundToggleDesc")}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Core Settings */}
@@ -680,6 +1027,235 @@ export default function SdrPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB: PENDING APPROVALS ────────────────────────────────────────── */}
+        {activeTab === "approvals" && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
+              <div>
+                <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
+                  <RiCheckDoubleLine className="text-violet-400" /> {t("sdr.approvalsTitle")}
+                </h3>
+                <p className="text-xs text-base-content/60 mt-0.5">
+                  {t("sdr.approvalsSubtitle")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadActions}
+                disabled={loadingActions}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all cursor-pointer self-start md:self-auto"
+              >
+                <RiRefreshLine size={14} className={loadingActions ? "animate-spin" : ""} />
+                {t("common.refresh")}
+              </button>
+            </div>
+
+            {loadingActions ? (
+              <div className="p-12 text-center text-sm text-base-content/50">
+                <RiRefreshLine className="animate-spin inline-block mr-2" size={20} />
+                Cargando cola de aprobaciones...
+              </div>
+            ) : pendingActions.length === 0 ? (
+              <div className="p-12 text-center rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2">
+                <RiCheckLine size={36} className="mx-auto text-emerald-500 opacity-80" />
+                <p className="text-sm font-semibold text-base-content">{t("sdr.noPendingApprovals")}</p>
+                <p className="text-xs text-base-content/50 max-w-md mx-auto">
+                  Cuando la IA prepare borradores para mensajes entrantes de leads en LinkedIn o Correo, aparecerán aquí para tu revisión y despacho con un clic.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingActions.map((act) => {
+                  const draftValue = editingDrafts[act.id] !== undefined ? editingDrafts[act.id] : act.suggested_reply;
+                  const isProcessing = actionProcessingId === act.id;
+
+                  return (
+                    <div
+                      key={act.id}
+                      className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-4"
+                    >
+                      {/* Lead & Context Header */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-3">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-semibold text-sm text-base-content">
+                            {act.target_name || "Lead / Prospecto"}
+                          </span>
+                          {act.target_company && (
+                            <span className="text-xs text-base-content/60 font-medium">
+                              · {act.target_company}
+                            </span>
+                          )}
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
+                            act.channel === "linkedin"
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                              : "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                          }`}>
+                            {act.channel === "linkedin" ? "LinkedIn" : "Email"}
+                          </span>
+                          {act.intent && (
+                            <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                              {act.intent}
+                            </span>
+                          )}
+                          {act.confidence !== null && (
+                            <span className="text-xs font-semibold text-emerald-500">
+                              {(act.confidence * 100).toFixed(0)}% confianza
+                            </span>
+                          )}
+                          {act.ai_turn_count > 0 && (
+                            <span className="text-xs text-base-content/50">
+                              Turno IA: {act.ai_turn_count}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-base-content/50">
+                          {new Date(act.created_at).toLocaleString()}
+                        </div>
+                      </div>
+
+                      {/* Draft content */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                          {t("sdr.suggestedDraft")}
+                        </label>
+                        <textarea
+                          rows={4}
+                          value={draftValue}
+                          onChange={(e) => setEditingDrafts({ ...editingDrafts, [act.id]: e.target.value })}
+                          className="w-full p-3.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm text-base-content leading-relaxed focus:outline-none focus:border-violet-500"
+                          placeholder="Texto de la respuesta a enviar..."
+                        />
+                      </div>
+
+                      {act.reason_code && (
+                        <div className="text-xs text-base-content/60 bg-base-100/50 p-2.5 rounded-xl border border-gray-200 dark:border-gray-800">
+                          <span className="font-semibold text-base-content/80">Motivo de propuesta:</span> {act.reason_code}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-end gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRejectAction(act.id)}
+                          disabled={isProcessing}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/10 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <RiCloseLine size={16} />
+                          {t("sdr.rejectDraft")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveAction(act.id)}
+                          disabled={isProcessing}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          <RiSendPlaneLine size={16} className={isProcessing ? "animate-spin" : ""} />
+                          {isProcessing ? "Enviando..." : t("sdr.approveAndSend")}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── TAB: PROMOTION GATES ───────────────────────────────────────────── */}
+        {activeTab === "gates" && (
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-base-content text-base flex items-center gap-2">
+                    <RiShieldKeyholeLine className="text-violet-400" /> {t("sdr.gatesTitle")}
+                  </h3>
+                  <p className="text-xs text-base-content/60">
+                    {t("sdr.gatesSubtitle")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadGates}
+                  disabled={loadingGates}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all cursor-pointer self-start md:self-auto"
+                >
+                  <RiRefreshLine size={14} className={loadingGates ? "animate-spin" : ""} />
+                  {t("common.refresh")}
+                </button>
+              </div>
+
+              <div className={`mt-3 p-3.5 rounded-xl border flex items-center gap-3 ${
+                gatesAllPassed
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300"
+              }`}>
+                {gatesAllPassed ? (
+                  <RiCheckLine size={20} className="shrink-0 text-emerald-500" />
+                ) : (
+                  <RiAlertLine size={20} className="shrink-0 text-amber-500" />
+                )}
+                <span className="text-xs font-medium">
+                  {gatesAllPassed
+                    ? "Todos los gates certificados. El agente puede operar en Modo 100% Autónomo con seguridad garantizada."
+                    : "Existen gates pendientes. El agente continuará en Modo Aprobación para proteger la reputación de tu cuenta."}
+                </span>
+              </div>
+            </div>
+
+            {/* Gates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {promotionGates.map((gate) => (
+                <div
+                  key={gate.key}
+                  className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-semibold text-sm text-base-content">{gate.label}</h4>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold shrink-0 border ${
+                        gate.passed
+                          ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                          : "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                      }`}>
+                        {gate.passed ? t("sdr.gatePassed") : t("sdr.gatePending")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-base-content/60 leading-relaxed">{gate.desc}</p>
+
+                    {gate.verified_at && (
+                      <div className="text-xs text-base-content/50 pt-1">
+                        Certificado el: {new Date(gate.verified_at).toLocaleString()}
+                      </div>
+                    )}
+
+                    {gate.evidence && (
+                      <pre className="p-2.5 rounded-xl bg-base-100/70 border border-gray-200 dark:border-gray-800 text-xs font-mono text-base-content/70 overflow-x-auto max-h-24">
+                        {JSON.stringify(gate.evidence, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleVerifyGate(gate.key)}
+                      className={`w-full py-2 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        gate.passed
+                          ? "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 text-base-content/70 border border-gray-300 dark:border-gray-700"
+                          : "bg-brand-500 hover:bg-brand-600 text-white shadow-xs"
+                      }`}
+                    >
+                      {gate.passed ? "Re-certificar Control" : t("sdr.verifyGate")}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

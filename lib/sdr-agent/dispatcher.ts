@@ -7,6 +7,8 @@ import { ensureLinkedInTargetAccountState, markLinkedInTargetState } from "@/lib
 import { sendEmail } from "@/lib/email/sender";
 import { decryptSecret } from "@/lib/crypto";
 import { getSdrThread } from "./repository";
+import { evaluatePreSendGuardrails } from "./guardrails/pre-send";
+import { circuitClosed } from "./runtime";
 
 export interface DispatchSdrActionOptions {
   actionId: string;
@@ -36,6 +38,7 @@ interface SdrActionRow {
   control_epoch: number;
   payload_json: string;
   edited_payload_json: string | null;
+  created_at: string;
 }
 
 export async function dispatchApprovedSdrAction(
@@ -48,6 +51,11 @@ export async function dispatchApprovedSdrAction(
 
   if (!action) {
     throw new Error(`SDR Action ${options.actionId} not found`);
+  }
+
+  // Idempotency / state check: only allow actions awaiting approval
+  if (action.state !== "proposed" && action.state !== "waiting_approval") {
+    throw new Error(`La acción ${options.actionId} ya fue procesada o no es válida (estado actual: ${action.state}).`);
   }
 
   const thread = getSdrThread(db, action.thread_id);
@@ -96,8 +104,76 @@ export async function dispatchApprovedSdrAction(
   const textToSend = options.editedBody || effectivePayload.suggested_reply || effectivePayload.body || "";
   const channel = thread.channel;
 
+  // Check if there is a newer inbound message
+  const newerInbound = db.prepare(`
+    SELECT id FROM sdr_messages
+    WHERE thread_id = ? AND direction = 'inbound' AND sent_at > ?
+    LIMIT 1
+  `).get(thread.id, action.created_at);
+
+  const agentRow = db.prepare(`
+    SELECT outbound_enabled FROM sdr_agents WHERE id = ?
+  `).get(thread.agent_id || "") as { outbound_enabled: number } | undefined;
+
+  const globalOutbound = process.env.SDR_OUTBOUND_ENABLED !== "false" && process.env.SDR_OUTBOUND_ENABLED !== "0";
+  const channelOutbound = channel === "linkedin"
+    ? (process.env.SDR_LINKEDIN_OUTBOUND_ENABLED !== "false" && process.env.SDR_LINKEDIN_OUTBOUND_ENABLED !== "0")
+    : (process.env.SDR_EMAIL_OUTBOUND_ENABLED !== "false" && process.env.SDR_EMAIL_OUTBOUND_ENABLED !== "0");
+
+  // Pre-Send Guardrails evaluation
+  const preSend = evaluatePreSendGuardrails({
+    expectedControlEpoch: action.control_epoch,
+    currentControlEpoch: thread.control_epoch,
+    threadState: thread.state,
+    effectiveMode: "approval",
+    actionWasApproved: true,
+    agentOutboundEnabled: agentRow ? agentRow.outbound_enabled === 1 : true,
+    accountOutboundEnabled: true,
+    globalOutboundEnabled: globalOutbound,
+    channelOutboundEnabled: channelOutbound,
+    targetDoNotContact: Boolean(target.do_not_contact),
+    hasNewerInbound: Boolean(newerInbound),
+    quotaAvailable: true,
+    circuitClosed: circuitClosed(db, thread.workspace_owner_id, thread.agent_id || "", "outbound"),
+    body: textToSend,
+  });
+
+  if (preSend.outcome === "block") {
+    db.prepare(`
+      UPDATE sdr_actions
+      SET state = 'failed', delivery_status = 'failed',
+        rejection_reason = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(`Blocked by pre-send guardrails: ${preSend.reasons.join(", ")}`, action.id);
+    throw new Error(`Guardrails de pre-envío bloquearon el mensaje: ${preSend.reasons.join(", ")}`);
+  }
+
   let externalMessageId = `sdr-msg-${Date.now()}`;
   let externalThreadId = thread.external_thread_id || target.unipile_chat_id || `thread-${target.id}`;
+
+  // Log in sdr_outbox as sending
+  const outboxId = randomUUID();
+  const idempotencyKey = `sdr_outbox:${action.id}:${Date.now()}`;
+  try {
+    db.prepare(`
+      INSERT INTO sdr_outbox (
+        id, workspace_owner_id, action_id, thread_id, channel, state,
+        control_epoch, recipient_snapshot, body, idempotency_key, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'sending', ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).run(
+      outboxId,
+      thread.workspace_owner_id,
+      action.id,
+      thread.id,
+      channel,
+      thread.control_epoch,
+      channel === "linkedin" ? (target.linkedin_url || target.id) : (target.email || target.id),
+      textToSend,
+      idempotencyKey,
+    );
+  } catch {
+    // Non-blocking outbox insertion fallback
+  }
 
   if (channel === "linkedin") {
     // 1. Resolve LinkedIn Account
@@ -130,30 +206,26 @@ export async function dispatchApprovedSdrAction(
         if (!sent?.message_id) throw new Error("El motor de LinkedIn no confirmó el envío");
         externalMessageId = sent.message_id;
       } else {
-        let providerId = target.unipile_provider_id;
-        if (!providerId && target.linkedin_url) {
-          const profile = await unipile.resolveProfile(target.linkedin_url, resolved.unipileAccountId);
-          providerId = profile.provider_id;
-          if (providerId) {
-            markLinkedInTargetState(db, accountId, target.id, { unipile_provider_id: providerId });
-          }
+        const recipientIdentifier = target.messaging_urn || target.linkedin_url || target.unipile_provider_id;
+        if (!recipientIdentifier) {
+          throw new Error("El prospecto no tiene identificador de mensajería ni URL de LinkedIn.");
         }
-
-        if (!providerId) {
-          throw new Error("No se pudo identificar el contacto de LinkedIn.");
-        }
-        const newChat = await unipile.startChat({
+        const started = await unipile.startChat({
           account_id: resolved.unipileAccountId,
-          attendees_ids: [providerId],
           text: textToSend,
+          attendees_ids: [recipientIdentifier],
         });
-        if (!newChat?.chat_id || !newChat.message_id) {
-          throw new Error("El motor de LinkedIn no confirmó el envío");
+        if (!started?.message_id && !started?.chat_id) {
+          throw new Error("El motor de LinkedIn no confirmó la apertura del chat.");
         }
-        externalMessageId = newChat.message_id;
-        externalThreadId = newChat.chat_id;
-        markLinkedInTargetState(db, accountId, target.id, { unipile_chat_id: newChat.chat_id });
+        externalMessageId = started.message_id || externalMessageId;
+        externalThreadId = started.chat_id || externalThreadId;
       }
+
+      markLinkedInTargetState(db, accountId, target.id, {
+        unipile_chat_id: externalThreadId,
+        message_sent_at: new Date().toISOString(),
+      });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       db.prepare(`
@@ -161,7 +233,12 @@ export async function dispatchApprovedSdrAction(
         SET state = 'failed', delivery_status = 'failed', updated_at = datetime('now')
         WHERE id = ?
       `).run(action.id);
-      throw new Error(`No se pudo enviar el mensaje por LinkedIn: ${errorMsg}`);
+      db.prepare(`
+        UPDATE sdr_outbox
+        SET state = 'failed', last_error = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(errorMsg, outboxId);
+      throw new Error(`Error al enviar mensaje por LinkedIn: ${errorMsg}`);
     }
 
     // Persist outbound in LinkedIn inbox table and SDR messages table
@@ -211,11 +288,20 @@ export async function dispatchApprovedSdrAction(
 
       db.prepare(`
         UPDATE sdr_threads
-        SET state = 'WAITING_LEAD', latest_processed_message_id = ?,
+        SET state = 'WAITING_LEAD',
+          latest_processed_message_id = ?,
           external_thread_id = CASE WHEN external_thread_id IS NULL OR external_thread_id LIKE 'thread-%' THEN ? ELSE external_thread_id END,
+          ai_turn_count = ai_turn_count + 1,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(action.message_id || externalMessageId, externalThreadId, thread.id);
+
+      db.prepare(`
+        UPDATE sdr_outbox
+        SET state = 'sent', provider_message_id = ?, provider_thread_id = ?,
+          sent_at = datetime('now'), updated_at = datetime('now')
+        WHERE id = ?
+      `).run(externalMessageId, externalThreadId, outboxId);
     })();
   } else {
     // 2. Email Channel
@@ -273,21 +359,30 @@ export async function dispatchApprovedSdrAction(
         SET state = 'failed', delivery_status = 'failed', updated_at = datetime('now')
         WHERE id = ?
       `).run(action.id);
+      db.prepare(`
+        UPDATE sdr_outbox
+        SET state = 'failed', last_error = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(errorMsg, outboxId);
       throw new Error(`Error al enviar correo: ${errorMsg}`);
     }
 
     db.transaction(() => {
+      // B6 fix: Correct columns, sender_name, and conflict target
       db.prepare(`
         INSERT INTO sdr_messages (
-          id, thread_id, direction, external_message_id, sender_type,
-          body, sent_at, delivery_status
-        ) VALUES (?, ?, 'outbound', ?, 'agent', ?, datetime('now'), 'delivered')
-        ON CONFLICT(external_message_id) DO NOTHING
+          id, thread_id, direction, external_message_id, sender_name,
+          body, content_hash, sent_at, delivery_status, metadata_json
+        ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, datetime('now'), 'delivered', ?)
+        ON CONFLICT(thread_id, external_message_id) DO NOTHING
       `).run(
         randomUUID(),
         thread.id,
         externalMessageId,
+        emailAccount.from_name || "InHubFlow",
         textToSend,
+        createHash("sha256").update(textToSend, "utf8").digest("hex"),
+        JSON.stringify({ sentVia: "sdr_action_dispatch", actionId: action.id }),
       );
 
       db.prepare(`
@@ -302,9 +397,19 @@ export async function dispatchApprovedSdrAction(
 
       db.prepare(`
         UPDATE sdr_threads
-        SET state = 'WAITING_LEAD', latest_processed_message_id = ?, updated_at = datetime('now')
+        SET state = 'WAITING_LEAD',
+          latest_processed_message_id = ?,
+          ai_turn_count = ai_turn_count + 1,
+          updated_at = datetime('now')
         WHERE id = ?
       `).run(action.message_id || externalMessageId, thread.id);
+
+      db.prepare(`
+        UPDATE sdr_outbox
+        SET state = 'sent', provider_message_id = ?, provider_thread_id = ?,
+          sent_at = datetime('now'), updated_at = datetime('now')
+        WHERE id = ?
+      `).run(externalMessageId, externalThreadId, outboxId);
     })();
   }
 

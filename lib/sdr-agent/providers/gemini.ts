@@ -9,11 +9,11 @@ import {
 } from "./provider";
 
 const DEFAULT_TIMEOUT_MS = 25_000;
-const DEFAULT_MAX_RETRIES = 2;
-const DEFAULT_MODEL = "gemini-3.6-flash";
-// gemini-3.7-flash responde 503 "high demand" de forma sostenida: se omite de la
-// cadena de fallback para no desperdiciar reintentos en un modelo caído.
-const FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.5-flash"];
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+const FALLBACK_MODELS = process.env.GEMINI_FALLBACK_MODELS
+  ? process.env.GEMINI_FALLBACK_MODELS.split(",").map((s) => s.trim()).filter(Boolean)
+  : ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
 
 const RESPONSE_JSON_SCHEMA: Schema = {
   type: Type.OBJECT,

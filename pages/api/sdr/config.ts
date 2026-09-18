@@ -18,6 +18,10 @@ interface ConfigBody {
   company_context?: unknown;
   custom_instructions?: unknown;
   handoff_rules?: unknown;
+  runtime_enabled?: unknown;
+  provider_enabled?: unknown;
+  outbound_enabled?: unknown;
+  auto_publish?: unknown;
 }
 
 function jsonObject(value: string | null | undefined): Record<string, unknown> {
@@ -114,16 +118,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const companyContext = parseOptionalString(body.company_context, "company_context", 20_000);
     const customInstructions = parseOptionalString(body.custom_instructions, "custom_instructions", 10_000);
     const handoffRules = parseOptionalString(body.handoff_rules, "handoff_rules", 10_000);
-    if (mode === "auto") return res.status(409).json({ error: "El modo automático requiere completar los gates de promoción y habilitarlo desde operaciones." });
+    
+    // Operational toggles
+    const runtimeEnabled = body.runtime_enabled === undefined ? undefined : (body.runtime_enabled ? 1 : 0);
+    const providerEnabled = body.provider_enabled === undefined ? undefined : (body.provider_enabled ? 1 : 0);
+    const outboundEnabled = body.outbound_enabled === undefined ? undefined : (body.outbound_enabled ? 1 : 0);
+    const autoPublish = body.auto_publish !== false;
+
+    if (mode === "auto") {
+      const autoGates = [
+        "shadow_evaluated",
+        "approval_canary_passed",
+        "takeover_race_passed",
+        "kill_switch_drill_passed",
+      ];
+      const unpassed = autoGates.filter((gate) => {
+        const row = db.prepare("SELECT passed FROM sdr_promotion_gates WHERE agent_id = ? AND capability = 'auto' AND gate_key = ?").get(agent.id, gate) as { passed?: number } | undefined;
+        return row?.passed !== 1;
+      });
+      if (unpassed.length > 0) {
+        return res.status(409).json({ error: `El modo automático requiere completar los gates de promoción (${unpassed.join(", ")}).` });
+      }
+    }
 
     db.transaction(() => {
       db.prepare(`
-        UPDATE sdr_agents SET name = COALESCE(?, name), mode = COALESCE(?, mode),
-          model = COALESCE(?, model), default_language = COALESCE(?, default_language),
-          confidence_threshold = COALESCE(?, confidence_threshold), max_auto_turns = COALESCE(?, max_auto_turns),
-          handoff_email = ?, config_revision = config_revision + 1, updated_at = datetime('now')
+        UPDATE sdr_agents SET
+          name = COALESCE(?, name),
+          mode = COALESCE(?, mode),
+          model = COALESCE(?, model),
+          default_language = COALESCE(?, default_language),
+          confidence_threshold = COALESCE(?, confidence_threshold),
+          max_auto_turns = COALESCE(?, max_auto_turns),
+          handoff_email = ?,
+          runtime_enabled = COALESCE(?, runtime_enabled),
+          provider_enabled = COALESCE(?, provider_enabled),
+          outbound_enabled = COALESCE(?, outbound_enabled),
+          status = 'active',
+          config_revision = config_revision + 1,
+          updated_at = datetime('now')
         WHERE id = ? AND workspace_owner_id = ?
-      `).run(name, mode, model, defaultLanguage, threshold, turns, handoffEmail, agent.id, actor.workspaceOwnerId);
+      `).run(
+        name,
+        mode,
+        model,
+        defaultLanguage,
+        threshold,
+        turns,
+        handoffEmail,
+        runtimeEnabled,
+        providerEnabled,
+        outboundEnabled,
+        agent.id,
+        actor.workspaceOwnerId,
+      );
 
       const currentPolicy = jsonObject(activeVersion?.policy_json);
       const currentConfig = jsonObject(activeVersion?.config_json);
@@ -136,25 +184,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...currentConfig,
         ...(customInstructions !== undefined ? { custom_instructions: customInstructions } : {}),
       };
+
       if (systemPrompt !== undefined || companyContext !== undefined || customInstructions !== undefined || handoffRules !== undefined || model !== undefined) {
+        const effectivePrompt = systemPrompt ?? activeVersion?.system_prompt ?? "";
+        const effectiveModel = model ?? activeVersion?.model ?? agent.model ?? "gemini-3.7-flash";
+        const approvedKnowledge = (db.prepare(`
+          SELECT COUNT(*) AS count FROM sdr_knowledge_sources
+          WHERE agent_id = ? AND workspace_owner_id = ? AND status = 'approved'
+            AND content IS NOT NULL AND length(trim(content)) > 0
+        `).get(agent.id, actor.workspaceOwnerId) as { count: number }).count;
+
+        // Auto-publish if system prompt is valid and approved knowledge exists, preventing provider shutdown (A1 fix)
+        const willPublish = autoPublish && approvedKnowledge > 0 && effectivePrompt.trim().length > 0;
         const versionId = crypto.randomUUID();
         const nextVersion = ((db.prepare("SELECT COALESCE(MAX(version_number), 0) AS count FROM sdr_agent_versions WHERE agent_id = ?").get(agent.id) as { count: number }).count) + 1;
+        const revisionHash = willPublish
+          ? crypto.createHash("sha256").update(JSON.stringify({ model: effectiveModel, prompt: effectivePrompt, policy: nextPolicy, config: nextConfig, approvedKnowledge }), "utf8").digest("hex")
+          : null;
+
         db.prepare(`
           INSERT INTO sdr_agent_versions (
             id, agent_id, version_number, model, system_prompt, policy_json,
-            config_json, publication_state, published_by_user_id, published_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, datetime('now'))
-        `).run(versionId, agent.id, nextVersion, model ?? activeVersion?.model ?? agent.model, systemPrompt ?? activeVersion?.system_prompt ?? "", JSON.stringify(nextPolicy), JSON.stringify(nextConfig), actor.id);
+            config_json, publication_state, revision_hash, published_by_user_id, published_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `).run(
+          versionId,
+          agent.id,
+          nextVersion,
+          effectiveModel,
+          effectivePrompt,
+          JSON.stringify(nextPolicy),
+          JSON.stringify(nextConfig),
+          willPublish ? "published" : "draft",
+          revisionHash,
+          actor.id,
+        );
+
         db.prepare("UPDATE sdr_agents SET active_version_id = ?, updated_at = datetime('now') WHERE id = ?").run(versionId, agent.id);
       }
+
       db.prepare(`
         INSERT INTO sdr_audit_events (
           id, workspace_owner_id, actor_type, actor_user_id, entity_type,
           entity_id, event_type, payload_json
         ) VALUES (?, ?, 'user', ?, 'agent', ?, 'configuration_updated', ?)
-      `).run(crypto.randomUUID(), actor.workspaceOwnerId, actor.id, agent.id, JSON.stringify({ mode, model }));
+      `).run(crypto.randomUUID(), actor.workspaceOwnerId, actor.id, agent.id, JSON.stringify({ mode, model, runtimeEnabled, providerEnabled, outboundEnabled }));
     })();
-    return res.status(200).json({ ok: true, message: "Configuración guardada como versión pendiente de publicación" });
+
+    return res.status(200).json({ ok: true, message: "Configuración guardada y sincronizada correctamente" });
   } catch (error) {
     return res.status(400).json({ error: error instanceof Error ? error.message : "Invalid SDR configuration" });
   }

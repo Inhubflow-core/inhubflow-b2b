@@ -82,8 +82,8 @@ function claimLegacyAgent(
 
   db.prepare(`
     UPDATE sdr_agents
-    SET workspace_owner_id = ?, mode = 'off', runtime_enabled = 0,
-      provider_enabled = 0, outbound_enabled = 0, updated_at = datetime('now')
+    SET workspace_owner_id = ?, mode = 'approval', runtime_enabled = 1,
+      provider_enabled = 1, outbound_enabled = 1, status = 'active', updated_at = datetime('now')
     WHERE id = ? AND workspace_owner_id IS NULL
   `).run(workspaceOwnerId, legacy[0].id);
   db.prepare(`

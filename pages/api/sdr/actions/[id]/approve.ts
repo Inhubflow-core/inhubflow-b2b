@@ -21,6 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(404).json({ error: "Acción SDR no encontrada" });
   }
 
+  if (action.state !== "proposed" && action.state !== "waiting_approval") {
+    return res.status(409).json({ error: `La acción ya fue procesada o no está disponible para aprobación (estado actual: ${action.state})` });
+  }
+
   if (!canAccessSdrThread(db, actor, action.thread_id)) {
     return res.status(404).json({ error: "Conversación no encontrada o no autorizada" });
   }

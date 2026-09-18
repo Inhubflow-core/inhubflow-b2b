@@ -3372,9 +3372,9 @@ export default function SignalsPage({
                                         </div>
                                       </div>
                                     </div>
-                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
+                                    <span className="text-xs block leading-tight font-normal text-gray-900 dark:text-white">
                                       {ev.title}
-                                    </strong>
+                                    </span>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {ev.desc}
                                     </p>
@@ -3524,9 +3524,9 @@ export default function SignalsPage({
                                         </div>
                                       </div>
                                     </div>
-                                    <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
+                                    <span className="text-xs block leading-tight font-normal text-gray-900 dark:text-white">
                                       {sig.title}
-                                    </strong>
+                                    </span>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {sig.desc}
                                     </p>
