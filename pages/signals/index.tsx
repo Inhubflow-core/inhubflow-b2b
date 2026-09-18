@@ -2774,11 +2774,11 @@ export default function SignalsPage({
                         {/* MODO BUSCADOR INTELIGENTE */}
                         {postSearchMode === "search" && (
                           <div className="space-y-4">
-                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
+                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {/* Campo 1: Competidor o Marca */}
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                                     Competidor, Marca o Creador
                                   </label>
                                   <input
@@ -2789,19 +2789,19 @@ export default function SignalsPage({
                                       setNewCompetitor(e.target.value);
                                     }}
                                     placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                   />
                                 </div>
 
                                 {/* Campo 2: Fecha de Publicación */}
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                                     Fecha de Publicación
                                   </label>
                                   <select
                                     value={postSearchDate}
                                     onChange={(e) => setPostSearchDate(e.target.value as any)}
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                   >
                                     <option value="past_week">Esta semana (Más recientes)</option>
                                     <option value="past_month">Último mes (Mayor volumen)</option>
@@ -2811,13 +2811,13 @@ export default function SignalsPage({
 
                                 {/* Campo 3: Ordenar por */}
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                                     Priorizar Resultados Por
                                   </label>
                                   <select
                                     value={postSearchSortBy}
                                     onChange={(e) => setPostSearchSortBy(e.target.value as any)}
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                   >
                                     <option value="engagement">Mayor Viralidad (Likes + Comentarios)</option>
                                     <option value="date">Más Recientes</option>
@@ -2827,11 +2827,12 @@ export default function SignalsPage({
 
                               {/* Palabras clave de búsqueda */}
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                  Palabras Clave en la Publicación *
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                                  Palabras Clave en la Publicación <span className="text-brand-500">*</span>
                                 </label>
                                 <div className="flex gap-2">
                                   <div className="relative flex-1">
+                                    <RiSearchLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                                     <input
                                       type="text"
                                       value={postSearchKeywords}
@@ -2843,15 +2844,15 @@ export default function SignalsPage({
                                         }
                                       }}
                                       placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
-                                      className="w-full rounded-xl border border-gray-300 bg-white pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                      className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-8 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                     />
                                     {postSearchKeywords && (
                                       <button
                                         type="button"
                                         onClick={() => setPostSearchKeywords("")}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                                       >
-                                        <RiCloseLine size={13} />
+                                        <RiCloseLine size={15} />
                                       </button>
                                     )}
                                   </div>
@@ -2859,7 +2860,7 @@ export default function SignalsPage({
                                     type="button"
                                     onClick={handleSearchLinkedInPosts}
                                     disabled={isSearchingPosts}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 shadow-xs transition-all shrink-0"
+                                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 shadow-xs transition-all shrink-0 cursor-pointer"
                                   >
                                     {isSearchingPosts ? (
                                       <>
@@ -2876,7 +2877,7 @@ export default function SignalsPage({
                                 {/* Chips sugeridos de 1 clic */}
                                 <div className="space-y-1.5 mt-2">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[10px] font-medium text-gray-400">Temas recomendados:</span>
+                                    <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
                                     {[
                                       "Prospección B2B",
                                       "Inteligencia Artificial",
@@ -2897,18 +2898,18 @@ export default function SignalsPage({
                                               setPostSearchKeywords(sug);
                                             }
                                           }}
-                                          className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                                             isChipActive
-                                              ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
-                                              : "bg-white hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-300 dark:border-gray-600 hover:border-brand-300"
+                                              ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                              : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                                           }`}
                                         >
-                                          {isChipActive ? `✓ ${sug}` : sug}
+                                          {isChipActive ? `✓ ${sug}` : `+${sug}`}
                                         </button>
                                       );
                                     })}
                                   </div>
-                                  <p className="text-[10px] text-gray-400">
+                                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
                                     💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
                                   </p>
                                 </div>
@@ -3092,11 +3093,11 @@ export default function SignalsPage({
 
                         {/* MODO MANUAL (Pegar URLs) */}
                         {postSearchMode === "manual" && (
-                          <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 space-y-3">
+                          <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
-                                  Nombre del Competidor o Referente (Opcional)
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                                  Competidor o Referente <span className="text-gray-400 font-normal">(Opcional)</span>
                                 </label>
                                 <input
                                   type="text"
@@ -3106,16 +3107,16 @@ export default function SignalsPage({
                                     setPostSearchCompetitor(e.target.value);
                                   }}
                                   placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                  className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                 />
                               </div>
                               <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300">
-                                    URL(s) de Publicaciones en LinkedIn *
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                    URL(s) de Publicaciones <span className="text-brand-500">*</span>
                                   </label>
-                                  <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">
-                                    {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "publicación detectada" : "publicaciones detectadas"}
+                                  <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">
+                                    {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "detectada" : "detectadas"}
                                   </span>
                                 </div>
                                 <textarea
@@ -3130,11 +3131,11 @@ export default function SignalsPage({
                                     setSelectedPostUrls(urls);
                                   }}
                                   placeholder="Pega una o más URLs de LinkedIn (una por línea)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
-                                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 font-mono"
+                                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 font-mono"
                                 />
                               </div>
                             </div>
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500">
                               Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
                             </p>
                           </div>
@@ -3146,17 +3147,17 @@ export default function SignalsPage({
                         PESTAÑA 2: PALABRAS CLAVE, COMPETIDORES Y NOTICIAS
                        ========================================================= */}
                     {signalCategoryTab === "keywords" && (
-                      <div className="space-y-4 animate-in fade-in duration-150">
+                      <div className="space-y-5 animate-in fade-in duration-150">
                         {/* 1. Empresa o Competidor a Vigilar */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
-                              Empresa, Competidor o Referente a Monitorear (Opcional)
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                              Empresa, Competidor o Referente <span className="text-gray-400 font-normal">(Opcional)</span>
                             </label>
-                            <span className="text-[10px] text-gray-400">Sin URLs necesarias</span>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Sin URLs necesarias</span>
                           </div>
                           <div className="relative">
-                            <RiBuildingLine className="absolute left-3.5 top-2.5 text-gray-400" size={15} />
+                            <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                             <input
                               type="text"
                               value={newCompetitor}
@@ -3165,28 +3166,28 @@ export default function SignalsPage({
                                 setPostSearchCompetitor(e.target.value);
                               }}
                               placeholder="Ej: HubSpot, Salesforce, Lemlist, Apollo, Deel..."
-                              className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                              className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                             />
                           </div>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
                             InHubFlow rastreará automáticamente discusiones públicas, menciones y personas que interactúen alrededor de este competidor.
                           </p>
                         </div>
 
                         {/* 2. Palabras Clave de Intención de Compra */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                               Palabras Clave de Intención de Compra
                             </label>
-                            <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                            <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">
                               {keywordsList.length} término(s) activo(s)
                             </span>
                           </div>
 
                           {/* Chips activos */}
                           {keywordsList.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-300 dark:border-gray-700 min-h-[42px] items-center">
+                            <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-gray-50 dark:bg-gray-850 border border-gray-300 dark:border-gray-700 items-center">
                               {keywordsList.map((kw) => (
                                 <span
                                   key={kw}
@@ -3196,7 +3197,7 @@ export default function SignalsPage({
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveKeyword(kw)}
-                                    className="hover:text-red-500 transition-colors"
+                                    className="hover:text-red-500 transition-colors cursor-pointer"
                                     title="Quitar palabra clave"
                                   >
                                     <RiCloseLine size={13} />
@@ -3209,6 +3210,7 @@ export default function SignalsPage({
                           {/* Input para agregar keywords */}
                           <div className="flex gap-2">
                             <div className="relative flex-1">
+                              <RiSearchLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                               <input
                                 type="text"
                                 value={customKeywordInput}
@@ -3220,31 +3222,31 @@ export default function SignalsPage({
                                   }
                                 }}
                                 placeholder="Escribe una frase y pulsa Enter (ej: 'busco CRM', 'alternativa a Lemlist')..."
-                                className="w-full rounded-xl border border-gray-300 bg-white pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                                className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-8 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                               />
                               {customKeywordInput && (
                                 <button
                                   type="button"
                                   onClick={() => setCustomKeywordInput("")}
-                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                                 >
-                                  <RiCloseLine size={13} />
+                                  <RiCloseLine size={15} />
                                 </button>
                               )}
                             </div>
                             <button
                               type="button"
                               onClick={() => handleAddKeyword(customKeywordInput)}
-                              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-xs transition-all shrink-0"
+                              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-xs transition-all shrink-0 cursor-pointer"
                             >
                               + Añadir
                             </button>
                           </div>
 
-                          {/* Sugerencias de 1 clic */}
-                          <div className="space-y-1.5 pt-1">
+                          {/* Sugerencias de 1 clic (estilo idéntico a las pills del Paso 1) */}
+                          <div className="pt-0.5 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[10px] font-medium text-gray-400">Términos sugeridos de alta intención:</span>
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mr-1">Términos sugeridos:</span>
                               {[
                                 "busco CRM",
                                 "alternativa a HubSpot",
@@ -3265,27 +3267,27 @@ export default function SignalsPage({
                                         handleAddKeyword(sug);
                                       }
                                     }}
-                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all ${
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                                       isAdded
-                                        ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
-                                        : "bg-white hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border border-gray-300 dark:border-gray-600 hover:border-brand-300"
+                                        ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                        : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                                     }`}
                                   >
-                                    {isAdded ? `✓ ${sug}` : `+ ${sug}`}
+                                    {isAdded ? `✓ ${sug}` : `+${sug}`}
                                   </button>
                                 );
                               })}
                             </div>
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500">
                               💡 El sistema rastrea publicaciones y preguntas en LinkedIn donde las personas usen estas palabras clave y las cruza con tus cargos y países del ICP.
                             </p>
                           </div>
                         </div>
 
-                        {/* 3. Eventos Disparadores de Mercado (Trigger Events) - MULTISELECCIÓN */}
-                        <div className="p-4 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2.5">
+                        {/* 3. Eventos Disparadores de Mercado (Trigger Events) */}
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                               Eventos Disparadores de Mercado (Trigger Events)
                             </label>
                             <div className="flex items-center gap-2">
@@ -3298,18 +3300,18 @@ export default function SignalsPage({
                                     setSelectedMarketEvents(["funding_round", "company_news", "acquisition_event"]);
                                   }
                                 }}
-                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                                className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
                                 {selectedMarketEvents.length === 3 ? "Deseleccionar todos" : "Seleccionar los 3"}
                               </button>
                               <span className="text-gray-300 dark:text-gray-600">|</span>
-                              <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold">Web Pública + LinkedIn</span>
+                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
                             </div>
                           </div>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
                             Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             {[
                               {
                                 id: "funding_round",
@@ -3340,32 +3342,36 @@ export default function SignalsPage({
                                   key={ev.id}
                                   type="button"
                                   onClick={() => handleToggleMarketEvent(ev.id)}
-                                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
+                                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative ${
                                     isActive
-                                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/40 shadow-xs"
-                                      : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
+                                      ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs"
+                                      : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                                   }`}
                                 >
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between mb-1.5">
                                     <Icon size={18} className={`${ev.iconColor} shrink-0`} />
                                     <div
                                       className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
                                         isActive
-                                          ? "bg-emerald-600 text-white shadow-xs"
-                                          : "border border-gray-400 dark:border-gray-500 text-transparent"
+                                          ? "bg-brand-500 text-white shadow-xs"
+                                          : "border border-gray-300 dark:border-gray-600 text-transparent"
                                       }`}
                                     >
                                       ✓
                                     </div>
                                   </div>
-                                  <strong className="text-xs block mt-1 leading-tight">{ev.title}</strong>
-                                  <span className="text-[10px] text-gray-400 block mt-0.5 leading-snug">{ev.desc}</span>
+                                  <strong className="text-xs block font-bold text-gray-900 dark:text-white">
+                                    {ev.title}
+                                  </strong>
+                                  <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-0.5">
+                                    {ev.desc}
+                                  </span>
                                 </button>
                               );
                             })}
                           </div>
                           {selectedMarketEvents.length > 0 && (
-                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                               ✓ Se detectarán {selectedMarketEvents.length === 3 ? "los 3 tipos de noticias públicas" : `${selectedMarketEvents.length} tipo(s) de noticias públicas`} y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
                             </p>
                           )}
@@ -3379,13 +3385,13 @@ export default function SignalsPage({
                     {signalCategoryTab === "icp_triggers" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
                         {/* Cabecera de los 6 disparadores */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                              <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                                 Señales Automáticas de Decisores (Nivel 3)
-                              </h4>
-                              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                              </span>
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                                 Selecciona 1 o más eventos. El sistema rastreará periódicamente LinkedIn buscando personas que cumplan estas condiciones:
                               </p>
                             </div>
@@ -3542,7 +3548,7 @@ export default function SignalsPage({
 
                     {/* Selector de Objetivo del Mensaje */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                         1. Objetivo de Conversión del Mensaje
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -3576,10 +3582,10 @@ export default function SignalsPage({
                               key={obj.id}
                               type="button"
                               onClick={() => setMsgObjective(obj.id as "conversation" | "demo" | "resource")}
-                              className={`p-3 rounded-2xl border text-left text-xs transition-all cursor-pointer ${
+                              className={`p-3.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
                                 isSelected
-                                  ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                                  : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
+                                  ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs font-bold"
+                                  : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                               }`}
                             >
                               <div className="font-bold flex items-center gap-1.5">
@@ -3597,7 +3603,7 @@ export default function SignalsPage({
 
                     {/* Selector de Tono */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                         2. Tono de la IA
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -3630,8 +3636,8 @@ export default function SignalsPage({
                               onClick={() => setMsgTone(tn.id as "consultive" | "professional" | "direct")}
                               className={`p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 isSelected
-                                  ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                                  : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
+                                  ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs font-bold"
+                                  : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                               }`}
                             >
                               <Icon size={15} className={tn.iconColor} />
@@ -3644,11 +3650,13 @@ export default function SignalsPage({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">Idioma del mensaje</label>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                          Idioma del Mensaje
+                        </label>
                         <select
                           value={msgLanguage}
                           onChange={(e) => setMsgLanguage(e.target.value as "es" | "en" | "pt-BR")}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         >
                           <option value="es">Español</option>
                           <option value="en">English</option>
@@ -3656,14 +3664,16 @@ export default function SignalsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">Máximo de palabras</label>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                          Máximo de Palabras
+                        </label>
                         <input
                           type="number"
                           min={20}
                           max={180}
                           value={msgMaxWords}
                           onChange={(e) => setMsgMaxWords(Math.max(20, Math.min(180, Number(e.target.value) || 90)))}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         />
                       </div>
                     </div>
@@ -3671,7 +3681,7 @@ export default function SignalsPage({
                     {/* Vista previa orientativa del mensaje */}
                     <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                           Simulación en Tiempo Real (LinkedIn Direct Message Preview)
                         </label>
@@ -3681,7 +3691,7 @@ export default function SignalsPage({
                       </div>
 
                       {/* Mockup de LinkedIn Card */}
-                      <div className="p-4 rounded-2xl bg-[#F3F6F8] dark:bg-gray-850 border border-gray-300 dark:border-gray-700 space-y-3">
+                      <div className="p-4 rounded-xl bg-[#F3F6F8] dark:bg-gray-850 border border-gray-300 dark:border-gray-700 space-y-3">
                         {/* Cabecera del chat de LinkedIn */}
                         <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2.5">
                           <div className="flex items-center gap-2.5">
@@ -3706,7 +3716,7 @@ export default function SignalsPage({
                           <span className="text-[10px] text-gray-400 block text-center">
                             Hoy · Mensaje generado con IA contextual
                           </span>
-                          <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-xs border border-gray-300 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
+                          <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-xl rounded-tl-xs border border-gray-300 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
                             {previewSignalMessage({
                               signalType: newType,
                               objective: msgObjective,
@@ -3739,7 +3749,7 @@ export default function SignalsPage({
                             value={customTemplate}
                             onChange={(e) => setCustomTemplate(e.target.value)}
                             placeholder="Hola {first_name}, vi que sigues activo en {topic}... ¿Cómo abordan este reto en {company}?"
-                            className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                            className="w-full rounded-xl border border-gray-300 bg-white p-3.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                           />
                           <p className="text-[11px] text-gray-400">
                             Variables disponibles: <code>{"{first_name}"}</code>, <code>{"{company}"}</code>, <code>{"{topic}"}</code>, <code>{"{competitor}"}</code>.
@@ -3754,80 +3764,81 @@ export default function SignalsPage({
                     PASO 4: REVISIÓN FINAL, CUENTA Y LANZAMIENTO
                    ========================================================= */}
                 {wizardStep === 4 && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        <RiPlayLine size={13} /> Paso 4 de 4: Revisar y Activar
-                      </div>
-                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
-                        Lanzamiento del Monitor de Señales
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Define el modo de ejecución y la cuenta de LinkedIn encargada de la prospección.
-                      </p>
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <RiPlayLine className="text-brand-500" /> Lanzamiento del Monitor de Señales
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 4 de 4</span>
                     </div>
 
                     {/* 1. Nombre del Monitor */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
-                        Nombre del Monitor *
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Nombre del Monitor <span className="text-brand-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        placeholder={`Radar: ${
-                          SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title || "Señales"
-                        } - ${newCompetitor || keywordsList[0] || "ICP"}`}
-                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 shadow-2xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                      />
+                      <div className="relative">
+                        <RiRadarLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          placeholder={`Radar: ${
+                            SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title || "Señales"
+                          } - ${newCompetitor || keywordsList[0] || "ICP"}`}
+                          className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                        />
+                      </div>
                     </div>
 
                     {/* 2. Cuenta de LinkedIn Remitente */}
                     {accounts.length > 0 && (
                       <div>
-                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                           Cuenta de LinkedIn Remitente
                         </label>
-                        <select
-                          value={selectedAccountId}
-                          onChange={(e) => setSelectedAccountId(e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                        >
-                          {accounts.map((acc) => (
-                            <option key={acc.id} value={acc.id}>
-                              {acc.name} {acc.is_authenticated ? "(Conectada ✓)" : "(Desconectada)"}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <RiLinkedinBoxFill className="absolute left-3.5 top-3 text-brand-600" size={16} />
+                          <select
+                            value={selectedAccountId}
+                            onChange={(e) => setSelectedAccountId(e.target.value)}
+                            className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                          >
+                            {accounts.map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} {acc.is_authenticated ? "(Conectada ✓)" : "(Desconectada)"}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     )}
 
                     {/* 3. Modo de Operación (Review vs Autopilot) */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                         Modo de Operación
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
                           type="button"
                           onClick={() => setNewMode("review")}
-                          className={`p-4 rounded-2xl border text-left text-xs transition-all ${
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                             newMode === "review"
-                              ? "border-brand-500 bg-brand-50/60 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                              : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
+                              ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs"
+                              : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                           }`}
                         >
-                          <div className="font-bold flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-bold text-xs">
                               Modo Revisión
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-100 text-brand-800 dark:bg-brand-900 dark:text-brand-300">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300">
                                 Recomendado
                               </span>
                             </span>
                             {newMode === "review" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
                             Los prospectos captados van a tu cola de «Hot Leads». Revisas y apruebas el mensaje antes de activar el contacto.
                           </div>
                         </button>
@@ -3835,22 +3846,22 @@ export default function SignalsPage({
                         <button
                           type="button"
                           onClick={() => setNewMode("autopilot")}
-                          className={`p-4 rounded-2xl border text-left text-xs transition-all ${
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                             newMode === "autopilot"
-                              ? "border-purple-500 bg-purple-50/60 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                              : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
+                              ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs"
+                              : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                           }`}
                         >
-                          <div className="font-bold flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-bold text-xs">
                               Piloto Automático (Autopilot)
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
                                 Gates SDR IA
                               </span>
                             </span>
-                            {newMode === "autopilot" && <RiCheckLine className="text-purple-500" size={18} />}
+                            {newMode === "autopilot" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1.5 leading-relaxed">
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
                             InHubFlow solo enrola automáticamente cuando la cuenta, campaña y los controles del SDR IA están listos. Si falta un gate, el lead pasa a revisión.
                           </div>
                         </button>
@@ -3860,13 +3871,13 @@ export default function SignalsPage({
                     {/* 4. Lista y campaña destino */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
-                          Lista de destino *
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                          Lista de Destino <span className="text-brand-500">*</span>
                         </label>
                         <select
                           value={newTargetList}
                           onChange={(e) => setNewTargetList(e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         >
                           <option value="">Selecciona una lista</option>
                           {lists.map((list) => (
@@ -3875,13 +3886,13 @@ export default function SignalsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
-                          Workflow {newMode === "autopilot" ? "*" : "(opcional)"}
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                          Workflow <span className="text-gray-400 font-normal">{newMode === "autopilot" ? "*" : "(Opcional)"}</span>
                         </label>
                         <select
                           value={newTargetWorkflow}
                           onChange={(e) => setNewTargetWorkflow(e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         >
                           <option value="">Solo guardar en lista</option>
                           {workflows.map((workflow) => (
@@ -3892,13 +3903,13 @@ export default function SignalsPage({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
-                        Frecuencia de escaneo
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                        Frecuencia de Escaneo
                       </label>
                       <select
                         value={scanIntervalMinutes}
                         onChange={(e) => setScanIntervalMinutes(Number(e.target.value))}
-                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                       >
                         <option value={60}>Cada hora</option>
                         <option value={360}>Cada 6 horas (recomendado)</option>
@@ -3908,70 +3919,75 @@ export default function SignalsPage({
                     </div>
 
                     {newMode === "autopilot" && (
-                      <div className={`p-3 rounded-xl border text-xs ${autopilotReadiness?.ready
+                      <div className={`p-3.5 rounded-xl border text-xs ${autopilotReadiness?.ready
                         ? "bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-200"
                         : "bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200"}`}>
                         <strong>{autopilotReadiness?.ready ? "✓ Autopilot listo" : "Autopilot permanecerá en revisión"}</strong>
                         {!autopilotReadiness?.ready && (
-                          <p className="mt-1">Completa cuenta, lista, workflow y gates del SDR IA. No se contactará a nadie automáticamente mientras falte un requisito.</p>
+                          <p className="mt-1 leading-relaxed">Completa cuenta, lista, workflow y gates del SDR IA. No se contactará a nadie automáticamente mientras falte un requisito.</p>
                         )}
                       </div>
                     )}
 
                     {/* Ficha Resumen Completa */}
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
-                      <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
-                        Resumen de Configuración del Monitor
-                      </span>
+                    <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          Resumen de Configuración del Monitor
+                        </span>
+                        <span className="text-[11px] text-brand-600 dark:text-brand-400 font-medium">
+                          Listo para activar
+                        </span>
+                      </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Audiencia (ICP)</span>
-                          <strong className="text-gray-800 dark:text-gray-200">
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Audiencia (ICP)</span>
+                          <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {icpTitles.length} cargos · {icpLocations.length > 0 ? icpLocations[0] : icpCountry}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Señal Elegida</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Señal Elegida</span>
                           <strong className="text-brand-600 truncate block">
                             {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Fórmula Mensaje</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Fórmula Mensaje</span>
                           <strong className="text-purple-600 truncate block capitalize">
                             {msgObjective} · {msgTone}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Modo</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Modo</span>
                           <strong className="text-emerald-600 block">
                             {newMode === "review" ? "Revisión Manual" : "Piloto Automático"}
                           </strong>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-300 dark:border-gray-700">
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Disparador / Posts</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-200 dark:border-gray-750">
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Disparador / Posts</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block" title={selectedPostUrls.join(", ")}>
                             {selectedPostUrls.length > 0
                               ? `${selectedPostUrls.length} publicación(es)`
                               : newCompetitor.trim() || keywordsList[0] || "Configurado"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Cuenta Remitente</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Cuenta Remitente</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {accounts.find((a) => a.id === selectedAccountId)?.name || "Cuenta activa"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Lista de Destino</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Lista de Destino</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {lists.find((l) => l.id === newTargetList)?.name || "Sin lista"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block">Frecuencia</span>
+                        <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
+                          <span className="text-[10px] text-gray-400 block font-medium">Frecuencia</span>
                           <strong className="text-gray-800 dark:text-gray-200 block">
                             {scanIntervalMinutes === 60
                               ? "Cada 1 hora"
