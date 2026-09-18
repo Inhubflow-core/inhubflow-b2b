@@ -4035,14 +4035,13 @@ export default function SignalsPage({
                     <button
                       type="button"
                       onClick={advanceWizard}
-                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
                     >
-                      Siguiente:{" "}
                       {wizardStep === 1
-                        ? "Elegir Disparador"
+                        ? "PASO 2: Disparador"
                         : wizardStep === 2
-                        ? "Mensaje IA Anti-Stalker"
-                        : "Revisar & Lanzar"}{" "}
+                        ? "PASO 3: Mensaje IA"
+                        : "PASO 4: Lanzar"}{" "}
                       <RiArrowRightLine size={15} />
                     </button>
                   ) : (
@@ -4050,7 +4049,7 @@ export default function SignalsPage({
                       type="button"
                       disabled={creatingMonitor}
                       onClick={() => handleCreateMonitor()}
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black text-white bg-brand-500 hover:bg-brand-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 cursor-pointer"
                     >
                       {creatingMonitor ? (
                         <>
