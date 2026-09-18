@@ -1560,7 +1560,7 @@ export default function SignalsPage({
           {/* Guía visual con la Fórmula Recomendada */}
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 p-2.5 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
             <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
-              Fórmula recomendada:
+              💡 Fórmula recomendada:
             </span>
             <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [Cantidad]
