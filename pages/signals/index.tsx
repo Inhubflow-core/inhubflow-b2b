@@ -2349,7 +2349,7 @@ export default function SignalsPage({
                                   : "text-gray-400"
                               }`}
                             >
-                              Paso {step.num}
+                              PASO {step.num}
                             </span>
                             <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
                               {step.label}
@@ -2383,7 +2383,7 @@ export default function SignalsPage({
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiSearchLine className="text-brand-500" /> Criterios de Prospección (ICP)
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 1 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 1 de 4</span>
                     </div>
 
                     {/* Cargo / Título Profesional */}
@@ -2582,7 +2582,7 @@ export default function SignalsPage({
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiRadarLine className="text-brand-500" /> Disparador de Señales de Intención
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 2 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 2 de 4</span>
                     </div>
 
                     {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
@@ -3543,7 +3543,7 @@ export default function SignalsPage({
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiSparklingLine className="text-brand-500" /> Mensaje IA Anti-Stalker
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 3 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 3 de 4</span>
                     </div>
 
                     {/* Selector de Objetivo del Mensaje */}
@@ -3769,7 +3769,7 @@ export default function SignalsPage({
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiPlayLine className="text-brand-500" /> Lanzamiento del Monitor de Señales
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 4 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 4 de 4</span>
                     </div>
 
                     {/* 1. Nombre del Monitor */}
