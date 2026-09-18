@@ -15,8 +15,9 @@ function normalize(value: string | null | undefined): string {
   return String(value || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/\b([a-zA-Z])\.([a-zA-Z])(?:\.([a-zA-Z]))?(?:\.([a-zA-Z]))?/g, "$1$2$3$4")
     .toLowerCase()
-    .replace(/\b(inc|llc|ltd|sa|sas|sl|plc|corp|corporation|company|co)\b/g, " ")
+    .replace(/\b(inc|llc|ltd|ltda|sa|sas|sl|srl|spa|plc|corp|corporation|company|co|gmbh|eirl)\b/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -26,9 +27,21 @@ function sourceDomain(link: string): string | null {
   catch { return null; }
 }
 
+function hasCountryListFootprint(text: string): boolean {
+  // Detecta footprints de dropdowns o listados alfabéticos de países en el pie de página
+  return /(?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s*;\s*){3,}/i.test(text)
+    || /\b(?:Christmas Island|Cocos Islands|Cook Islands|Faroe Islands|Falkland Islands)\b/i.test(text);
+}
+
 function acceptableSource(result: WebSearchResult): boolean {
   const domain = sourceDomain(result.link);
-  return Boolean(domain && !BLOCKED_DOMAINS.some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`)));
+  if (!domain || BLOCKED_DOMAINS.some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`))) {
+    return false;
+  }
+  if (hasCountryListFootprint(result.snippet || "") || hasCountryListFootprint(result.title || "")) {
+    return false;
+  }
+  return true;
 }
 
 function relativeDate(value: string | null, nowMs: number): string | null {
@@ -90,10 +103,61 @@ function titleMatches(headline: string | null | undefined, titles: string[]): bo
   return titles.some((title) => normalized.includes(normalize(title)));
 }
 
-function companyMatches(profileCompany: string | null | undefined, expected: string): boolean {
-  const actual = normalize(profileCompany);
-  const wanted = normalize(expected);
-  return Boolean(actual && wanted && (actual.includes(wanted) || wanted.includes(actual)));
+const CORPORATE_SUFFIXES = new Set([
+  "inc", "llc", "ltd", "ltda", "sa", "sas", "sl", "srl", "spa", "plc",
+  "corp", "corporation", "company", "co", "gmbh", "eirl", "group", "holding",
+  "tech", "technologies", "technology", "solutions", "chile", "mexico", "colombia",
+  "espana", "spain", "argentina", "peru", "brasil", "brazil", "latam", "global", "international",
+  "health", "lab", "labs", "s", "a",
+]);
+
+function companyTokens(name: string): string[] {
+  const norm = normalize(name);
+  return norm.split(/\s+/).filter((w) => w.length > 0 && !CORPORATE_SUFFIXES.has(w));
+}
+
+export function companyMatches(profileCompany: string | null | undefined, expected: string): boolean {
+  if (!profileCompany || !expected) return false;
+  const actualNorm = normalize(profileCompany);
+  const wantedNorm = normalize(expected);
+  if (!actualNorm || !wantedNorm) return false;
+
+  // 1. Coincidencia exacta directa
+  if (actualNorm === wantedNorm) return true;
+
+  const wantedTokens = companyTokens(expected);
+  const actualTokens = companyTokens(profileCompany);
+  if (wantedTokens.length === 0 || actualTokens.length === 0) {
+    return actualNorm === wantedNorm;
+  }
+
+  const wantedCore = wantedTokens.join(" ");
+  const actualCore = actualTokens.join(" ");
+  if (wantedCore === actualCore) return true;
+
+  // 2. Si la empresa esperada tiene una sola palabra (ej: "Integral", "NotCo", "Stripe"):
+  // No permitir coincidencias con empresas que añaden palabras no corporativas ("Tapiz Decoración Integral")
+  if (wantedTokens.length === 1) {
+    // Si los tokens centrales son exactamente iguales
+    if (actualTokens.length === 1 && actualTokens[0] === wantedTokens[0]) return true;
+    // O si la empresa empieza exactamente con ese nombre y sólo añade 1 token corporativo/secundario (ej: "Betterfly Health")
+    if (actualTokens.length <= 2 && actualTokens[0] === wantedTokens[0]) {
+      return true;
+    }
+    return false;
+  }
+
+  // 3. Para empresas de 2 o más palabras clave:
+  const allWantedInActual = wantedTokens.every((t) => actualTokens.includes(t));
+  if (allWantedInActual && actualTokens.length <= wantedTokens.length + 1) {
+    return true;
+  }
+  const allActualInWanted = actualTokens.every((t) => wantedTokens.includes(t));
+  if (allActualInWanted && wantedTokens.length <= actualTokens.length + 1) {
+    return true;
+  }
+
+  return false;
 }
 
 function personCandidate(item: unknown): item is UnipileSearchPerson {
@@ -148,6 +212,7 @@ function webQuery(context: SignalScannerContext): string {
 
 const MAX_SERPER_SEARCHES_PER_SCAN = 4;
 const SERPER_COURTESY_DELAY_MS = 350;
+const MAX_LEADS_PER_ARTICLE = 2;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -254,8 +319,10 @@ export async function scanWebSignals(
     let people: Awaited<ReturnType<typeof findPeople>>;
     try { people = await findPeople(linkedIn, web, context, company, locationIds, budget); }
     catch { continue; }
+    let articleLeadsCount = 0;
     for (const candidate of people) {
       if (leads.length >= context.limit) break;
+      if (articleLeadsCount >= MAX_LEADS_PER_ARTICLE) break;
       try {
         const profile = await linkedIn.resolveProfile(candidate.url, context.remoteAccountId);
         const current = profile.work_experience?.find((role) => role.current) || profile.work_experience?.[0];
@@ -311,6 +378,7 @@ export async function scanWebSignals(
             },
           },
         });
+        articleLeadsCount++;
       } catch {
         // Never emit a web lead unless the LinkedIn identity and current company verify.
       }

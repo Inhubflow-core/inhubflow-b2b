@@ -414,6 +414,29 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
   },
 ];
 
+const ASK_AI_TEMPLATES = [
+  {
+    icon: "💰",
+    label: "Rondas de Inversión",
+    prompt: "Encuentra 10 CEOs de empresas que recibieron inversion recientemente en Chile",
+  },
+  {
+    icon: "🚀",
+    label: "Nuevos en el Cargo",
+    prompt: "Encuentra 10 Directores de Marketing o VP de Ventas que asumieron nuevo cargo en los últimos 90 días en México",
+  },
+  {
+    icon: "📢",
+    label: "Publicaciones Activas",
+    prompt: "Encuentra 10 Líderes Comerciales que publican activamente sobre prospección B2B o IA en España",
+  },
+  {
+    icon: "📈",
+    label: "Crecimiento Acelerado",
+    prompt: "Encuentra 10 Fundadores y CEOs de startups en hipercrecimiento en Colombia",
+  },
+];
+
 export default function SignalsPage({
   initialMonitors,
   lists,
@@ -1538,9 +1561,27 @@ export default function SignalsPage({
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400">
-            Pide en lenguaje natural exactamente qué tipo de intención buscas (ej: empresas que levantaron fondos, contratando líderes de ventas o asistentes a ferias comerciales).
-          </p>
+          {/* Guía visual con la Fórmula Recomendada */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 p-2.5 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
+            <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
+              💡 Fórmula recomendada:
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
+              [Cantidad]
+            </span>
+            <span>+</span>
+            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-medium border border-indigo-200/50 dark:border-indigo-800/50">
+              [Cargo / Decisor]
+            </span>
+            <span>+</span>
+            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200/50 dark:border-amber-800/50">
+              [Señal de Intención o Evento]
+            </span>
+            <span>+</span>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-medium border border-emerald-200/50 dark:border-emerald-800/50">
+              [País o Ciudad]
+            </span>
+          </div>
 
           <form onSubmit={handleExecuteAsk} className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
@@ -1549,7 +1590,7 @@ export default function SignalsPage({
                 type="text"
                 value={askPrompt}
                 onChange={(e) => setAskPrompt(e.target.value)}
-                placeholder="Ejemplo: Encuentra CEOs en SaaS en México que hayan anunciado ronda de inversión recientemente..."
+                placeholder="Ejemplo: Encuentra 10 CEOs de empresas que recibieron inversion recientemente en Chile..."
                 className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-xs md:text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
@@ -1581,6 +1622,25 @@ export default function SignalsPage({
               )}
             </div>
           </form>
+
+          {/* Chips con Plantillas de Ejemplo Rápidas */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              Ejemplos rápidos:
+            </span>
+            {ASK_AI_TEMPLATES.map((tmpl, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setAskPrompt(tmpl.prompt)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50/80 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
+                title={`Cargar: "${tmpl.prompt}"`}
+              >
+                <span>{tmpl.icon}</span>
+                <span>{tmpl.label}</span>
+              </button>
+            ))}
+          </div>
 
           {/* Resultados de Ask AI */}
           {askResults && (

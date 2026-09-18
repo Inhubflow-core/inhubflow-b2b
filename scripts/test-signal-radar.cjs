@@ -26,7 +26,7 @@ const { SignalRadarService } = require("../lib/signals/service.ts");
 const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/scanners/index.ts");
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
-const { scanWebSignals } = require("../lib/signals/scanners/web.ts");
+const { scanWebSignals, companyMatches } = require("../lib/signals/scanners/web.ts");
 const { extractCompanyFromHeadline } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
@@ -370,6 +370,17 @@ async function run() {
     assert.equal(run.state, "unsupported");
     assert.equal(run.error_code, "unsupported_capability");
     db.close();
+  }
+
+  console.log("▶ companyMatches previene falsos positivos con palabras genéricas");
+  {
+    assert.equal(companyMatches("Tapiz Decoración Integral", "Integral"), false);
+    assert.equal(companyMatches("DiAlma Centro Integral Familiar", "Integral"), false);
+    assert.equal(companyMatches("Integral Data Vision", "Integral"), false);
+    assert.equal(companyMatches("Integral Chile S.A.", "Integral"), true);
+    assert.equal(companyMatches("Integral Inc", "Integral"), true);
+    assert.equal(companyMatches("Integral Tech S.P.A.", "Integral"), true);
+    assert.equal(companyMatches("Betterfly Health", "Betterfly"), true);
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");
