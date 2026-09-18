@@ -45,6 +45,8 @@ export interface CreateMonitorInput {
   scan_interval_minutes?: number;
   created_by?: string;
   workspace_owner_id?: string;
+  /** 'ask' marca investigaciones puntuales de Ask AI; se excluyen del listado de monitores. */
+  kind?: "monitor" | "ask";
 }
 
 export interface ListLeadsQuery {
@@ -114,8 +116,12 @@ export class SignalRadarService {
   listMonitors(actor?: ApiActor | SignalActorScope): Array<SignalMonitor & { total_leads: number; pending_leads: number }> {
     const db = this.database();
     const scope = actorScope(actor);
-    const condition = scope && !scope.isSuperAdmin ? "WHERE m.workspace_owner_id = ?" : "";
-    const params = scope && !scope.isSuperAdmin ? [scope.workspaceOwnerId] : [];
+    // Las investigaciones puntuales de Ask AI no son monitores recurrentes: no
+    // deben aparecer en la pestaña "Monitores Configurados".
+    const conditions = ["COALESCE(m.kind, 'monitor') = 'monitor'"];
+    const params: unknown[] = [];
+    if (scope && !scope.isSuperAdmin) { conditions.push("m.workspace_owner_id = ?"); params.push(scope.workspaceOwnerId); }
+    const condition = `WHERE ${conditions.join(" AND ")}`;
     return db.prepare(`
       SELECT m.*,
         COUNT(sl.id) AS total_leads,
@@ -192,21 +198,22 @@ export class SignalRadarService {
       created_by: input.created_by || null,
       created_at: now,
       updated_at: now,
+      kind: input.kind === "ask" ? "ask" : "monitor",
     };
     db.prepare(`
       INSERT INTO signal_monitors (
         id, workspace_owner_id, name, type, target_url, competitor_name,
         keywords_json, icp_filters_json, mode, status, account_id,
         target_list_id, target_workflow_id, message_config_json,
-        scan_interval_minutes, next_scan_at, scan_state, created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'idle', ?, ?, ?)
+        scan_interval_minutes, next_scan_at, scan_state, created_by, created_at, updated_at, kind
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'idle', ?, ?, ?, ?)
     `).run(
       monitor.id, monitor.workspace_owner_id, monitor.name, monitor.type,
       monitor.target_url, monitor.competitor_name, monitor.keywords_json,
       monitor.icp_filters_json, monitor.mode, monitor.status, monitor.account_id,
       monitor.target_list_id, monitor.target_workflow_id, monitor.message_config_json,
       monitor.scan_interval_minutes, monitor.next_scan_at, monitor.created_by,
-      monitor.created_at, monitor.updated_at,
+      monitor.created_at, monitor.updated_at, monitor.kind,
     );
     this.logEvent(id, "monitor_created", { type: monitor.type, mode: monitor.mode });
     return monitor;
@@ -621,6 +628,7 @@ export class SignalRadarService {
     const plan = await planSignalResearch(query);
     const monitor = this.createMonitor({
       name: `Ask AI · ${plan.monitorName}`,
+      kind: "ask",
       type: plan.signalType,
       keywords: plan.keywords,
       icp_filters: {

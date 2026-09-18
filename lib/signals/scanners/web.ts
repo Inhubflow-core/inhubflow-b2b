@@ -146,12 +146,25 @@ function webQuery(context: SignalScannerContext): string {
   return [queryTerms, titles, location].filter(Boolean).join(" ");
 }
 
+const MAX_SERPER_SEARCHES_PER_SCAN = 4;
+const SERPER_COURTESY_DELAY_MS = 350;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface SerperBudget {
+  searchesUsed: number;
+  maxSearches: number;
+}
+
 async function findPeople(
   linkedIn: SignalScannerClient,
   web: WebSearchClient,
   context: SignalScannerContext,
   company: string,
-  locationIds: string[] = []
+  locationIds: string[] = [],
+  budget?: SerperBudget,
 ): Promise<Array<{ url: string; name: string; providerId?: string | null; company?: string }>> {
   const titles = context.icp.titles?.length ? context.icp.titles : ["CEO", "Founder"];
   const candidates: Array<{ url: string; name: string; providerId?: string | null; company?: string }> = [];
@@ -172,6 +185,16 @@ async function findPeople(
     // X-Ray fallback below still verifies every candidate through LinkedIn profile retrieval.
   }
   if (candidates.length > 0) return candidates;
+
+  // Límite de presupuesto Serper por scan run para proteger créditos y evitar 429
+  if (budget && budget.searchesUsed >= budget.maxSearches) {
+    return candidates;
+  }
+  if (budget) {
+    budget.searchesUsed++;
+    await sleep(SERPER_COURTESY_DELAY_MS);
+  }
+
   const xray = await web.search({
     query: `site:linkedin.com/in/ (${titles.map((title) => `"${title}"`).join(" OR ")}) "${company}"`,
     country: locationCode(context.icp),
@@ -210,6 +233,10 @@ export async function scanWebSignals(
   const leads: DiscoveredSignalLead[] = [];
   const seenArticles = new Set<string>();
   const locationIds = await resolveLocationIds(linkedIn, context);
+  const budget: SerperBudget = {
+    searchesUsed: 1, // Búsqueda inicial de noticias ya consumida
+    maxSearches: MAX_SERPER_SEARCHES_PER_SCAN,
+  };
 
   for (const article of articles) {
     if (leads.length >= context.limit) break;
@@ -225,7 +252,7 @@ export async function scanWebSignals(
     const company = extractCompany(article, context.monitor.type);
     if (!company) continue;
     let people: Awaited<ReturnType<typeof findPeople>>;
-    try { people = await findPeople(linkedIn, web, context, company, locationIds); }
+    try { people = await findPeople(linkedIn, web, context, company, locationIds, budget); }
     catch { continue; }
     for (const candidate of people) {
       if (leads.length >= context.limit) break;

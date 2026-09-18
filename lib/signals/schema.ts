@@ -80,6 +80,8 @@ export interface SignalMonitor {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** 'ask' = investigación puntual creada por Ask AI (no es un monitor recurrente). */
+  kind: "monitor" | "ask";
 }
 
 export interface SignalLead {
@@ -149,7 +151,7 @@ function rebuildSignalMonitors(db: Database.Database): void {
     ["scan_lease_expires_at", "NULL"], ["cursor_json", "NULL"], ["capabilities_json", "NULL"],
     ["last_checked_at", "NULL"], ["last_success_at", "NULL"], ["last_error", "NULL"],
     ["consecutive_failures", "0"], ["created_by", "NULL"], ["created_at", "datetime('now')"],
-    ["updated_at", "datetime('now')"],
+    ["updated_at", "datetime('now')"], ["kind", "'monitor'"],
   ];
   const names = fields.map(([name]) => name).join(", ");
   const selects = fields.map(([name, fallback]) => expression(existing, name, fallback)).join(", ");
@@ -188,7 +190,8 @@ function rebuildSignalMonitors(db: Database.Database): void {
           consecutive_failures INTEGER NOT NULL DEFAULT 0,
           created_by TEXT,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          kind TEXT NOT NULL DEFAULT 'monitor' CHECK(kind IN ('monitor', 'ask'))
         )
       `);
       db.exec(`INSERT INTO signal_monitors_new (${names}) SELECT ${selects} FROM signal_monitors`);
@@ -299,7 +302,8 @@ export function applySignalSchema(db: Database.Database): void {
       consecutive_failures INTEGER NOT NULL DEFAULT 0,
       created_by TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      kind TEXT NOT NULL DEFAULT 'monitor' CHECK(kind IN ('monitor', 'ask'))
     )
   `);
 
@@ -309,8 +313,10 @@ export function applySignalSchema(db: Database.Database): void {
     ["scan_state", "TEXT NOT NULL DEFAULT 'idle'"], ["scan_lease_owner", "TEXT"],
     ["scan_lease_expires_at", "TEXT"], ["cursor_json", "TEXT"], ["capabilities_json", "TEXT"],
     ["last_success_at", "TEXT"], ["last_error", "TEXT"], ["consecutive_failures", "INTEGER NOT NULL DEFAULT 0"],
+    ["kind", "TEXT NOT NULL DEFAULT 'monitor'"],
   ];
   for (const [name, definition] of monitorColumns) ensureColumn(db, "signal_monitors", name, definition);
+  db.exec("UPDATE signal_monitors SET kind = 'ask' WHERE name LIKE 'Ask AI · %' AND (kind IS NULL OR kind != 'ask')");
 
   if (tableSql(db, "signal_leads") && !columns(db, "signal_leads").has("identity_key")) rebuildSignalLeads(db);
   db.exec(`

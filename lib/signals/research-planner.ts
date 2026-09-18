@@ -157,10 +157,11 @@ function isTransient(error: unknown): boolean {
 }
 
 function modelCandidates(): string[] {
+  // gemini-3.7-flash responde 503 "high demand" de forma sostenida, así que ya no
+  // forma parte de la cadena por defecto: sólo se usa si alguien lo nombra explícitamente.
   return unique([
-    process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash",
-    ...(process.env.GEMINI_FALLBACK_MODELS || "").split(","),
-    "gemini-3.7-flash",
+    process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash",
+    ...(process.env.GEMINI_FALLBACK_MODELS || "gemini-3.6-flash,gemini-3.8-flash,gemini-3.5-flash").split(","),
     "gemini-3.6-flash",
   ]);
 }

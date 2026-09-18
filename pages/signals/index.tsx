@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GetServerSideProps } from "next";
 import { getDb } from "@/lib/db";
 import { previewSignalMessage } from "@/lib/signals/message-template";
@@ -125,8 +125,11 @@ export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
   const workspaceOwnerId = user.owner_id || user.id;
   const isSuperAdmin = user.email?.trim().toLowerCase() === "inhubflow@gmail.com";
 
+  const whereClause = isSuperAdmin
+    ? "WHERE COALESCE(kind, 'monitor') = 'monitor'"
+    : "WHERE workspace_owner_id = ? AND COALESCE(kind, 'monitor') = 'monitor'";
   const monitorsRaw = db
-    .prepare(`SELECT * FROM signal_monitors ${isSuperAdmin ? "" : "WHERE workspace_owner_id = ?"} ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM signal_monitors ${whereClause} ORDER BY created_at DESC`)
     .all(...(isSuperAdmin ? [] : [workspaceOwnerId])) as SignalMonitor[];
 
   const initialMonitors = monitorsRaw.map((m) => {
@@ -431,6 +434,8 @@ export default function SignalsPage({
   const [askPrompt, setAskPrompt] = useState("");
   const [askLoading, setAskLoading] = useState(false);
   const [askResults, setAskResults] = useState<SignalLead[] | null>(null);
+  const [askAccountId, setAskAccountId] = useState(accounts[0]?.id || "");
+  const askAbortControllerRef = useRef<AbortController | null>(null);
 
   // Modal Nuevo Monitor - Wizard 4 Pasos
   const [showNewModal, setShowNewModal] = useState(false);
@@ -1208,10 +1213,29 @@ export default function SignalsPage({
     toast.success("Mensaje actualizado");
   };
 
+  // Cancelar investigación en curso de Ask AI
+  const handleCancelAsk = () => {
+    if (askAbortControllerRef.current) {
+      askAbortControllerRef.current.abort();
+    }
+  };
+
   // Ejecutar Ask AI
   const handleExecuteAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!askPrompt.trim()) return;
+
+    const targetAccountId = askAccountId || selectedAccountId || accounts[0]?.id;
+    if (!targetAccountId) {
+      toast.error("Debes conectar o seleccionar una cuenta de LinkedIn para usar Ask AI");
+      return;
+    }
+
+    if (askAbortControllerRef.current) {
+      askAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    askAbortControllerRef.current = controller;
 
     setAskLoading(true);
     setAskResults(null);
@@ -1221,9 +1245,10 @@ export default function SignalsPage({
       const res = await fetch("/api/signals/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           query: askPrompt.trim(),
-          account_id: selectedAccountId,
+          account_id: targetAccountId,
           list_id: newTargetList || undefined,
           workflow_id: newTargetWorkflow || undefined,
         }),
@@ -1232,14 +1257,21 @@ export default function SignalsPage({
       const data = await res.json();
       if (res.ok && data.leads) {
         setAskResults(data.leads);
+        // Sincronizar inmediatamente la tabla Hot Leads para reflejar los nuevos prospectos
+        fetchLeads();
         toast.success(`Se encontraron ${data.leads.length} prospectos de alta intención`, { id: toastId });
       } else {
         toast.error(data.error || "Error en la consulta Ask AI", { id: toastId });
       }
-    } catch {
-      toast.error("Error al conectar con el servicio Ask AI", { id: toastId });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        toast.info("Investigación cancelada", { id: toastId });
+      } else {
+        toast.error("Error al conectar con el servicio Ask AI", { id: toastId });
+      }
     } finally {
       setAskLoading(false);
+      askAbortControllerRef.current = null;
     }
   };
 
@@ -1464,8 +1496,8 @@ export default function SignalsPage({
 
         {/* Sección "Ask AI" */}
         <div className="bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/20 dark:to-indigo-950/20 border border-brand-500/20 dark:border-brand-500/10 rounded-2xl p-5 shadow-theme-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <RiSparklingLine className="text-brand-600 dark:text-brand-400" size={20} />
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                 Ask AI — Investigador Autónomo de Prospectos
@@ -1473,6 +1505,37 @@ export default function SignalsPage({
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-md">
                 Búsqueda en Lenguaje Natural
               </span>
+            </div>
+
+            {/* Selector de cuenta de LinkedIn */}
+            <div className="flex items-center gap-2">
+              {accounts.length === 0 ? (
+                <span className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-lg">
+                  ⚠️ Sin cuentas conectadas
+                </span>
+              ) : accounts.length === 1 ? (
+                <span className="text-xs text-gray-600 dark:text-gray-300 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 px-2.5 py-1 rounded-lg">
+                  Cuenta: <strong className="text-gray-900 dark:text-white">{accounts[0].name}</strong>
+                </span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="ask-account-select" className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                    Cuenta:
+                  </label>
+                  <select
+                    id="ask-account-select"
+                    value={askAccountId}
+                    onChange={(e) => setAskAccountId(e.target.value)}
+                    className="text-xs rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-gray-900 shadow-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 focus:border-brand-500 focus:outline-none"
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -1490,21 +1553,33 @@ export default function SignalsPage({
                 className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-xs md:text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
-            <button
-              type="submit"
-              disabled={askLoading || !askPrompt.trim()}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs md:text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-all shadow-xs shrink-0"
-            >
-              {askLoading ? (
-                <>
-                  <RiRefreshLine className="animate-spin" size={16} /> Investigando Web & LinkedIn...
-                </>
-              ) : (
-                <>
-                  <RiSparklingLine size={16} /> Investigar con IA
-                </>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="submit"
+                disabled={askLoading || !askPrompt.trim() || accounts.length === 0}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs md:text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-all shadow-xs"
+              >
+                {askLoading ? (
+                  <>
+                    <RiRefreshLine className="animate-spin" size={16} /> Investigando Web & LinkedIn...
+                  </>
+                ) : (
+                  <>
+                    <RiSparklingLine size={16} /> Investigar con IA
+                  </>
+                )}
+              </button>
+              {askLoading && (
+                <button
+                  type="button"
+                  onClick={handleCancelAsk}
+                  className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl text-xs md:text-sm font-semibold text-gray-700 hover:text-red-600 bg-gray-100 hover:bg-red-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-red-950/40 dark:hover:text-red-400 border border-gray-300 dark:border-gray-700 transition-all"
+                  title="Cancelar investigación en curso"
+                >
+                  <RiCloseLine size={16} /> Cancelar
+                </button>
               )}
-            </button>
+            </div>
           </form>
 
           {/* Resultados de Ask AI */}
