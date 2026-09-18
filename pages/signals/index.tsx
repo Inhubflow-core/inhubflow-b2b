@@ -2279,9 +2279,9 @@ export default function SignalsPage({
         {/* Modal: Wizard de Creación de Monitor */}
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
-            <div className="w-full max-w-5xl xl:max-w-6xl h-[88vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+            <div className="w-full max-w-5xl xl:max-w-6xl h-[88vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-300 dark:border-gray-700 shadow-2xl overflow-hidden">
               {/* 1. Cabecera Principal del Modal */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
                     <RiRadarLine size={22} />
@@ -2308,7 +2308,7 @@ export default function SignalsPage({
               </div>
 
               {/* 2. Barra de Progreso del Wizard (Stepper) */}
-              <div className="px-6 py-3.5 border-b border-gray-100 dark:border-gray-800/80 bg-gray-50/60 dark:bg-gray-850/50">
+              <div className="px-6 py-3.5 border-b border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50">
                 <div className="flex items-center justify-between max-w-4xl mx-auto">
                   {[
                     { num: 1, label: "Definir ICP", icon: RiUserSearchLine },
@@ -2379,7 +2379,7 @@ export default function SignalsPage({
                    ========================================================= */}
                 {wizardStep === 1 && (
                   <div className="space-y-5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiSearchLine className="text-brand-500" /> Criterios de Prospección (ICP)
                       </h2>
@@ -2413,7 +2413,7 @@ export default function SignalsPage({
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                                 active
                                   ? "bg-brand-500 border-brand-500 text-white shadow-xs"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                                  : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                               }`}
                             >
                               {active ? `✓ ${st}` : `+${st}`}
@@ -2479,7 +2479,7 @@ export default function SignalsPage({
                                 className={`px-2.5 py-0.5 rounded-lg text-xs font-medium border transition-all ${
                                   active
                                     ? "bg-brand-500 border-brand-500 text-white shadow-xs"
-                                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                                    : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                                 }`}
                               >
                                 {active ? `✓ ${cName}` : `+${cName}`}
@@ -2517,7 +2517,7 @@ export default function SignalsPage({
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                                 active
                                   ? "bg-brand-500 border-brand-500 text-white shadow-xs"
-                                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                                  : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
                               }`}
                             >
                               {active ? `✓ ${si}` : `+${si}`}
@@ -2560,7 +2560,7 @@ export default function SignalsPage({
                     </div>
 
                     {/* Resumen de configuración ICP */}
-                    <div className="p-3.5 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/60 dark:border-brand-900/40 flex items-center justify-between text-xs">
+                    <div className="p-3.5 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-300 dark:border-brand-800 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2 text-brand-900 dark:text-brand-200">
                         <RiShieldCheckLine size={18} className="text-brand-500 shrink-0" />
                         <span>
@@ -2578,7 +2578,7 @@ export default function SignalsPage({
                    ========================================================= */}
                 {wizardStep === 2 && (
                   <div className="space-y-5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiRadarLine className="text-brand-500" /> Disparador de Señales de Intención
                       </h2>
@@ -2595,7 +2595,7 @@ export default function SignalsPage({
                         }}
                         className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "posts"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
                             : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
@@ -2620,7 +2620,7 @@ export default function SignalsPage({
                         }}
                         className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "keywords"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
                             : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
@@ -2648,7 +2648,7 @@ export default function SignalsPage({
                         }}
                         className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "icp_triggers"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
                             : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
@@ -2668,12 +2668,12 @@ export default function SignalsPage({
 
                     {/* =========================================================
                         PESTAÑA 1: PUBLICACIONES EN LINKEDIN (LIKES + COMENTARIOS)
-                       ========================================================= */}
+                    ========================================================= */}
                     {signalCategoryTab === "posts" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
                         {/* Selector de modo: Buscador Inteligente vs Manual */}
-                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
-                          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs">
+                        <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
+                          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-xs">
                             <button
                               type="button"
                               onClick={() => setPostSearchMode("search")}
@@ -2704,7 +2704,7 @@ export default function SignalsPage({
 
                         {/* Publicaciones actualmente configuradas en el monitor */}
                         {selectedPostUrls.length > 0 && (
-                          <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200/80 dark:border-brand-900/60 space-y-2.5">
+                          <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-300 dark:border-brand-800 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold">
@@ -2735,7 +2735,7 @@ export default function SignalsPage({
                               {selectedPostUrls.map((url, idx) => (
                                 <div
                                   key={url + idx}
-                                  className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs shadow-2xs"
+                                  className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-xs shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <RiLinkedinBoxFill className="text-brand-600 shrink-0" size={16} />
@@ -2774,7 +2774,7 @@ export default function SignalsPage({
                         {/* MODO BUSCADOR INTELIGENTE */}
                         {postSearchMode === "search" && (
                           <div className="space-y-4">
-                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3.5">
+                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {/* Campo 1: Competidor o Marca */}
                                 <div>
@@ -2789,7 +2789,7 @@ export default function SignalsPage({
                                       setNewCompetitor(e.target.value);
                                     }}
                                     placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                    className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
                                   />
                                 </div>
 
@@ -2801,7 +2801,7 @@ export default function SignalsPage({
                                   <select
                                     value={postSearchDate}
                                     onChange={(e) => setPostSearchDate(e.target.value as any)}
-                                    className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                                   >
                                     <option value="past_week">Esta semana (Más recientes)</option>
                                     <option value="past_month">Último mes (Mayor volumen)</option>
@@ -2817,7 +2817,7 @@ export default function SignalsPage({
                                   <select
                                     value={postSearchSortBy}
                                     onChange={(e) => setPostSearchSortBy(e.target.value as any)}
-                                    className="w-full rounded-xl border border-gray-300 bg-gray-50/50 px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                                   >
                                     <option value="engagement">Mayor Viralidad (Likes + Comentarios)</option>
                                     <option value="date">Más Recientes</option>
@@ -2843,7 +2843,7 @@ export default function SignalsPage({
                                         }
                                       }}
                                       placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
-                                      className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                      className="w-full rounded-xl border border-gray-300 bg-white pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
                                     />
                                     {postSearchKeywords && (
                                       <button
@@ -2900,7 +2900,7 @@ export default function SignalsPage({
                                           className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
                                             isChipActive
                                               ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
-                                              : "bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-200 dark:border-gray-600"
+                                              : "bg-white hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-300 dark:border-gray-600 hover:border-brand-300"
                                           }`}
                                         >
                                           {isChipActive ? `✓ ${sug}` : sug}
@@ -2917,7 +2917,7 @@ export default function SignalsPage({
 
                             {/* RESULTADOS DE BÚSQUEDA */}
                             {isSearchingPosts && (
-                              <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 space-y-3">
+                              <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-300 dark:border-gray-700 space-y-3">
                                 <RiRefreshLine className="animate-spin text-brand-500 mx-auto" size={28} />
                                 <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                                   Conectando con LinkedIn y ordenando publicaciones por viralidad...
@@ -2931,7 +2931,7 @@ export default function SignalsPage({
                             {!isSearchingPosts && discoveredPosts.length > 0 && (
                               <div className="space-y-3">
                                 {/* Barra de control de publicaciones */}
-                                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-200/80 dark:border-brand-900/60">
+                                <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-300 dark:border-brand-800">
                                   <div className="flex items-center gap-2">
                                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-bold">
                                       {selectedPostUrls.length}
@@ -2976,7 +2976,7 @@ export default function SignalsPage({
                                         className={`relative p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
                                           isSelected
                                             ? "border-brand-500 bg-brand-50/40 dark:bg-brand-950/40 shadow-xs ring-1 ring-brand-500"
-                                            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/80 hover:border-brand-300 dark:hover:border-brand-700"
+                                            : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800/80 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                                         }`}
                                       >
                                         <div className="flex items-start justify-between gap-3">
@@ -2987,7 +2987,7 @@ export default function SignalsPage({
                                                 className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
                                                   isSelected
                                                     ? "bg-brand-500 border-brand-500 text-white"
-                                                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                                                    : "border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900"
                                                 }`}
                                               >
                                                 {isSelected && <RiCheckLine size={12} />}
@@ -2999,7 +2999,7 @@ export default function SignalsPage({
                                               <img
                                                 src={post.author.profilePictureUrl}
                                                 alt={post.author.name}
-                                                className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-200 dark:border-gray-700"
+                                                className="w-9 h-9 rounded-full object-cover shrink-0 border border-gray-300 dark:border-gray-700"
                                               />
                                             ) : (
                                               <div className="w-9 h-9 rounded-full bg-linear-to-br from-brand-400 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
@@ -3034,7 +3034,7 @@ export default function SignalsPage({
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               onClick={(e) => e.stopPropagation()}
-                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 transition-colors shrink-0"
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-300 dark:border-brand-800 transition-colors shrink-0"
                                             >
                                               Ver en LinkedIn <RiExternalLinkLine size={11} />
                                             </a>
@@ -3050,10 +3050,10 @@ export default function SignalsPage({
 
                                         {/* Métricas de Engagement */}
                                         <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60">
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                                             <RiThumbUpLine size={12} /> {post.reactionCount} reacciones
                                           </span>
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60">
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
                                             <RiChat1Line size={12} /> {post.commentCount} comentarios
                                           </span>
                                           {post.repostCount > 0 && (
@@ -3075,7 +3075,7 @@ export default function SignalsPage({
                             )}
 
                             {!isSearchingPosts && discoveredPosts.length === 0 && (
-                              <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border border-dashed border-gray-300 dark:border-gray-700 space-y-2">
+                              <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border-2 border-dashed border-gray-300 dark:border-gray-700 space-y-2">
                                 <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
                                   <RiFireLine size={20} />
                                 </div>
@@ -3092,7 +3092,7 @@ export default function SignalsPage({
 
                         {/* MODO MANUAL (Pegar URLs) */}
                         {postSearchMode === "manual" && (
-                          <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 space-y-3">
+                          <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 space-y-3">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
@@ -3148,7 +3148,7 @@ export default function SignalsPage({
                     {signalCategoryTab === "keywords" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
                         {/* 1. Empresa o Competidor a Vigilar */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-2">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2">
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
                               Empresa, Competidor o Referente a Monitorear (Opcional)
@@ -3165,7 +3165,7 @@ export default function SignalsPage({
                                 setPostSearchCompetitor(e.target.value);
                               }}
                               placeholder="Ej: HubSpot, Salesforce, Lemlist, Apollo, Deel..."
-                              className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-10 pr-3.5 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                              className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
                             />
                           </div>
                           <p className="text-[10px] text-gray-400">
@@ -3174,7 +3174,7 @@ export default function SignalsPage({
                         </div>
 
                         {/* 2. Palabras Clave de Intención de Compra */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
                               Palabras Clave de Intención de Compra
@@ -3186,11 +3186,11 @@ export default function SignalsPage({
 
                           {/* Chips activos */}
                           {keywordsList.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800 min-h-[42px] items-center">
+                            <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-300 dark:border-gray-700 min-h-[42px] items-center">
                               {keywordsList.map((kw) => (
                                 <span
                                   key={kw}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800/60 shadow-2xs"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-50 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-300 dark:border-brand-800 shadow-2xs"
                                 >
                                   {kw}
                                   <button
@@ -3220,7 +3220,7 @@ export default function SignalsPage({
                                   }
                                 }}
                                 placeholder="Escribe una frase y pulsa Enter (ej: 'busco CRM', 'alternativa a Lemlist')..."
-                                className="w-full rounded-xl border border-gray-300 bg-gray-50/50 pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
+                                className="w-full rounded-xl border border-gray-300 bg-white pl-3 pr-8 py-2 text-xs text-gray-900 focus:bg-white dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 transition-colors"
                               />
                               {customKeywordInput && (
                                 <button
@@ -3268,7 +3268,7 @@ export default function SignalsPage({
                                     className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all ${
                                       isAdded
                                         ? "bg-brand-500 border-brand-500 text-white shadow-2xs"
-                                        : "bg-gray-100 hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border-gray-200 dark:border-gray-600"
+                                        : "bg-white hover:bg-brand-50 hover:text-brand-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/60 dark:hover:text-brand-300 text-gray-700 border border-gray-300 dark:border-gray-600 hover:border-brand-300"
                                     }`}
                                   >
                                     {isAdded ? `✓ ${sug}` : `+ ${sug}`}
@@ -3283,7 +3283,7 @@ export default function SignalsPage({
                         </div>
 
                         {/* 3. Eventos Disparadores de Mercado (Trigger Events) - MULTISELECCIÓN */}
-                        <div className="p-4 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-200 dark:border-gray-700 space-y-2.5">
+                        <div className="p-4 rounded-xl bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-800/80 border border-gray-300 dark:border-gray-700 shadow-xs space-y-2.5">
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
                               Eventos Disparadores de Mercado (Trigger Events)
@@ -3343,7 +3343,7 @@ export default function SignalsPage({
                                   className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                                     isActive
                                       ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/40 shadow-xs"
-                                      : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                      : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                                   }`}
                                 >
                                   <div className="flex items-center justify-between">
@@ -3352,7 +3352,7 @@ export default function SignalsPage({
                                       className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
                                         isActive
                                           ? "bg-emerald-600 text-white shadow-xs"
-                                          : "border border-gray-300 dark:border-gray-600 text-transparent"
+                                          : "border border-gray-400 dark:border-gray-500 text-transparent"
                                       }`}
                                     >
                                       ✓
@@ -3379,7 +3379,7 @@ export default function SignalsPage({
                     {signalCategoryTab === "icp_triggers" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
                         {/* Cabecera de los 6 disparadores */}
-                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3">
+                        <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
                               <h4 className="text-xs font-bold text-gray-900 dark:text-white">
@@ -3481,7 +3481,7 @@ export default function SignalsPage({
                                   className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
                                     isSelected
                                       ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/40 shadow-xs"
-                                      : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                      : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                                   }`}
                                 >
                                   <div>
@@ -3495,7 +3495,7 @@ export default function SignalsPage({
                                           className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
                                             isSelected
                                               ? "bg-emerald-600 text-white shadow-xs"
-                                              : "border border-gray-300 dark:border-gray-600 text-transparent"
+                                              : "border border-gray-400 dark:border-gray-500 text-transparent"
                                           }`}
                                         >
                                           ✓
@@ -3516,7 +3516,7 @@ export default function SignalsPage({
 
                           {/* Mensaje de Confirmación */}
                           {selectedIcpSignals.length > 0 && (
-                            <div className="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between text-[11px]">
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[11px]">
                               <p className="text-emerald-600 dark:text-emerald-400 font-medium">
                                 ✓ <strong>{selectedIcpSignals.length} señal(es) activa(s):</strong> InHubFlow buscará continuamente perfiles y los agregará con su evidencia a la lista de destino.
                               </p>
@@ -3533,7 +3533,7 @@ export default function SignalsPage({
                    ========================================================= */}
                 {wizardStep === 3 && (
                   <div className="space-y-5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <RiSparklingLine className="text-brand-500" /> Mensaje IA Anti-Stalker
                       </h2>
@@ -3579,7 +3579,7 @@ export default function SignalsPage({
                               className={`p-3 rounded-2xl border text-left text-xs transition-all cursor-pointer ${
                                 isSelected
                                   ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                  : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                               }`}
                             >
                               <div className="font-bold flex items-center gap-1.5">
@@ -3631,7 +3631,7 @@ export default function SignalsPage({
                               className={`p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 isSelected
                                   ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                                  : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                               }`}
                             >
                               <Icon size={15} className={tn.iconColor} />
@@ -3669,7 +3669,7 @@ export default function SignalsPage({
                     </div>
 
                     {/* Vista previa orientativa del mensaje */}
-                    <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
                           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -3683,7 +3683,7 @@ export default function SignalsPage({
                       {/* Mockup de LinkedIn Card */}
                       <div className="p-4 rounded-2xl bg-[#F3F6F8] dark:bg-gray-850 border border-gray-300 dark:border-gray-700 space-y-3">
                         {/* Cabecera del chat de LinkedIn */}
-                        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2.5">
+                        <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                               ME
@@ -3706,7 +3706,7 @@ export default function SignalsPage({
                           <span className="text-[10px] text-gray-400 block text-center">
                             Hoy · Mensaje generado con IA contextual
                           </span>
-                          <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-xs border border-gray-200 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
+                          <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-xs border border-gray-300 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
                             {previewSignalMessage({
                               signalType: newType,
                               objective: msgObjective,
@@ -3815,7 +3815,7 @@ export default function SignalsPage({
                           className={`p-4 rounded-2xl border text-left text-xs transition-all ${
                             newMode === "review"
                               ? "border-brand-500 bg-brand-50/60 dark:bg-brand-950/30 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                              : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                           }`}
                         >
                           <div className="font-bold flex items-center justify-between">
@@ -3838,7 +3838,7 @@ export default function SignalsPage({
                           className={`p-4 rounded-2xl border text-left text-xs transition-all ${
                             newMode === "autopilot"
                               ? "border-purple-500 bg-purple-50/60 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                              : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-850 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-600 hover:shadow-xs"
                           }`}
                         >
                           <div className="font-bold flex items-center justify-between">
@@ -3909,8 +3909,8 @@ export default function SignalsPage({
 
                     {newMode === "autopilot" && (
                       <div className={`p-3 rounded-xl border text-xs ${autopilotReadiness?.ready
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-200"
-                        : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200"}`}>
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-200"
+                        : "bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-900 dark:text-amber-200"}`}>
                         <strong>{autopilotReadiness?.ready ? "✓ Autopilot listo" : "Autopilot permanecerá en revisión"}</strong>
                         {!autopilotReadiness?.ready && (
                           <p className="mt-1">Completa cuenta, lista, workflow y gates del SDR IA. No se contactará a nadie automáticamente mientras falte un requisito.</p>
@@ -3919,38 +3919,38 @@ export default function SignalsPage({
                     )}
 
                     {/* Ficha Resumen Completa */}
-                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700 space-y-3">
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-850 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                       <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider block">
                         Resumen de Configuración del Monitor
                       </span>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Audiencia (ICP)</span>
                           <strong className="text-gray-800 dark:text-gray-200">
                             {icpTitles.length} cargos · {icpLocations.length > 0 ? icpLocations[0] : icpCountry}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Señal Elegida</span>
                           <strong className="text-brand-600 truncate block">
                             {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Fórmula Mensaje</span>
                           <strong className="text-purple-600 truncate block capitalize">
                             {msgObjective} · {msgTone}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Modo</span>
                           <strong className="text-emerald-600 block">
                             {newMode === "review" ? "Revisión Manual" : "Piloto Automático"}
                           </strong>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-200/60 dark:border-gray-700/60">
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-300 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Disparador / Posts</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block" title={selectedPostUrls.join(", ")}>
                             {selectedPostUrls.length > 0
@@ -3958,19 +3958,19 @@ export default function SignalsPage({
                               : newCompetitor.trim() || keywordsList[0] || "Configurado"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Cuenta Remitente</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {accounts.find((a) => a.id === selectedAccountId)?.name || "Cuenta activa"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Lista de Destino</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {lists.find((l) => l.id === newTargetList)?.name || "Sin lista"}
                           </strong>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
                           <span className="text-[10px] text-gray-400 block">Frecuencia</span>
                           <strong className="text-gray-800 dark:text-gray-200 block">
                             {scanIntervalMinutes === 60
@@ -3989,7 +3989,7 @@ export default function SignalsPage({
               </div>
 
               {/* 4. Footer de Navegación del Wizard */}
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-850/80">
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-300 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-850/80">
                 <div>
                   {wizardStep === 1 ? (
                     <button
@@ -4058,7 +4058,7 @@ export default function SignalsPage({
         {showImportModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
             <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 p-6 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+              <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                 <h3 className="font-bold text-sm text-gray-900 dark:text-white">
                   Importar {selectedLeadIds.length} Prospectos a una Lista
                 </h3>
@@ -4087,7 +4087,7 @@ export default function SignalsPage({
                 </select>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-300 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => setShowImportModal(false)}
