@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (!unipile.isConfigured()) {
-      return res.status(502).json({ error: "El motor Unipile no está configurado" });
+      return res.status(502).json({ error: "El servicio de búsqueda no está configurado" });
     }
 
     const resolved = await resolveUnipileAccount(db, accountId, unipile);
@@ -175,7 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error("[api/signals/posts/search] Error searching posts:", error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Error al buscar publicaciones en LinkedIn vía Unipile",
+      error: error instanceof Error ? error.message : "Error al buscar publicaciones en LinkedIn",
     });
   }
 }

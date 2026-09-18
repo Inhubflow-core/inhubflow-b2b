@@ -2582,23 +2582,29 @@ export default function SignalsPage({
                     </div>
 
                     {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 text-xs gap-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1.5 rounded-2xl bg-gray-100/90 dark:bg-gray-800/90 text-xs gap-1.5 border border-gray-200/60 dark:border-gray-700/60">
                       <button
                         type="button"
                         onClick={() => {
                           setSignalCategoryTab("posts");
                           setNewType("post_engagement");
                         }}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "posts"
-                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
-                            : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
-                        <span className="text-sm">🎯</span>
-                        <div className="text-left">
-                          <span className="block leading-tight font-bold">Posts en LinkedIn</span>
-                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Likes y Comentarios</span>
+                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                          signalCategoryTab === "posts"
+                            ? "text-brand-600 dark:text-brand-400"
+                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
+                        }`}>
+                          01
+                        </span>
+                        <div className="min-w-0">
+                          <span className="block leading-tight font-bold text-xs truncate">Posts en LinkedIn</span>
+                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">Likes y Comentarios</span>
                         </div>
                       </button>
 
@@ -2608,16 +2614,22 @@ export default function SignalsPage({
                           setSignalCategoryTab("keywords");
                           setNewType("keyword_intent");
                         }}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "keywords"
-                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
-                            : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
-                        <span className="text-sm">🔍</span>
-                        <div className="text-left">
-                          <span className="block leading-tight font-bold">Palabras Clave & Mercado</span>
-                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">Menciones y Noticias</span>
+                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                          signalCategoryTab === "keywords"
+                            ? "text-brand-600 dark:text-brand-400"
+                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
+                        }`}>
+                          02
+                        </span>
+                        <div className="min-w-0">
+                          <span className="block leading-tight font-bold text-xs truncate">Palabras Clave & Mercado</span>
+                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">Menciones y Noticias</span>
                         </div>
                       </button>
 
@@ -2630,16 +2642,22 @@ export default function SignalsPage({
                           }
                           setNewType(selectedIcpSignals[0] || "new_in_role");
                         }}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl font-bold transition-all cursor-pointer ${
+                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
                           signalCategoryTab === "icp_triggers"
-                            ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-white shadow-2xs"
-                            : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-200/80 dark:border-gray-700/80"
+                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
                         }`}
                       >
-                        <span className="text-sm">⚡</span>
-                        <div className="text-left">
-                          <span className="block leading-tight font-bold">Disparadores de ICP</span>
-                          <span className="text-[10px] font-normal text-gray-400 hidden sm:block">100% Automático (Cero URLs)</span>
+                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                          signalCategoryTab === "icp_triggers"
+                            ? "text-brand-600 dark:text-brand-400"
+                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
+                        }`}>
+                          03
+                        </span>
+                        <div className="min-w-0">
+                          <span className="block leading-tight font-bold text-xs truncate">Disparadores de ICP</span>
+                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">100% Automático (Cero URLs)</span>
                         </div>
                       </button>
                     </div>
@@ -2678,9 +2696,6 @@ export default function SignalsPage({
                               <RiFileList3Line size={13} /> Pegar URL(s) Manualmente
                             </button>
                           </div>
-                          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
-                            <RiSparklingLine className="text-amber-500" size={13} /> Motor Unipile en tiempo real
-                          </span>
                         </div>
 
                         {/* Publicaciones actualmente configuradas en el monitor */}
