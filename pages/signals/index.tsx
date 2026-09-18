@@ -416,22 +416,18 @@ export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
 
 const ASK_AI_TEMPLATES = [
   {
-    icon: "💰",
     label: "Rondas de Inversión",
     prompt: "Encuentra 10 CEOs de empresas que recibieron inversion recientemente en Chile",
   },
   {
-    icon: "🚀",
     label: "Nuevos en el Cargo",
     prompt: "Encuentra 10 Directores de Marketing o VP de Ventas que asumieron nuevo cargo en los últimos 90 días en México",
   },
   {
-    icon: "📢",
     label: "Publicaciones Activas",
     prompt: "Encuentra 10 Líderes Comerciales que publican activamente sobre prospección B2B o IA en España",
   },
   {
-    icon: "📈",
     label: "Crecimiento Acelerado",
     prompt: "Encuentra 10 Fundadores y CEOs de startups en hipercrecimiento en Colombia",
   },
@@ -1564,7 +1560,7 @@ export default function SignalsPage({
           {/* Guía visual con la Fórmula Recomendada */}
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 p-2.5 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
             <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
-              💡 Fórmula recomendada:
+              Fórmula recomendada:
             </span>
             <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [Cantidad]
@@ -1633,10 +1629,9 @@ export default function SignalsPage({
                 key={idx}
                 type="button"
                 onClick={() => setAskPrompt(tmpl.prompt)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50/80 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
+                className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50/80 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
                 title={`Cargar: "${tmpl.prompt}"`}
               >
-                <span>{tmpl.icon}</span>
                 <span>{tmpl.label}</span>
               </button>
             ))}
