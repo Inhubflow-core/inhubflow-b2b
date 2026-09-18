@@ -1573,15 +1573,15 @@ export default function SignalsPage({
               [Cantidad]
             </span>
             <span>+</span>
-            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-medium border border-indigo-200/50 dark:border-indigo-800/50">
+            <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [Cargo / Decisor]
             </span>
             <span>+</span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-medium border border-amber-200/50 dark:border-amber-800/50">
+            <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [Señal de Intención o Evento]
             </span>
             <span>+</span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-medium border border-emerald-200/50 dark:border-emerald-800/50">
+            <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [País o Ciudad]
             </span>
           </div>
