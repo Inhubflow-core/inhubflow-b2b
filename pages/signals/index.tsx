@@ -3358,40 +3358,6 @@ export default function SignalsPage({
                        ========================================================= */}
                     {signalCategoryTab === "icp_triggers" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
-                        {/* Resumen del ICP activo que alimenta estos disparadores */}
-                        <div className="p-3.5 rounded-2xl bg-linear-to-r from-emerald-50/80 via-teal-50/50 to-blue-50/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-blue-950/20 border border-emerald-200/80 dark:border-emerald-800/60 shadow-2xs space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                                Filtros ICP del Paso 1 en Ejecución Automática
-                              </span>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                              Cero URLs requeridas
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-gray-700 dark:text-gray-300">
-                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Cargos Objetivo:</strong>
-                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
-                                {icpTitles.length > 0 ? icpTitles.slice(0, 2).join(", ") + (icpTitles.length > 2 ? ` (+${icpTitles.length - 2})` : "") : "Todos los cargos"}
-                              </span>
-                            </div>
-                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Ubicación:</strong>
-                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
-                                {icpCountry} {icpCity ? `(${icpCity})` : ""}
-                              </span>
-                            </div>
-                            <div className="bg-white/70 dark:bg-gray-800/60 p-2 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
-                              <strong className="block text-[10px] text-gray-400 uppercase tracking-wider">Empresas / Tamaño:</strong>
-                              <span className="font-semibold text-gray-900 dark:text-gray-100 truncate block">
-                                {icpCompany.trim() || (icpSizes.length > 0 ? icpSizes.slice(0, 2).join(", ") : "Cualquier tamaño")}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
                         {/* Cabecera de los 6 disparadores */}
                         <div className="p-4 rounded-xl bg-white dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-2xs space-y-3">
                           <div className="flex items-center justify-between">
