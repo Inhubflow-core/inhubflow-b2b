@@ -512,7 +512,7 @@ export default function SignalsPage({
   const [timeWindowDays, setTimeWindowDays] = useState<number>(90);
   const [sourceStrategy, setSourceStrategy] = useState<"linkedin" | "web" | "hybrid">("linkedin");
 
-  // Buscador Inteligente de Posts en LinkedIn (Unipile)
+  // Buscador Inteligente de Posts en LinkedIn
   const [postSearchMode, setPostSearchMode] = useState<"search" | "manual">("search");
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
   const [postSearchKeywords, setPostSearchKeywords] = useState("");
@@ -580,7 +580,7 @@ export default function SignalsPage({
     setKeywordsList(keywordsList.filter((item) => item !== k));
   };
 
-  // Búsqueda de posts en LinkedIn vía Unipile
+  // Búsqueda de posts en LinkedIn
   const handleSearchLinkedInPosts = async () => {
     if (!selectedAccountId) {
       toast.error("Selecciona una cuenta de LinkedIn conectada");

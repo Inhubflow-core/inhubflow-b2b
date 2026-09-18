@@ -217,8 +217,8 @@ const TOURS: Record<TourPage, DriveStep[]> = {
     {
       element: '[data-tour="settings-tab-general"]',
       popover: {
-        title: "Connect an AI agent",
-        description: "The General tab has a copyable MCP URL to hook up Claude Code, Cursor, or any MCP-compatible agent to manage InHubFlow on your behalf — plus the daily import cap and this tour picker.",
+        title: "General Settings",
+        description: "Configure daily import limits, account preferences, and manage your InHubFlow workspace settings.",
       },
     },
   ],

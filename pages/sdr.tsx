@@ -636,9 +636,9 @@ export default function SdrPage() {
                     onChange={(e) => setModel(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs text-sm font-medium text-base-content focus:outline-none focus:border-violet-500"
                   >
-                    <option value="gemini-3.7-flash">Google Gemini 3.7 Flash ({t("sdr.aiModelRecommended") || "Recomendado"})</option>
-                    <option value="gemini-3.8-flash">Google Gemini 3.8 Flash</option>
-                    <option value="gemini-3.6-flash">Google Gemini 3.6 Flash</option>
+                    <option value="gemini-3.7-flash">InHubFlow Neural 3.7 ({t("sdr.aiModelRecommended") || "Recomendado"})</option>
+                    <option value="gemini-3.8-flash">InHubFlow Neural 3.8 (Ultra)</option>
+                    <option value="gemini-3.6-flash">InHubFlow Neural 3.6 (Fast)</option>
                   </select>
                   <p className="text-xs text-base-content/40 mt-1.5">
                     {t("sdr.aiModelDesc")}

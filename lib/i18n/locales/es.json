@@ -597,8 +597,8 @@
     "badgeAutonomous": "AUTÓNOMO",
     "engineParameters": "Parámetros del Motor de IA",
     "aiModel": "Modelo de Inteligencia Artificial",
-    "aiModelRecommended": "Google Gemini 3.6 Flash (Recomendado - Ultrarrápido)",
-    "aiModelDesc": "Utiliza la API de Gemini configurada en .env.local con salida JSON estructurada.",
+    "aiModelRecommended": "InHubFlow Neural 3.6 (Recomendado - Ultrarrápido)",
+    "aiModelDesc": "Utiliza el motor neuronal propio de InHubFlow con optimización continua y salida estructurada.",
     "minConfidence": "Umbral Mínimo de Confianza: {pct}%",
     "minConfidenceDesc": "Si la confianza es inferior, la IA solicitará revisión humana automáticamente.",
     "maxAutoTurns": "Máximo de Turnos Consecutivos",
@@ -631,7 +631,7 @@
     "simMessage": "Mensaje del Prospecto (Inbound)",
     "simMessagePlaceholder": "Escribe el mensaje del prospecto aquí...",
     "simBtn": "Simular Respuesta con IA",
-    "simLoading": "Procesando con Gemini...",
+    "simLoading": "Procesando con IA...",
     "analysisResult": "Resultado del Análisis",
     "intent": "Intención",
     "confidence": "Confianza",
@@ -668,7 +668,7 @@
     "blocker_runtime_master_disabled": "Motor global desactivado",
     "blocker_agent_not_active": "Agente no activo",
     "blocker_provider_master_disabled": "Proveedor global desactivado",
-    "blocker_provider_credentials_missing": "Falta API Key de Gemini",
+    "blocker_provider_credentials_missing": "Falta configuración de credenciales del motor de IA",
     "blocker_approved_knowledge_missing": "Falta aprobar al menos una fuente de conocimiento",
     "blocker_provider_circuit_open": "Circuito del proveedor en espera",
     "blocker_outbound_master_disabled": "Envíos globales desactivados",
@@ -682,7 +682,7 @@
     "confirmDeleteDoc": "¿Seguro que deseas eliminar este documento de la base de conocimiento?",
     "toastDocDeleted": "Documento eliminado",
     "toastEnterSimMessage": "Por favor ingresa un mensaje para probar",
-    "toastSimCompleted": "Simulación completada con Gemini"
+    "toastSimCompleted": "Simulación completada con éxito"
   },
   "emailHealth": {
     "title": "Email Health",

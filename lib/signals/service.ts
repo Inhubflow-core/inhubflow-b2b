@@ -456,7 +456,7 @@ export class SignalRadarService {
       const code = isFeatureNotSubscribed ? "unsupported_capability" : providerErrorCode(error);
       const rawMessage = error instanceof Error ? error.message : String(error);
       const message = isFeatureNotSubscribed
-        ? "Esta señal requiere Sales Navigator en tu suscripción de Unipile."
+        ? "Esta señal requiere Sales Navigator en tu cuenta de LinkedIn conectada."
         : rawMessage;
       const retryable = isFeatureNotSubscribed ? false : (error instanceof SignalScanError ? error.retryable : true);
       const failures = isFeatureNotSubscribed ? 0 : (monitor.consecutive_failures + 1);

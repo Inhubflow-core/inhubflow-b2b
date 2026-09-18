@@ -1996,29 +1996,9 @@ const INTEGRATIONS: IntegrationDef[] = [
     accentColor: "#4f46e5",
     placeholder: "Apollo API key",
   },
-  {
-    key: "openrouter",
-    name: "OpenRouter",
-    description: "Route AI requests across models (GPT-4, Claude, Llama…)",
-    badge: "OR",
-    badgeColor: "#0ea5e9",
-    accentColor: "#0ea5e9",
-    placeholder: "sk-or-...",
-  },
-  {
-    key: "claude",
-    name: "Claude (Anthropic)",
-    description: "Anthropic Claude for AI-powered personalization",
-    badge: "AI",
-    badgeColor: "#d97706",
-    accentColor: "#d97706",
-    placeholder: "sk-ant-...",
-  },
 ];
 
-// Apollo is open-core (free); OpenRouter/Claude drive the premium AI writer and are
-// hidden in the free build.
-const PREMIUM_INTEGRATION_KEYS = new Set(["openrouter", "claude"]);
+const PREMIUM_INTEGRATION_KEYS = new Set<string>();
 
 function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
   const [configuredMap, setConfiguredMap] = useState<Record<string, { masked: string | null; configured: boolean }>>({});
@@ -2142,94 +2122,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
 // ─── General Tab ──────────────────────────────────────────────────────────────
 
 // ─── MCP card ─────────────────────────────────────────────────────────────────
-// Lets the user grab the hosted MCP URL for this InHubFlow instance (self-hosted, so
-// it's built from the browser's own origin) and copy the one-liner to connect an
-// AI agent. Premium-only (ee/mcp) — hidden entirely when hasPremium is false.
-
-function McpCard() {
-  const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [mcpUrl, setMcpUrl] = useState("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setMcpUrl(`${window.location.origin}/api/mcp`);
-    }
-  }, []);
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* clipboard blocked — user can still select the text */
-    }
-  }
-
-  if (!mcpUrl) return null;
-
-  const cliCommand = `claude mcp add --transport http inhubflow ${mcpUrl}`;
-
-  return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left"
-      >
-        <RiFlashlightLine size={13} className="text-primary shrink-0" />
-        <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">MCP — connect an AI agent</p>
-        <RiArrowDownSLine size={15} className={`ml-auto text-base-content/30 transition-transform ${expanded ? "rotate-180" : ""}`} />
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4">
-          <p className="text-xs text-base-content/50 mb-3 leading-relaxed">
-            Connect Claude Code, Claude.ai, Cursor, or any MCP-compatible AI agent to this InHubFlow instance —
-            it can read contacts, launch campaigns, and review replies on your behalf.
-          </p>
-
-          <div className="rounded-lg border border-base-300/50 bg-base-300/30 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wide text-base-content/40 mb-2">
-              MCP server URL
-            </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 min-w-0 truncate rounded-md bg-base-100 border border-base-300/50 px-3 py-2 text-xs text-base-content font-mono">
-                {mcpUrl}
-              </code>
-              <button
-                onClick={() => copy(mcpUrl)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-base-300/60 px-3 py-2 text-xs text-base-content/70 hover:bg-base-300/60 transition-colors"
-              >
-                {copied ? <RiCheckLine size={13} className="text-success" /> : <RiFileCopyLine size={13} />}
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-base-content/50 leading-relaxed">
-            <p className="mb-1.5"><span className="text-base-content/70 font-medium">Claude Code</span> — run this in your terminal:</p>
-            <div className="flex items-center gap-2 mb-1.5">
-              <code className="flex-1 min-w-0 truncate rounded-md bg-base-300/30 border border-base-300/50 px-3 py-2 text-xs text-base-content font-mono">
-                {cliCommand}
-              </code>
-              <button
-                onClick={() => copy(cliCommand)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-base-300/60 px-3 py-2 text-xs text-base-content/70 hover:bg-base-300/60 transition-colors"
-              >
-                <RiFileCopyLine size={13} />
-              </button>
-            </div>
-            <p>
-              Other agents (Cursor, Claude desktop/web, etc.) — add it as an HTTP MCP server / connector
-              using the URL above. You&apos;ll be prompted to sign in to InHubFlow in the browser on first use.
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// MCP integration is managed internally.
 
 function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
   const router = useRouter();
@@ -2335,9 +2228,6 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
           </button>
         </form>
       </div>
-
-      {/* MCP — premium (ee/mcp); hidden in the public build */}
-      {hasPremium && <McpCard />}
 
       {/* Product tour */}
       <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
