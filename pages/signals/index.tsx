@@ -3557,21 +3557,18 @@ export default function SignalsPage({
                           {
                             id: "conversation",
                             icon: RiChat1Line,
-                            iconColor: "text-brand-500",
                             title: "Iniciar Conversación",
                             desc: "Abre diálogo estratégico sobre cuellos de botella en su proceso.",
                           },
                           {
                             id: "demo",
                             icon: RiCalendarLine,
-                            iconColor: "text-blue-500",
                             title: "Agendar Demo Breve",
                             desc: "Propuesta de valor directa para directores con dolor activo.",
                           },
                           {
                             id: "resource",
                             icon: RiFileList3Line,
-                            iconColor: "text-purple-500",
                             title: "Compartir Recurso / Guía",
                             desc: "Ofrece un framework o playbook sin fricción comercial inicial.",
                           },
@@ -3585,13 +3582,24 @@ export default function SignalsPage({
                               onClick={() => setMsgObjective(obj.id as "conversation" | "demo" | "resource")}
                               className={`p-3.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
                                 isSelected
-                                  ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs font-bold"
+                                  ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/40 shadow-xs font-bold"
                                   : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                               }`}
                             >
-                              <div className="font-bold flex items-center gap-1.5">
-                                <Icon size={16} className={obj.iconColor} />
-                                <span>{obj.title}</span>
+                              <div className="font-bold flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Icon size={16} className="text-gray-700 dark:text-gray-300 shrink-0" />
+                                  <span>{obj.title}</span>
+                                </div>
+                                <div
+                                  className={`w-4 h-4 rounded flex items-center justify-center text-xs font-bold transition-all shrink-0 ${
+                                    isSelected
+                                      ? "bg-emerald-600 text-white shadow-xs"
+                                      : "border border-gray-400 dark:border-gray-500 text-transparent"
+                                  }`}
+                                >
+                                  ✓
+                                </div>
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
                                 {obj.desc}
@@ -3612,19 +3620,16 @@ export default function SignalsPage({
                           {
                             id: "consultive",
                             icon: RiSparklingLine,
-                            iconColor: "text-purple-500",
                             label: "Consultivo & Experto (Recomendado)",
                           },
                           {
                             id: "professional",
                             icon: RiBriefcaseLine,
-                            iconColor: "text-amber-500",
                             label: "Profesional & Directo",
                           },
                           {
                             id: "direct",
                             icon: RiThumbUpLine,
-                            iconColor: "text-emerald-500",
                             label: "Cercano & Casual",
                           },
                         ].map((tn) => {
@@ -3637,12 +3642,15 @@ export default function SignalsPage({
                               onClick={() => setMsgTone(tn.id as "consultive" | "professional" | "direct")}
                               className={`p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                 isSelected
-                                  ? "border-2 border-brand-500 bg-brand-50/50 dark:bg-brand-950/30 text-gray-900 dark:text-white shadow-xs font-bold"
+                                  ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/40 shadow-xs font-bold"
                                   : "border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750"
                               }`}
                             >
-                              <Icon size={15} className={tn.iconColor} />
+                              <Icon size={15} className="text-gray-700 dark:text-gray-300" />
                               <span>{tn.label}</span>
+                              {isSelected && (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-0.5">✓</span>
+                              )}
                             </button>
                           );
                         })}
