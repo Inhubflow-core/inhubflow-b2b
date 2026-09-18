@@ -1525,7 +1525,7 @@ export default function SignalsPage({
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                 Ask AI — Investigador Autónomo de Prospectos
               </h3>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-md">
+              <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-md">
                 Búsqueda en Lenguaje Natural
               </span>
             </div>
@@ -1562,7 +1562,7 @@ export default function SignalsPage({
             </div>
           </div>
           {/* Guía visual con la Fórmula Recomendada */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 p-2.5 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 bg-white/70 dark:bg-gray-800/70 p-2.5 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
             <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
               💡 Fórmula recomendada:
             </span>
@@ -1628,7 +1628,7 @@ export default function SignalsPage({
 
           {/* Chips con Plantillas de Ejemplo Rápidas */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
               Ejemplos rápidos:
             </span>
             {ASK_AI_TEMPLATES.map((tmpl, idx) => (
@@ -1636,7 +1636,7 @@ export default function SignalsPage({
                 key={idx}
                 type="button"
                 onClick={() => setAskPrompt(tmpl.prompt)}
-                className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50/80 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
+                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium text-gray-700 hover:text-brand-600 bg-white hover:bg-brand-50/80 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 transition-all whitespace-nowrap shadow-2xs cursor-pointer"
                 title={`Cargar: "${tmpl.prompt}"`}
               >
                 <span>{tmpl.label}</span>
@@ -1673,12 +1673,12 @@ export default function SignalsPage({
                             {resLead.headline}
                           </p>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 shrink-0">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 shrink-0">
                           {resLead.score}% Match
                         </span>
                       </div>
 
-                      <div className="mt-2.5 p-2 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/30 text-[11px] text-purple-900 dark:text-purple-200">
+                      <div className="mt-2.5 p-2 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/30 text-xs text-purple-900 dark:text-purple-200">
                         <span className="font-bold">Señal: </span>
                         {resLead.signal_snippet}
                       </div>
@@ -1720,7 +1720,7 @@ export default function SignalsPage({
             >
               Hot Leads / Cola de Revisión
               {totalPending > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
+                <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
                   {totalPending}
                 </span>
               )}
@@ -1880,7 +1880,7 @@ export default function SignalsPage({
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {lead.company ? `@ ${lead.company}` : ""}
                         </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
                           {lead.signal_type === "post_comment" || lead.signal_type === "high_intent_comments"
                             ? "Comentó en Post"
                             : lead.signal_type === "post_reaction" || lead.signal_type === "competitor_reactions"
@@ -1901,7 +1901,7 @@ export default function SignalsPage({
                             ? "Empresa en Expansión"
                             : "Señal de Intención"}
                         </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                           {lead.score}% ICP Fit
                         </span>
                       </div>
@@ -1925,7 +1925,7 @@ export default function SignalsPage({
                               <button
                                 type="button"
                                 onClick={() => { setEditingLeadId(lead.id); setEditingDraft(lead.icebreaker_preview || ""); }}
-                                className="text-[11px] text-brand-600 hover:underline"
+                                className="text-xs text-brand-600 hover:underline"
                               >
                                 Editar antes de aprobar
                               </button>
@@ -2051,14 +2051,14 @@ export default function SignalsPage({
                             <h4 className="font-bold text-sm text-gray-900 dark:text-white">
                               {m.name}
                             </h4>
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
                               {signalTitle}
                             </span>
                           </div>
                         </div>
 
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          className={`px-2 py-0.5 rounded text-xs font-bold ${
                             m.mode === "autopilot"
                               ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
                               : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
@@ -2140,7 +2140,7 @@ export default function SignalsPage({
                         </button>
                       </div>
 
-                      <div className="flex flex-col items-end gap-0.5 text-[11px] text-gray-400">
+                      <div className="flex flex-col items-end gap-0.5 text-xs text-gray-400">
                         <span>{m.scan_state === "running" ? "Escaneando…" : m.last_success_at ? `Último éxito ${new Date(m.last_success_at).toLocaleString()}` : "Sin escaneos exitosos"}</span>
                         {m.next_scan_at && m.status === "active" && <span>Próximo: {new Date(m.next_scan_at).toLocaleString()}</span>}
                         {m.last_error && <span className="text-red-500 max-w-52 truncate" title={m.last_error}>{m.last_error}</span>}
@@ -2190,12 +2190,12 @@ export default function SignalsPage({
                     <div key={sig.id} className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15 space-y-2">
                       <div className="flex items-center justify-between">
                         <sig.icon className={sig.color} size={18} />
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${sig.badgeBg}`}>
                           {sig.badge}
                         </span>
                       </div>
                       <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
                     </div>
                   ))}
                 </div>
@@ -2214,12 +2214,12 @@ export default function SignalsPage({
                     <div key={sig.id} className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 space-y-2">
                       <div className="flex items-center justify-between">
                         <sig.icon className={sig.color} size={18} />
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${sig.badgeBg}`}>
                           {sig.badge}
                         </span>
                       </div>
                       <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
                     </div>
                   ))}
                 </div>
@@ -2238,12 +2238,12 @@ export default function SignalsPage({
                     <div key={sig.id} className="p-4 rounded-2xl bg-brand-500/5 border border-brand-500/15 space-y-2">
                       <div className="flex items-center justify-between">
                         <sig.icon className={sig.color} size={18} />
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${sig.badgeBg}`}>
                           {sig.badge}
                         </span>
                       </div>
                       <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
                     </div>
                   ))}
                 </div>
@@ -2262,12 +2262,12 @@ export default function SignalsPage({
                     <div key={sig.id} className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 space-y-2">
                       <div className="flex items-center justify-between">
                         <sig.icon className={sig.color} size={18} />
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sig.badgeBg}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${sig.badgeBg}`}>
                           {sig.badge}
                         </span>
                       </div>
                       <h4 className="font-bold text-xs text-gray-900 dark:text-white">{sig.title}</h4>
-                      <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">{sig.description}</p>
                     </div>
                   ))}
                 </div>
@@ -2351,7 +2351,7 @@ export default function SignalsPage({
                             >
                               PASO {step.num}
                             </span>
-                            <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                               {step.label}
                             </span>
                           </div>
@@ -2468,7 +2468,7 @@ export default function SignalsPage({
                       {/* Ciudades clave sugeridas */}
                       {selectedCountryOption && selectedCountryOption.popularCities.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500 mr-1 font-medium">Ciudades clave:</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500 mr-1 font-medium">Ciudades clave:</span>
                           {selectedCountryOption.popularCities.map((cName) => {
                             const active = icpCity.toLowerCase() === cName.toLowerCase();
                             return (
@@ -2608,7 +2608,7 @@ export default function SignalsPage({
                         </span>
                         <div className="min-w-0">
                           <span className="block leading-tight font-bold text-xs truncate">Posts en LinkedIn</span>
-                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">Likes y Comentarios</span>
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">Likes y Comentarios</span>
                         </div>
                       </button>
 
@@ -2633,7 +2633,7 @@ export default function SignalsPage({
                         </span>
                         <div className="min-w-0">
                           <span className="block leading-tight font-bold text-xs truncate">Palabras Clave & Mercado</span>
-                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">Menciones y Noticias</span>
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">Menciones y Noticias</span>
                         </div>
                       </button>
 
@@ -2661,7 +2661,7 @@ export default function SignalsPage({
                         </span>
                         <div className="min-w-0">
                           <span className="block leading-tight font-bold text-xs truncate">Disparadores de ICP</span>
-                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 block truncate">100% Automático (Cero URLs)</span>
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">100% Automático (Cero URLs)</span>
                         </div>
                       </button>
                     </div>
@@ -2707,7 +2707,7 @@ export default function SignalsPage({
                           <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-300 dark:border-brand-800 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-xs font-bold">
                                   {selectedPostUrls.length}
                                 </span>
                                 <span className="text-xs font-bold text-gray-900 dark:text-white">
@@ -2715,7 +2715,7 @@ export default function SignalsPage({
                                     ? "1 Publicación activa configurada"
                                     : `${selectedPostUrls.length} Publicaciones activas configuradas`}
                                 </span>
-                                <span className="text-[10px] text-brand-700 dark:text-brand-300 font-medium hidden sm:inline">
+                                <span className="text-xs text-brand-700 dark:text-brand-300 font-medium hidden sm:inline">
                                   (Señales que serán escaneadas)
                                 </span>
                               </div>
@@ -2725,7 +2725,7 @@ export default function SignalsPage({
                                   setSelectedPostUrls([]);
                                   setNewTargetUrl("");
                                 }}
-                                className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
+                                className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline"
                               >
                                 Limpiar todas
                               </button>
@@ -2739,7 +2739,7 @@ export default function SignalsPage({
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <RiLinkedinBoxFill className="text-brand-600 shrink-0" size={16} />
-                                    <span className="truncate font-mono text-[11px] text-gray-700 dark:text-gray-300" title={url}>
+                                    <span className="truncate font-mono text-xs text-gray-700 dark:text-gray-300" title={url}>
                                       {url}
                                     </span>
                                   </div>
@@ -2748,7 +2748,7 @@ export default function SignalsPage({
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
                                     >
                                       Ver post <RiExternalLinkLine size={10} />
                                     </a>
@@ -2877,7 +2877,7 @@ export default function SignalsPage({
                                 {/* Chips sugeridos de 1 clic */}
                                 <div className="space-y-1.5 mt-2">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
                                     {[
                                       "Prospección B2B",
                                       "Inteligencia Artificial",
@@ -2909,7 +2909,7 @@ export default function SignalsPage({
                                       );
                                     })}
                                   </div>
-                                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                  <p className="text-xs text-gray-400 dark:text-gray-500">
                                     💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
                                   </p>
                                 </div>
@@ -2923,7 +2923,7 @@ export default function SignalsPage({
                                 <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                                   Conectando con LinkedIn y ordenando publicaciones por viralidad...
                                 </p>
-                                <p className="text-[11px] text-gray-400">
+                                <p className="text-xs text-gray-400">
                                   Esto toma unos segundos mientras calculamos reacciones y comentarios reales.
                                 </p>
                               </div>
@@ -2934,7 +2934,7 @@ export default function SignalsPage({
                                 {/* Barra de control de publicaciones */}
                                 <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-brand-50/60 dark:bg-brand-950/30 border border-brand-300 dark:border-brand-800">
                                   <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-[11px] font-bold">
+                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-500 text-white text-xs font-bold">
                                       {selectedPostUrls.length}
                                     </span>
                                     <span className="text-xs font-bold text-gray-900 dark:text-white">
@@ -2942,7 +2942,7 @@ export default function SignalsPage({
                                         ? "1 publicación seleccionada"
                                         : `${selectedPostUrls.length} publicaciones seleccionadas`}
                                     </span>
-                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                       (de {discoveredPosts.length} encontradas)
                                     </span>
                                   </div>
@@ -2950,7 +2950,7 @@ export default function SignalsPage({
                                     <button
                                       type="button"
                                       onClick={() => handleSelectTopPosts(3)}
-                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-700 bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-800 hover:bg-brand-100/50 transition-colors"
+                                      className="px-2.5 py-1 rounded-lg text-xs font-bold text-brand-700 bg-white dark:bg-gray-800 border border-brand-300 dark:border-brand-800 hover:bg-brand-100/50 transition-colors"
                                     >
                                       ⭐ Seleccionar Top 3 Virales
                                     </button>
@@ -2958,7 +2958,7 @@ export default function SignalsPage({
                                       <button
                                         type="button"
                                         onClick={() => handleSelectTopPosts(0)}
-                                        className="px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
+                                        className="px-2 py-1 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"
                                       >
                                         Limpiar
                                       </button>
@@ -3015,13 +3015,13 @@ export default function SignalsPage({
                                                   {post.author.name}
                                                 </span>
                                                 {post.author.isCompany && (
-                                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                  <span className="px-1.5 py-0.2 rounded text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                                                     Empresa
                                                   </span>
                                                 )}
                                               </div>
                                               {post.author.headline && (
-                                                <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
                                                   {post.author.headline}
                                                 </p>
                                               )}
@@ -3035,7 +3035,7 @@ export default function SignalsPage({
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               onClick={(e) => e.stopPropagation()}
-                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-300 dark:border-brand-800 transition-colors shrink-0"
+                                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 border border-brand-300 dark:border-brand-800 transition-colors shrink-0"
                                             >
                                               Ver en LinkedIn <RiExternalLinkLine size={11} />
                                             </a>
@@ -3050,7 +3050,7 @@ export default function SignalsPage({
                                         )}
 
                                         {/* Métricas de Engagement */}
-                                        <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
+                                        <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
                                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                                             <RiThumbUpLine size={12} /> {post.reactionCount} reacciones
                                           </span>
@@ -3063,7 +3063,7 @@ export default function SignalsPage({
                                             </span>
                                           )}
                                           {post.date && (
-                                            <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 ml-auto">
+                                            <span className="inline-flex items-center gap-1 text-xs text-gray-400 ml-auto">
                                               <RiTimeLine size={11} /> {post.date}
                                             </span>
                                           )}
@@ -3083,7 +3083,7 @@ export default function SignalsPage({
                                 <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">
                                   Descubre publicaciones virales de competidores en 1 clic
                                 </h5>
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto">
                                   Escribe el nombre de un competidor o temas clave de tu nicho arriba y pulsa <strong>Buscar Posts</strong> para ver publicaciones reales con alto volumen de comentarios y reacciones.
                                 </p>
                               </div>
@@ -3135,7 +3135,7 @@ export default function SignalsPage({
                                 />
                               </div>
                             </div>
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
                               Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
                             </p>
                           </div>
@@ -3154,7 +3154,7 @@ export default function SignalsPage({
                             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                               Empresa, Competidor o Referente <span className="text-gray-400 font-normal">(Opcional)</span>
                             </label>
-                            <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Sin URLs necesarias</span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Sin URLs necesarias</span>
                           </div>
                           <div className="relative">
                             <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -3169,7 +3169,7 @@ export default function SignalsPage({
                               className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                             />
                           </div>
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                             InHubFlow rastreará automáticamente discusiones públicas, menciones y personas que interactúen alrededor de este competidor.
                           </p>
                         </div>
@@ -3246,7 +3246,7 @@ export default function SignalsPage({
                           {/* Sugerencias de 1 clic (estilo idéntico a las pills del Paso 1) */}
                           <div className="pt-0.5 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mr-1">Términos sugeridos:</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">Términos sugeridos:</span>
                               {[
                                 "busco CRM",
                                 "alternativa a HubSpot",
@@ -3278,7 +3278,7 @@ export default function SignalsPage({
                                 );
                               })}
                             </div>
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
                               💡 El sistema rastrea publicaciones y preguntas en LinkedIn donde las personas usen estas palabras clave y las cruza con tus cargos y países del ICP.
                             </p>
                           </div>
@@ -3291,7 +3291,7 @@ export default function SignalsPage({
                               <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                                 Eventos Disparadores de Mercado (Trigger Events)
                               </span>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
                               </p>
                             </div>
@@ -3305,12 +3305,12 @@ export default function SignalsPage({
                                     setSelectedMarketEvents(["funding_round", "company_news", "acquisition_event"]);
                                   }
                                 }}
-                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                                className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
                                 {selectedMarketEvents.length === 3 ? "Deseleccionar todos" : "Seleccionar los 3"}
                               </button>
                               <span className="text-gray-300 dark:text-gray-600">|</span>
-                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
                             </div>
                           </div>
 
@@ -3358,11 +3358,11 @@ export default function SignalsPage({
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
+                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
                                           {ev.badge}
                                         </span>
                                         <div
-                                          className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+                                          className={`w-4 h-4 rounded flex items-center justify-center text-xs font-bold transition-all ${
                                             isActive
                                               ? "bg-emerald-600 text-white shadow-xs"
                                               : "border border-gray-400 dark:border-gray-500 text-transparent"
@@ -3375,7 +3375,7 @@ export default function SignalsPage({
                                     <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {ev.title}
                                     </strong>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {ev.desc}
                                     </p>
                                   </div>
@@ -3385,7 +3385,7 @@ export default function SignalsPage({
                           </div>
 
                           {selectedMarketEvents.length > 0 && (
-                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[11px]">
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs">
                               <p className="text-emerald-600 dark:text-emerald-400 font-medium">
                                 ✓ <strong>{selectedMarketEvents.length === 3 ? "Los 3 tipos de noticias activas:" : `${selectedMarketEvents.length} tipo(s) de noticias activas:`}</strong> Se detectarán noticias públicas y se cruzarán con los decisores en LinkedIn que coincidan con tu ICP.
                               </p>
@@ -3407,7 +3407,7 @@ export default function SignalsPage({
                               <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                                 Señales Automáticas de Decisores (Nivel 3)
                               </span>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 Selecciona 1 o más eventos. El sistema rastreará periódicamente LinkedIn buscando personas que cumplan estas condiciones:
                               </p>
                             </div>
@@ -3428,7 +3428,7 @@ export default function SignalsPage({
                                     ]);
                                   }
                                 }}
-                                className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+                                className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
                                 {selectedIcpSignals.length === 6 ? "Restablecer (1)" : "Seleccionar los 6"}
                               </button>
@@ -3510,11 +3510,11 @@ export default function SignalsPage({
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className={`${sig.iconColor} shrink-0`} size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
+                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
                                           {sig.badge}
                                         </span>
                                         <div
-                                          className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold transition-all ${
+                                          className={`w-4 h-4 rounded flex items-center justify-center text-xs font-bold transition-all ${
                                             isSelected
                                               ? "bg-emerald-600 text-white shadow-xs"
                                               : "border border-gray-400 dark:border-gray-500 text-transparent"
@@ -3527,7 +3527,7 @@ export default function SignalsPage({
                                     <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {sig.title}
                                     </strong>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                                       {sig.desc}
                                     </p>
                                   </div>
@@ -3538,7 +3538,7 @@ export default function SignalsPage({
 
                           {/* Mensaje de Confirmación */}
                           {selectedIcpSignals.length > 0 && (
-                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-[11px]">
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs">
                               <p className="text-emerald-600 dark:text-emerald-400 font-medium">
                                 ✓ <strong>{selectedIcpSignals.length} señal(es) activa(s):</strong> InHubFlow buscará continuamente perfiles y los agregará con su evidencia a la lista de destino.
                               </p>
@@ -3608,7 +3608,7 @@ export default function SignalsPage({
                                 <Icon size={16} className={obj.iconColor} />
                                 <span>{obj.title}</span>
                               </div>
-                              <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
                                 {obj.desc}
                               </div>
                             </button>
@@ -3701,7 +3701,7 @@ export default function SignalsPage({
                           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                           Simulación en Tiempo Real (LinkedIn Direct Message Preview)
                         </label>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
                           <RiShieldCheckLine size={12} /> Vista previa orientativa
                         </span>
                       </div>
@@ -3719,17 +3719,17 @@ export default function SignalsPage({
                                 Martín Echavarría
                                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                               </div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
                                 Director Comercial & Alianzas @ Grupo Retail B2B
                               </div>
                             </div>
                           </div>
-                          <span className="text-[10px] text-gray-400 font-medium">En línea</span>
+                          <span className="text-xs text-gray-400 font-medium">En línea</span>
                         </div>
 
                         {/* Burbuja de mensaje */}
                         <div className="space-y-1">
-                          <span className="text-[10px] text-gray-400 block text-center">
+                          <span className="text-xs text-gray-400 block text-center">
                             Hoy · Mensaje generado con IA contextual
                           </span>
                           <div className="max-w-xl bg-white dark:bg-gray-800 p-4 rounded-xl rounded-tl-xs border border-gray-300 dark:border-gray-700 shadow-2xs text-xs md:text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-normal">
@@ -3746,7 +3746,7 @@ export default function SignalsPage({
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[10px] text-gray-400 pt-1">
+                        <div className="flex items-center justify-between text-xs text-gray-400 pt-1">
                           <span>Generado según ICP + Señal de Intención</span>
                           <span>InHubFlow AI Engine</span>
                         </div>
@@ -3767,7 +3767,7 @@ export default function SignalsPage({
                             placeholder="Hola {first_name}, vi que sigues activo en {topic}... ¿Cómo abordan este reto en {company}?"
                             className="w-full rounded-xl border border-gray-300 bg-white p-3.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                           />
-                          <p className="text-[11px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             Variables disponibles: <code>{"{first_name}"}</code>, <code>{"{company}"}</code>, <code>{"{topic}"}</code>, <code>{"{competitor}"}</code>.
                           </p>
                         </div>
@@ -3848,13 +3848,13 @@ export default function SignalsPage({
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 font-bold text-xs">
                               Modo Revisión
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300">
+                              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300">
                                 Recomendado
                               </span>
                             </span>
                             {newMode === "review" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
                             Los prospectos captados van a tu cola de «Hot Leads». Revisas y apruebas el mensaje antes de activar el contacto.
                           </div>
                         </button>
@@ -3871,13 +3871,13 @@ export default function SignalsPage({
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 font-bold text-xs">
                               Piloto Automático (Autopilot)
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
+                              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
                                 Gates SDR IA
                               </span>
                             </span>
                             {newMode === "autopilot" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
                             InHubFlow solo enrola automáticamente cuando la cuenta, campaña y los controles del SDR IA están listos. Si falta un gate, el lead pasa a revisión.
                           </div>
                         </button>
@@ -3951,31 +3951,31 @@ export default function SignalsPage({
                         <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                           Resumen de Configuración del Monitor
                         </span>
-                        <span className="text-[11px] text-brand-600 dark:text-brand-400 font-medium">
+                        <span className="text-xs text-brand-600 dark:text-brand-400 font-medium">
                           Listo para activar
                         </span>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Audiencia (ICP)</span>
+                          <span className="text-xs text-gray-400 block font-medium">Audiencia (ICP)</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {icpTitles.length} cargos · {icpLocations.length > 0 ? icpLocations[0] : icpCountry}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Señal Elegida</span>
+                          <span className="text-xs text-gray-400 block font-medium">Señal Elegida</span>
                           <strong className="text-brand-600 truncate block">
                             {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Fórmula Mensaje</span>
+                          <span className="text-xs text-gray-400 block font-medium">Fórmula Mensaje</span>
                           <strong className="text-purple-600 truncate block capitalize">
                             {msgObjective} · {msgTone}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Modo</span>
+                          <span className="text-xs text-gray-400 block font-medium">Modo</span>
                           <strong className="text-emerald-600 block">
                             {newMode === "review" ? "Revisión Manual" : "Piloto Automático"}
                           </strong>
@@ -3983,7 +3983,7 @@ export default function SignalsPage({
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-gray-200 dark:border-gray-750">
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Disparador / Posts</span>
+                          <span className="text-xs text-gray-400 block font-medium">Disparador / Posts</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block" title={selectedPostUrls.join(", ")}>
                             {selectedPostUrls.length > 0
                               ? `${selectedPostUrls.length} publicación(es)`
@@ -3991,19 +3991,19 @@ export default function SignalsPage({
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Cuenta Remitente</span>
+                          <span className="text-xs text-gray-400 block font-medium">Cuenta Remitente</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {accounts.find((a) => a.id === selectedAccountId)?.name || "Cuenta activa"}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Lista de Destino</span>
+                          <span className="text-xs text-gray-400 block font-medium">Lista de Destino</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block">
                             {lists.find((l) => l.id === newTargetList)?.name || "Sin lista"}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
-                          <span className="text-[10px] text-gray-400 block font-medium">Frecuencia</span>
+                          <span className="text-xs text-gray-400 block font-medium">Frecuencia</span>
                           <strong className="text-gray-800 dark:text-gray-200 block">
                             {scanIntervalMinutes === 60
                               ? "Cada 1 hora"
