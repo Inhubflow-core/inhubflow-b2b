@@ -3512,35 +3512,12 @@ export default function SignalsPage({
                     PASO 3: MENSAJE IA ANTI-STALKER & LIVE PREVIEW
                    ========================================================= */}
                 {wizardStep === 3 && (
-                  <div className="space-y-6 animate-in fade-in duration-200">
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                        <RiSparklingLine size={13} /> Paso 3 de 4: Mensaje IA Anti-Stalker
-                      </div>
-                      <h4 className="text-lg font-black text-gray-900 dark:text-white">
-                        Fórmula de Apertura Anti-Stalker (La Regla de Oro)
-                      </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Configura cómo redactará la IA para que el contacto sea 100% natural, relevante y con alta respuesta.
-                      </p>
-                    </div>
-
-                    {/* Banner de conversación natural */}
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
-                      <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-bold">
-                        <span className="text-amber-600 text-base">💡</span>
-                        <span>Regla de conversación natural:</span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 text-red-900 dark:text-red-200">
-                          <span className="font-bold">❌ Error Típico (Stalker): </span>
-                          «Hola, vi que le diste like a mi competidor X…» (Suena invasivo).
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200">
-                          <span className="font-bold">✅ Fórmula InHubFlow: </span>
-                          Usa la señal como contexto natural para debatir su proceso actual sin revelar rastreo.
-                        </div>
-                      </div>
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <RiSparklingLine className="text-brand-500" /> Mensaje IA Anti-Stalker
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso 3 de 4</span>
                     </div>
 
                     {/* Selector de Objetivo del Mensaje */}
@@ -3552,36 +3529,49 @@ export default function SignalsPage({
                         {[
                           {
                             id: "conversation",
-                            title: "💬 Iniciar Conversación",
+                            icon: RiChat1Line,
+                            iconColor: "text-brand-500",
+                            title: "Iniciar Conversación",
                             desc: "Abre diálogo estratégico sobre cuellos de botella en su proceso.",
                           },
                           {
                             id: "demo",
-                            title: "📅 Agendar Demo Breve",
+                            icon: RiCalendarLine,
+                            iconColor: "text-blue-500",
+                            title: "Agendar Demo Breve",
                             desc: "Propuesta de valor directa para directores con dolor activo.",
                           },
                           {
                             id: "resource",
-                            title: "📖 Compartir Recurso / Guía",
+                            icon: RiFileList3Line,
+                            iconColor: "text-purple-500",
+                            title: "Compartir Recurso / Guía",
                             desc: "Ofrece un framework o playbook sin fricción comercial inicial.",
                           },
-                        ].map((obj) => (
-                          <button
-                            key={obj.id}
-                            type="button"
-                            onClick={() => setMsgObjective(obj.id as "conversation" | "demo" | "resource")}
-                            className={`p-3 rounded-2xl border text-left text-xs transition-all ${
-                              msgObjective === obj.id
-                                ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
-                                : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            <div className="font-bold">{obj.title}</div>
-                            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
-                              {obj.desc}
-                            </div>
-                          </button>
-                        ))}
+                        ].map((obj) => {
+                          const Icon = obj.icon;
+                          const isSelected = msgObjective === obj.id;
+                          return (
+                            <button
+                              key={obj.id}
+                              type="button"
+                              onClick={() => setMsgObjective(obj.id as "conversation" | "demo" | "resource")}
+                              className={`p-3 rounded-2xl border text-left text-xs transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-900 dark:text-brand-200 font-bold ring-2 ring-brand-500/20"
+                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="font-bold flex items-center gap-1.5">
+                                <Icon size={16} className={obj.iconColor} />
+                                <span>{obj.title}</span>
+                              </div>
+                              <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-1 leading-snug">
+                                {obj.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -3590,25 +3580,45 @@ export default function SignalsPage({
                       <label className="block text-xs font-bold text-gray-800 dark:text-gray-200">
                         2. Tono de la IA
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {[
-                          { id: "consultive", label: "🎯 Consultivo & Experto (Recomendado)" },
-                          { id: "professional", label: "⚡ Profesional & Directo" },
-                          { id: "direct", label: "🤝 Cercano & Casual" },
-                        ].map((tn) => (
-                          <button
-                            key={tn.id}
-                            type="button"
-                            onClick={() => setMsgTone(tn.id as "consultive" | "professional" | "direct")}
-                            className={`p-2.5 rounded-xl border text-center text-xs transition-all ${
-                              msgTone === tn.id
-                                ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
-                                : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            {tn.label}
-                          </button>
-                        ))}
+                          {
+                            id: "consultive",
+                            icon: RiSparklingLine,
+                            iconColor: "text-purple-500",
+                            label: "Consultivo & Experto (Recomendado)",
+                          },
+                          {
+                            id: "professional",
+                            icon: RiBriefcaseLine,
+                            iconColor: "text-amber-500",
+                            label: "Profesional & Directo",
+                          },
+                          {
+                            id: "direct",
+                            icon: RiThumbUpLine,
+                            iconColor: "text-emerald-500",
+                            label: "Cercano & Casual",
+                          },
+                        ].map((tn) => {
+                          const Icon = tn.icon;
+                          const isSelected = msgTone === tn.id;
+                          return (
+                            <button
+                              key={tn.id}
+                              type="button"
+                              onClick={() => setMsgTone(tn.id as "consultive" | "professional" | "direct")}
+                              className={`p-2.5 rounded-xl border text-center text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                                isSelected
+                                  ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 font-bold ring-2 ring-purple-500/20"
+                                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300"
+                              }`}
+                            >
+                              <Icon size={15} className={tn.iconColor} />
+                              <span>{tn.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -3645,8 +3655,8 @@ export default function SignalsPage({
                           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                           Simulación en Tiempo Real (LinkedIn Direct Message Preview)
                         </label>
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                          🛡️ Vista previa orientativa
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                          <RiShieldCheckLine size={12} /> Vista previa orientativa
                         </span>
                       </div>
 
