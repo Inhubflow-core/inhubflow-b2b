@@ -1562,6 +1562,9 @@ export default function SignalsPage({
             <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
               💡 Fórmula recomendada:
             </span>
+            <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700/80 text-gray-800 dark:text-gray-200 font-semibold border border-gray-200 dark:border-gray-600">
+              Encuentra
+            </span>
             <span className="px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-medium border border-brand-200/50 dark:border-brand-800/50">
               [Cantidad]
             </span>
