@@ -3321,24 +3321,21 @@ export default function SignalsPage({
                                 icon: RiLineChartLine,
                                 title: "Rondas de Inversión",
                                 badge: "Rondas de Capital",
-                                badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
-                                desc: "Financiamiento reciente",
+                                desc: "Empresas que acaban de levantar capital semilla, Serie A/B o inversión privada. Tienen presupuesto fresco y urgencia de contratar soluciones para acelerar su crecimiento.",
                               },
                               {
                                 id: "company_news",
                                 icon: RiMegaphoneLine,
                                 title: "Expansión / Noticias",
                                 badge: "Expansión Rápida",
-                                badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
-                                desc: "Nuevas aperturas y lanzamientos",
+                                desc: "Compañías que anuncian nuevas sedes, aperturas internacionales o lanzamientos de producto. Momentos clave donde requieren nuevos proveedores y tecnología.",
                               },
                               {
                                 id: "acquisition_event",
                                 icon: RiExchangeLine,
                                 title: "Fusiones & Compras",
                                 badge: "Fusiones / M&A",
-                                badgeBg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
-                                desc: "Reestructuración y nuevo stack",
+                                desc: "Organizaciones en procesos de adquisición, fusión o reestructuración corporativa. Etapas de cambio donde evalúan unificar herramientas y renovar su stack.",
                               },
                             ].map((ev) => {
                               const isActive = selectedMarketEvents.includes(ev.id);
@@ -3358,7 +3355,7 @@ export default function SignalsPage({
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${ev.badgeBg}`}>
+                                        <span className="text-xs font-normal px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                                           {ev.badge}
                                         </span>
                                         <div
@@ -3375,7 +3372,7 @@ export default function SignalsPage({
                                     <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {ev.title}
                                     </strong>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
                                       {ev.desc}
                                     </p>
                                   </div>
@@ -3441,55 +3438,43 @@ export default function SignalsPage({
                               {
                                 id: "new_in_role",
                                 icon: RiUserAddLine,
-                                iconColor: "text-emerald-500",
                                 title: "Just Hired / Nuevo Cargo (<90 Días)",
                                 badge: "Ventana Dorada",
-                                badgeBg: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
                                 desc: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días tienen presupuesto fresco para nuevos proveedores.",
                               },
                               {
                                 id: "internal_promotion",
                                 icon: RiArrowUpLine,
-                                iconColor: "text-purple-500",
                                 title: "Ascenso Interno a Decisor",
                                 badge: "Poder de Firma",
-                                badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
                                 desc: "Profesionales promovidos internamente a puestos de liderazgo con capacidad de contratación y cambio de stack.",
                               },
                               {
                                 id: "hiring_spree",
                                 icon: RiBriefcaseLine,
-                                iconColor: "text-orange-500",
                                 title: "Hiring Intent (Contratación Activa)",
                                 badge: "Presupuesto Abierto",
-                                badgeBg: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
                                 desc: "Empresas de tu sector que han publicado vacantes comerciales o de operaciones. Si contratan personal, necesitan herramientas.",
                               },
                               {
                                 id: "company_growth",
                                 icon: RiLineChartLine,
-                                iconColor: "text-teal-500",
                                 title: "Empresas en Hipercrecimiento (+20%)",
                                 badge: "Expansión Rápida",
-                                badgeBg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
                                 desc: "Empresas cuya plantilla esté creciendo rápidamente (+20% anual) según métricas de contratación en LinkedIn.",
                               },
                               {
                                 id: "profile_viewers",
                                 icon: RiEyeLine,
-                                iconColor: "text-fuchsia-500",
                                 title: "Visitantes Recientes de tu Perfil",
                                 badge: "Interés Directo",
-                                badgeBg: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
                                 desc: "Prospectos y decisores que han visitado tu perfil de LinkedIn recientemente. Requiere Sales Navigator.",
                               },
                               {
                                 id: "active_poster",
                                 icon: RiFireLine,
-                                iconColor: "text-rose-500",
                                 title: "Más Activos en tu ICP (<48h)",
                                 badge: "Bandeja Caliente",
-                                badgeBg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
                                 desc: "Decisores que publican o comentan activamente en LinkedIn, garantizando que su bandeja de mensajes está activa.",
                               },
                             ].map((sig) => {
@@ -3508,9 +3493,9 @@ export default function SignalsPage({
                                 >
                                   <div>
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                                      <Icon className={`${sig.iconColor} shrink-0`} size={18} />
+                                      <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
                                       <div className="flex items-center gap-1.5">
-                                        <span className={`text-xs font-normal px-1.5 py-0.5 rounded-md ${sig.badgeBg}`}>
+                                        <span className="text-xs font-normal px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                                           {sig.badge}
                                         </span>
                                         <div
@@ -3527,7 +3512,7 @@ export default function SignalsPage({
                                     <strong className="text-xs block leading-tight font-bold text-gray-900 dark:text-white">
                                       {sig.title}
                                     </strong>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
                                       {sig.desc}
                                     </p>
                                   </div>
