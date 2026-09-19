@@ -1319,21 +1319,30 @@ export default function InboxPage() {
       return;
     }
     setSyncingLinkedIn(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20_000);
     try {
       const res = await fetch(`/api/accounts/${accId}/sync-linkedin-inbox`, {
         method: "POST",
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al sincronizar LinkedIn");
       
       toast.success(
-        `LinkedIn sincronizado: ${data.messages ?? data.capturedCount ?? 0} mensajes procesados en ${data.chats ?? 0} conversaciones.`
+        `LinkedIn sincronizado: ${data.messages ?? data.capturedCount ?? 0} mensajes nuevos en ${data.chats ?? 0} conversaciones.`
       );
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error al sincronizar");
+      if (error instanceof Error && error.name === "AbortError") {
+        toast.error("La sincronización tardó demasiado. Por favor, reintenta.");
+      } else {
+        toast.error(error instanceof Error ? error.message : "Error al sincronizar");
+      }
     } finally {
-      setTimeout(() => setSyncingLinkedIn(false), 2500);
+      clearTimeout(timeoutId);
+      setSyncingLinkedIn(false);
     }
   }
 
