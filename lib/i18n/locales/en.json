@@ -563,7 +563,41 @@
     "suggestAi": "Suggest with AI",
     "replyPlaceholder": "Type your message or use AI to draft a response...",
     "send": "Send",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "unknown": "Unknown contact",
+    "time": {
+      "justNow": "Just now",
+      "minutes": "{count} min ago",
+      "hours": "{count}h ago",
+      "days": "{count}d ago"
+    },
+    "verdicts": {
+      "ooo_followup": "Out of office",
+      "substitute": "Substitute contact",
+      "call_task": "Call requested",
+      "human_reply": "Human reply",
+      "not_interested": "Not interested",
+      "cancelled": "Cancelled",
+      "pending": "Pending",
+      "failed": "Analysis error",
+      "none": "Unclassified"
+    },
+    "errors": {
+      "loadThread": "Unable to load email thread.",
+      "loadLinkedInThread": "Unable to load LinkedIn conversation.",
+      "send": "Error sending email reply.",
+      "loadAccounts": "Error loading LinkedIn accounts.",
+      "loadReplies": "Error loading Inbox conversations."
+    },
+    "toasts": {
+      "replySent": "Reply sent successfully.",
+      "nothingToBackfill": "No pending replies to backfill.",
+      "backfilled": "Replies successfully backfilled.",
+      "nothingToReclassify": "No pending replies to reclassify.",
+      "reclassifiedAll": "{count} replies successfully reclassified."
+    },
+    "attachmentEmailOnly": "File attachments are enabled for the Email channel.",
+    "attachmentsDisabledLinkedIn": "Attachments not available for LinkedIn messaging"
   },
   "sdr": {
     "title": "AI SDR Assistant",

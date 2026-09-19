@@ -1109,30 +1109,38 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
         {/* Toolbar Bottom Row */}
         <div className="flex items-center justify-between gap-3 pt-1">
           <div className="flex items-center gap-1.5">
-            {activeChannelTab === "linkedin" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Adjuntar documento o imagen (PDF, PNG, JPG, Docx)"
-                  className="p-2 rounded-xl text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
-                >
-                  <RiAttachment2 size={17} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  title="Insertar emojis"
-                  className={`p-2 rounded-xl transition-colors ${
-                    showEmojiPicker
-                      ? "bg-primary/15 text-primary"
-                      : "text-base-content/60 hover:text-base-content hover:bg-base-200"
-                  }`}
-                >
-                  <RiEmotionLine size={17} />
-                </button>
-              </>
+            {activeChannelTab === "email" ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Adjuntar documento o imagen (PDF, PNG, JPG, Docx)"
+                className="p-2 rounded-xl text-base-content/60 hover:text-base-content hover:bg-base-200 transition-colors"
+              >
+                <RiAttachment2 size={17} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title={t("inbox.attachmentsDisabledLinkedIn")}
+                className="p-2 rounded-xl text-base-content/30 cursor-not-allowed opacity-40"
+              >
+                <RiAttachment2 size={17} />
+              </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              title="Insertar emojis"
+              className={`p-2 rounded-xl transition-colors ${
+                showEmojiPicker
+                  ? "bg-primary/15 text-primary"
+                  : "text-base-content/60 hover:text-base-content hover:bg-base-200"
+              }`}
+            >
+              <RiEmotionLine size={17} />
+            </button>
 
             <button
               type="button"
@@ -1173,8 +1181,6 @@ export default function InboxPage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [accountId, setAccountId] = useState("");
   const [selectedReply, setSelectedReply] = useState<InboxReply | null>(null);
-  const [reclassifyingAll, setReclassifyingAll] = useState(false);
-  const [backfilling, setBackfilling] = useState(false);
   const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<LinkedInDiagnosticReport | null>(null);
@@ -1291,48 +1297,6 @@ export default function InboxPage() {
 
     return () => clearInterval(interval);
   }, [accountId, channel, router.query.thread]);
-
-  async function handleBackfill() {
-    setBackfilling(true);
-    try {
-      const response = await fetch("/api/inbox/backfill", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.backfill"));
-      toast.success(
-        data.to_process === 0
-          ? t("inbox.toasts.nothingToBackfill")
-          : t("inbox.toasts.backfilled", {
-              classified: data.classified,
-              captured: data.captured,
-              failed: data.failed ? ` (${data.failed} ${t("inbox.verdicts.failed").toLowerCase()})` : "",
-            })
-      );
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("inbox.errors.backfill"));
-    } finally {
-      setBackfilling(false);
-    }
-  }
-
-  async function handleReclassifyAll() {
-    setReclassifyingAll(true);
-    try {
-      const response = await fetch("/api/inbox/reclassify-all", { method: "POST" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? t("inbox.errors.reclassifyAll"));
-      toast.success(
-        data.to_process === 0
-          ? t("inbox.toasts.nothingToReclassify")
-          : t("inbox.toasts.reclassifiedAll", { count: data.to_process })
-      );
-      await load();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("inbox.errors.reclassifyAll"));
-    } finally {
-      setReclassifyingAll(false);
-    }
-  }
 
   async function handleSyncLinkedIn() {
     const accId = accountId || accounts[0]?.id;
@@ -1558,26 +1522,6 @@ export default function InboxPage() {
             {syncingLinkedIn ? <RiLoader4Line size={14} className="animate-spin" /> : <RiLinkedinBoxLine size={15} />}
             {syncingLinkedIn ? t("inbox.syncing") : t("inbox.syncLinkedIn")}
           </button>
-
-          <button
-            onClick={handleBackfill}
-            disabled={backfilling}
-            title={t("inbox.backfillTitle")}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
-          >
-            {backfilling ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRefreshLine size={14} />}
-            {backfilling ? t("inbox.backfilling") : t("inbox.backfill")}
-          </button>
-
-          <button
-            onClick={handleReclassifyAll}
-            disabled={reclassifyingAll}
-            title={t("inbox.reclassifyAllTitle")}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 disabled:opacity-40 transition-colors shadow-xs"
-          >
-            {reclassifyingAll ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRefreshLine size={14} />}
-            {reclassifyingAll ? t("inbox.reclassifying") : t("inbox.reclassifyAll")}
-          </button>
         </div>
       </div>
 
@@ -1595,7 +1539,7 @@ export default function InboxPage() {
               <input
                 type="text"
                 className="w-full bg-base-200 border border-base-300/60 rounded-xl pl-9 pr-8 py-2 text-xs text-base-content placeholder:text-base-content/35 focus:outline-none focus:border-primary/50 focus:bg-base-100 transition-all shadow-inner"
-                placeholder="Buscar prospecto o mensaje..."
+                placeholder={t("inbox.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -1612,11 +1556,11 @@ export default function InboxPage() {
             {/* Quick Filter Pills (LinkedIn Style) */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
               {[
-                { id: "all", label: "Todos", icon: null },
-                { id: "linkedin", label: "LinkedIn", icon: RiLinkedinBoxLine },
-                { id: "email", label: "Email", icon: RiMailLine },
-                { id: "autopilot", label: "Autopilot", icon: RiRobotLine },
-                { id: "handoff", label: "Intervención", icon: RiAlertLine },
+                { id: "all", label: t("inbox.filterAll"), icon: null },
+                { id: "linkedin", label: t("inbox.filterLinkedin"), icon: RiLinkedinBoxLine },
+                { id: "email", label: t("inbox.filterEmail"), icon: RiMailLine },
+                { id: "autopilot", label: t("inbox.filterAutopilot"), icon: RiRobotLine },
+                { id: "handoff", label: t("inbox.filterIntervention"), icon: RiAlertLine },
               ].map((filter) => {
                 const Icon = filter.icon;
                 return (

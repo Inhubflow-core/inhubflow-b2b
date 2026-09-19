@@ -26,15 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ) {
     return res.status(404).json({ error: "LinkedIn conversation not found" });
   }
-  if (threadId) {
-    const exactThread = db.prepare(`
-      SELECT 1 FROM linkedin_inbox_messages
-      WHERE account_id = ? AND target_id = ? AND external_thread_id = ?
-      LIMIT 1
-    `).get(accountId, targetId, threadId);
-    if (!exactThread) return res.status(404).json({ error: "LinkedIn conversation not found" });
+  let messages = getCampaignLinkedInThread(db, targetId, accountId, threadId);
+  if (messages.length === 0 && threadId) {
+    // Fallback to target-level messages for this account if exact thread id is not yet populated
+    messages = getCampaignLinkedInThread(db, targetId, accountId);
   }
-
-  const messages = getCampaignLinkedInThread(db, targetId, accountId, threadId);
   return res.status(200).json({ ok: true, messages });
 }

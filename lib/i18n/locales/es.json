@@ -563,7 +563,41 @@
     "suggestAi": "Sugerir con IA",
     "replyPlaceholder": "Escribe tu respuesta o usa la IA para redactar...",
     "send": "Enviar",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "unknown": "Contacto desconocido",
+    "time": {
+      "justNow": "Ahora mismo",
+      "minutes": "Hace {count} min",
+      "hours": "Hace {count} h",
+      "days": "Hace {count} d"
+    },
+    "verdicts": {
+      "ooo_followup": "Fuera de oficina",
+      "substitute": "Contacto sustituto",
+      "call_task": "Llamada solicitada",
+      "human_reply": "Respuesta humana",
+      "not_interested": "No interesado",
+      "cancelled": "Cancelado",
+      "pending": "Pendiente",
+      "failed": "Error de análisis",
+      "none": "Sin clasificar"
+    },
+    "errors": {
+      "loadThread": "No se pudo cargar el hilo de correos.",
+      "loadLinkedInThread": "No se pudo cargar la conversación de LinkedIn.",
+      "send": "Error al enviar la respuesta por correo.",
+      "loadAccounts": "Error al cargar las cuentas de LinkedIn.",
+      "loadReplies": "Error al cargar las conversaciones del Inbox."
+    },
+    "toasts": {
+      "replySent": "Respuesta enviada con éxito.",
+      "nothingToBackfill": "No hay respuestas pendientes por recuperar.",
+      "backfilled": "Respuestas recuperadas con éxito.",
+      "nothingToReclassify": "No hay respuestas pendientes por clasificar.",
+      "reclassifiedAll": "{count} respuestas reclasificadas con éxito."
+    },
+    "attachmentEmailOnly": "Los archivos adjuntos están habilitados para el canal de Email.",
+    "attachmentsDisabledLinkedIn": "Adjuntos no disponibles para mensajería de LinkedIn"
   },
   "sdr": {
     "title": "Asistente SDR con IA",
