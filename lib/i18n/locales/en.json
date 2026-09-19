@@ -1008,6 +1008,262 @@
     "toastCreated": "Ticket created successfully! Our team will respond shortly.",
     "toastReplied": "Reply sent successfully!",
     "statusChanged": "Status updated successfully"
+  },
+  "signalRadar": {
+    "header": {
+      "title": "SIGNAL RADAR",
+      "subtitle": "Detect hot prospects and active decision makers on LinkedIn with real-time intent signals.",
+      "badge": "Live Radar",
+      "newMonitor": "New Monitor",
+      "stats": {
+        "activeMonitors": "Active Monitors",
+        "hotLeadsCaptured": "Hot Leads Captured",
+        "reviewQueue": "In Review Queue",
+        "sentAutopilot": "Sent with Autopilot"
+      }
+    },
+    "askAi": {
+      "title": "Ask AI Radar Copilot",
+      "placeholder": "What kind of prospects or companies do you want to monitor today? (e.g. CEOs in Chile who raised capital)",
+      "btnCreate": "Create Monitor",
+      "btnAnalyzing": "Analyzing...",
+      "badge": "Smart Copilot",
+      "templates": {
+        "funding": {
+          "label": "Funding Rounds",
+          "prompt": "Find 10 CEOs of companies that recently raised funding in Chile"
+        },
+        "newRoles": {
+          "label": "New in Role",
+          "prompt": "Find 10 Marketing Directors or VPs of Sales who took on a new role in the last 90 days in Mexico"
+        },
+        "activePosts": {
+          "label": "Active Posts",
+          "prompt": "Find 10 Sales Leaders actively posting about B2B prospecting or AI in Spain"
+        },
+        "growth": {
+          "label": "Fast Growth",
+          "prompt": "Find 10 Founders and CEOs of hypergrowth startups in Colombia"
+        }
+      }
+    },
+    "tabs": {
+      "leads": "Hot Leads Queue",
+      "monitors": "Active Monitors",
+      "guide": "Signals Guide",
+      "searchPlaceholder": "Search by name, company or signal...",
+      "filterAll": "All statuses",
+      "filterPending": "Pending review",
+      "filterApproved": "Approved",
+      "filterDismissed": "Dismissed",
+      "filterPromoted": "Promoted",
+      "bulkApprove": "Approve selected ({count})",
+      "bulkExport": "Export to List ({count})",
+      "bulkDismiss": "Dismiss selected ({count})"
+    },
+    "leadsTable": {
+      "thLead": "Prospect",
+      "thCompanyRole": "Role & Company",
+      "thSignal": "Signal & Evidence",
+      "thMessage": "Anti-Stalker AI Message",
+      "thActions": "Actions",
+      "btnApprove": "Approve & Send",
+      "btnEdit": "Edit Message",
+      "btnSave": "Save",
+      "btnCancel": "Cancel",
+      "btnPromote": "Promote to Contact",
+      "btnDismiss": "Dismiss",
+      "viewEvidence": "View evidence",
+      "emptyTitle": "No hot leads captured yet",
+      "emptyDesc": "Configure or activate a signal monitor so InHubFlow automatically detects prospects with hot intent.",
+      "statusPending": "Pending",
+      "statusApproved": "Approved",
+      "statusDismissed": "Dismissed",
+      "statusPromoted": "Promoted",
+      "statusSent": "Sent"
+    },
+    "monitorsTable": {
+      "emptyTitle": "You don't have active monitors yet",
+      "emptyDesc": "Create your first radar monitor to watch competitors, funding rounds, or job changes on LinkedIn.",
+      "btnCreateFirst": "Create First Monitor",
+      "scanNow": "Scan Now",
+      "scanning": "Scanning...",
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "delete": "Delete",
+      "lastScan": "Last scan: {time}",
+      "neverScanned": "Never scanned",
+      "leadsCount": "{count} leads",
+      "modeReview": "Review Mode",
+      "modeAutopilot": "Autopilot"
+    },
+    "wizard": {
+      "stepper": {
+        "step1": "STEP 1",
+        "step1Label": "Audience & ICP",
+        "step2": "STEP 2",
+        "step2Label": "Trigger",
+        "step3": "STEP 3",
+        "step3Label": "AI Message",
+        "step4": "STEP 4",
+        "step4Label": "Launch"
+      },
+      "buttons": {
+        "cancel": "Cancel",
+        "back": "Back",
+        "nextStep2": "STEP 2: Trigger",
+        "nextStep3": "STEP 3: AI Message",
+        "nextStep4": "STEP 4: Launch",
+        "launch": "Launch Signal Monitor",
+        "launching": "Launching Monitor...",
+        "saveChanges": "Save Monitor Changes",
+        "savingChanges": "Saving Changes..."
+      },
+      "step1": {
+        "title": "Prospecting Criteria (ICP)",
+        "stepOf": "STEP 1 of 4",
+        "titleLabel": "Job Title or Role",
+        "titlePlaceholder": "e.g. CEO, Marketing Director, Dentist, Lawyer...",
+        "countryLabel": "Country or City",
+        "countryPlaceholder": "e.g. Spain, Mexico, Chile, Colombia, London...",
+        "industryLabel": "Industry or Sector",
+        "industryPlaceholder": "e.g. Software, Healthcare, Real Estate, Consulting...",
+        "quickRolesLabel": "Key Decision Maker Suggestions for Fast Setup",
+        "badgeRequired": "Required",
+        "badgeOptional": "Optional"
+      },
+      "step2": {
+        "title": "Signal Trigger",
+        "stepOf": "STEP 2 of 4",
+        "tabPosts": "Viral Posts",
+        "tabKeywords": "Keywords & Events",
+        "tabIcpTriggers": "Automatic ICP Signals",
+        "marketEventsTitle": "Market Trigger Events",
+        "marketEventsDesc": "Trigger alerts when companies in your sector make headlines in the news or funding rounds (select 1, 2 or all 3):",
+        "selectAll3": "Select all 3",
+        "deselectAll": "Deselect all",
+        "icpSignalsTitle": "Automatic Signals Based on Your ICP",
+        "icpSignalsDesc": "Detect decision makers at buying moments when they change jobs, get promoted, or their company is hiring:",
+        "selectAll6": "Select all 6",
+        "reset1": "Reset (1)",
+        "competitorLabel": "Company, Competitor or Benchmark",
+        "competitorPlaceholder": "e.g. HubSpot, Salesforce, Lemlist, Apollo, Deel...",
+        "keywordsLabel": "Buying Intent Keywords",
+        "keywordsPlaceholder": "Type a keyword and press Enter...",
+        "searchPostsBtn": "Search Posts",
+        "manualMode": "Paste URLs manually",
+        "discoverMode": "Discover viral posts"
+      },
+      "definitions": {
+        "funding_round": {
+          "title": "Funding Rounds",
+          "badge": "Capital Rounds",
+          "desc": "Companies that just raised seed, Series A/B or private funding. They have fresh budget and urgency to hire solutions to accelerate growth."
+        },
+        "company_news": {
+          "title": "Expansion / News",
+          "badge": "Rapid Expansion",
+          "desc": "Companies announcing new offices, international launches, or product updates. Key moments where they need new vendors and tech."
+        },
+        "acquisition_event": {
+          "title": "Mergers & Acquisitions",
+          "badge": "Mergers / M&A",
+          "desc": "Organizations undergoing acquisitions, mergers, or restructuring. Transition stages where they evaluate tool consolidation and renewing their stack."
+        },
+        "new_in_role": {
+          "title": "Just Hired / New in Role (<90 Days)",
+          "badge": "Golden Window",
+          "desc": "Newly appointed decision makers (CEO, VP, Director). In their first 90 days they have fresh budget for new vendors."
+        },
+        "internal_promotion": {
+          "title": "Internal Promotion to Leader",
+          "badge": "Signing Power",
+          "desc": "Professionals promoted internally to leadership roles with hiring and stack changing authority."
+        },
+        "hiring_spree": {
+          "title": "Hiring Intent (Active Hiring)",
+          "badge": "Open Budget",
+          "desc": "Companies in your sector with open sales or ops job postings. If they are hiring staff, they need tools."
+        },
+        "company_growth": {
+          "title": "Hypergrowth Companies (+20%)",
+          "badge": "Fast Expansion",
+          "desc": "Companies whose headcount is growing rapidly (+20% annually) based on LinkedIn hiring data."
+        },
+        "profile_viewers": {
+          "title": "Recent Profile Viewers",
+          "badge": "Direct Interest",
+          "desc": "Prospects and decision makers who viewed your LinkedIn profile recently. Requires Sales Navigator."
+        },
+        "active_poster": {
+          "title": "Most Active in ICP (<48h)",
+          "badge": "Hot Inbox",
+          "desc": "Decision makers who post or comment actively on LinkedIn, ensuring their inbox is active."
+        }
+      },
+      "step3": {
+        "title": "Anti-Stalker AI Message",
+        "stepOf": "STEP 3 of 4",
+        "objTitle": "1. Message Conversion Objective",
+        "objConversationTitle": "Start Conversation",
+        "objConversationDesc": "Opens a strategic dialogue about bottlenecks in their process.",
+        "objDemoTitle": "Schedule Quick Demo",
+        "objDemoDesc": "Direct value proposition for directors with active pain points.",
+        "objResourceTitle": "Share Resource / Playbook",
+        "objResourceDesc": "Offers a framework or playbook without upfront commercial friction.",
+        "toneTitle": "2. AI Tone",
+        "toneConsultive": "Consultative & Expert (Recommended)",
+        "toneProfessional": "Professional & Direct",
+        "toneDirect": "Friendly & Casual",
+        "langLabel": "Message Language",
+        "maxWordsLabel": "Maximum Words",
+        "previewTitle": "Real-Time Simulation (LinkedIn Direct Message Preview)",
+        "previewNotice": "Orientative Preview",
+        "customTemplateTitle": "+ Would you like to write a custom template with variables?",
+        "customTemplatePlaceholder": "Hi {first_name}, noticed you're active on {topic}... How are you addressing this challenge at {company}?"
+      },
+      "step4": {
+        "title": "Launch Signal Monitor",
+        "stepOf": "STEP 4 of 4",
+        "nameLabel": "Monitor Name",
+        "namePlaceholder": "Radar: ICP Signals",
+        "accountLabel": "Sender LinkedIn Account",
+        "modeLabel": "Operation Mode",
+        "modeReviewTitle": "Review Mode",
+        "modeReviewBadge": "Recommended",
+        "modeReviewDesc": "Captured prospects go to your 'Hot Leads' queue. You review and approve the message before initiating contact.",
+        "modeAutopilotTitle": "Autopilot Mode",
+        "modeAutopilotBadge": "AI SDR Gates",
+        "modeAutopilotDesc": "AI qualifies the profile, validates it matches your ICP, and sends the connection message automatically without manual intervention.",
+        "targetListLabel": "Destination List for Captured Leads",
+        "selectListPlaceholder": "Select a list..."
+      }
+    },
+    "modals": {
+      "importTitle": "Import Leads to List",
+      "importDesc": "The selected prospects ({count}) will be added to the chosen list to start outreach sequences.",
+      "importConfirmBtn": "Import to List",
+      "deleteTitle": "Delete Monitor",
+      "deleteConfirmText": "Are you sure you want to delete this monitor? Prospects already captured in your lists will be preserved.",
+      "deleteBtn": "Yes, delete",
+      "cancelBtn": "Cancel"
+    },
+    "toasts": {
+      "monitorCreated": "Monitor created successfully",
+      "monitorUpdated": "Monitor updated successfully",
+      "monitorDeleted": "Monitor deleted",
+      "scanTriggered": "Scan started in background",
+      "leadApproved": "Lead approved and ready to send",
+      "leadDismissed": "Lead dismissed",
+      "leadPromoted": "Lead promoted to contact successfully",
+      "leadsImported": "{count} leads imported to list",
+      "roleRequired": "Add at least one target role",
+      "targetRequired": "Select at least one post or enter its URL",
+      "keywordsRequired": "Add at least one keyword, competitor or event",
+      "icpSignalRequired": "Select at least one ICP trigger signal",
+      "templateTooShort": "Custom template is too short",
+      "listRequired": "Select a destination list in the launch step"
+    }
   }
 }
-

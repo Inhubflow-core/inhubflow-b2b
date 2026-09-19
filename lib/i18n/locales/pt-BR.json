@@ -1008,6 +1008,262 @@
     "toastCreated": "Chamado criado com sucesso! Nossa equipe responderá em breve.",
     "toastReplied": "Resposta enviada com sucesso!",
     "statusChanged": "Status atualizado com sucesso"
+  },
+  "signalRadar": {
+    "header": {
+      "title": "SIGNAL RADAR",
+      "subtitle": "Detecte prospects quentes e tomadores de decisão ativos no LinkedIn com sinais de intenção em tempo real.",
+      "badge": "Live Radar",
+      "newMonitor": "Novo Monitor",
+      "stats": {
+        "activeMonitors": "Monitores Ativos",
+        "hotLeadsCaptured": "Hot Leads Capturados",
+        "reviewQueue": "Na Fila de Revisão",
+        "sentAutopilot": "Enviados com Autopilot"
+      }
+    },
+    "askAi": {
+      "title": "Ask AI Radar Copilot",
+      "placeholder": "Que tipo de prospects ou empresas você deseja monitorar hoje? (ex. CEOs no Chile que captaram investimento)",
+      "btnCreate": "Criar Monitor",
+      "btnAnalyzing": "Analisando...",
+      "badge": "Copiloto Inteligente",
+      "templates": {
+        "funding": {
+          "label": "Rodadas de Investimento",
+          "prompt": "Encontre 10 CEOs de empresas que receberam investimento recentemente no Chile"
+        },
+        "newRoles": {
+          "label": "Novos no Cargo",
+          "prompt": "Encontre 10 Diretores de Marketing ou VPs de Vendas que assumiram novo cargo nos últimos 90 dias no México"
+        },
+        "activePosts": {
+          "label": "Publicações Ativas",
+          "prompt": "Encontre 10 Líderes Comerciais que publicam ativamente sobre prospecção B2B ou IA na Espanha"
+        },
+        "growth": {
+          "label": "Crescimento Acelerado",
+          "prompt": "Encontre 10 Fundadores e CEOs de startups em hipercrecimento na Colômbia"
+        }
+      }
+    },
+    "tabs": {
+      "leads": "Fila de Hot Leads",
+      "monitors": "Monitores Ativos",
+      "guide": "Guia de Sinais",
+      "searchPlaceholder": "Buscar por nome, empresa ou sinal...",
+      "filterAll": "Todos os status",
+      "filterPending": "Revisão pendente",
+      "filterApproved": "Aprovados",
+      "filterDismissed": "Descartados",
+      "filterPromoted": "Promovidos",
+      "bulkApprove": "Aprovar selecionados ({count})",
+      "bulkExport": "Exportar para Lista ({count})",
+      "bulkDismiss": "Descartar selecionados ({count})"
+    },
+    "leadsTable": {
+      "thLead": "Prospect",
+      "thCompanyRole": "Cargo & Empresa",
+      "thSignal": "Sinal & Evidência",
+      "thMessage": "Mensagem IA Anti-Stalker",
+      "thActions": "Ações",
+      "btnApprove": "Aprovar e Enviar",
+      "btnEdit": "Editar Mensagem",
+      "btnSave": "Salvar",
+      "btnCancel": "Cancelar",
+      "btnPromote": "Promover para Contato",
+      "btnDismiss": "Descartar",
+      "viewEvidence": "Ver evidência",
+      "emptyTitle": "Nenhum hot lead capturado ainda",
+      "emptyDesc": "Configure ou ative um monitor de sinais para que o InHubFlow detecte automaticamente prospects com intenção quente.",
+      "statusPending": "Pendente",
+      "statusApproved": "Aprovado",
+      "statusDismissed": "Descartado",
+      "statusPromoted": "Promovido",
+      "statusSent": "Enviado"
+    },
+    "monitorsTable": {
+      "emptyTitle": "Você ainda não tem monitores ativos",
+      "emptyDesc": "Crie seu primeiro monitor de radar para acompanhar concorrentes, rodadas de capital ou mudanças de cargo no LinkedIn.",
+      "btnCreateFirst": "Criar Primeiro Monitor",
+      "scanNow": "Escanear Agora",
+      "scanning": "Escaneando...",
+      "edit": "Editar",
+      "pause": "Pausar",
+      "resume": "Retomar",
+      "delete": "Excluir",
+      "lastScan": "Último escaneamento: {time}",
+      "neverScanned": "Nunca escaneado",
+      "leadsCount": "{count} leads",
+      "modeReview": "Modo Revisão",
+      "modeAutopilot": "Autopilot"
+    },
+    "wizard": {
+      "stepper": {
+        "step1": "PASSO 1",
+        "step1Label": "Audiência & ICP",
+        "step2": "PASSO 2",
+        "step2Label": "Disparador",
+        "step3": "PASSO 3",
+        "step3Label": "Mensagem IA",
+        "step4": "PASSO 4",
+        "step4Label": "Lançar"
+      },
+      "buttons": {
+        "cancel": "Cancelar",
+        "back": "Voltar",
+        "nextStep2": "PASSO 2: Disparador",
+        "nextStep3": "PASSO 3: Mensagem IA",
+        "nextStep4": "PASSO 4: Lançar",
+        "launch": "Lançar Monitor de Sinais",
+        "launching": "Lançando Monitor...",
+        "saveChanges": "Salvar Alterações do Monitor",
+        "savingChanges": "Salvando Alterações..."
+      },
+      "step1": {
+        "title": "Critérios de Prospecção (ICP)",
+        "stepOf": "PASSO 1 de 4",
+        "titleLabel": "Cargo ou Título Profissional",
+        "titlePlaceholder": "ex: CEO, Diretor de Marketing, Dentista, Advogado...",
+        "countryLabel": "País ou Cidade",
+        "countryPlaceholder": "ex: Espanha, México, Chile, Colômbia, Madri...",
+        "industryLabel": "Indústria ou Setor",
+        "industryPlaceholder": "ex: Software, Saúde, Imobiliário, Consultoria...",
+        "quickRolesLabel": "Sugestões de Cargos-Chave para Decisão Rápida",
+        "badgeRequired": "Obrigatório",
+        "badgeOptional": "Opcional"
+      },
+      "step2": {
+        "title": "Disparador de Sinais",
+        "stepOf": "PASSO 2 de 4",
+        "tabPosts": "Publicações Virais (Posts)",
+        "tabKeywords": "Palavras-Chave & Eventos",
+        "tabIcpTriggers": "Sinais Automáticos de ICP",
+        "marketEventsTitle": "Eventos Disparadores de Mercado (Trigger Events)",
+        "marketEventsDesc": "Ative alertas quando empresas do seu setor forem destaque em notícias ou rodadas de captação (selecione 1, 2 ou as 3 opções):",
+        "selectAll3": "Selecionar os 3",
+        "deselectAll": "Desmarcar todos",
+        "icpSignalsTitle": "Sinais Automáticos Baseados no Seu ICP",
+        "icpSignalsDesc": "Detecte tomadores de decisão em momentos de compra quando mudam de cargo, são promovidos ou a empresa contrata em massa:",
+        "selectAll6": "Selecionar os 6",
+        "reset1": "Restaurar (1)",
+        "competitorLabel": "Empresa, Concorrente ou Referência",
+        "competitorPlaceholder": "ex: HubSpot, Salesforce, Lemlist, Apollo, Deel...",
+        "keywordsLabel": "Palavras-Chave de Intenção de Compra",
+        "keywordsPlaceholder": "Digite uma palavra-chave e pressione Enter...",
+        "searchPostsBtn": "Buscar Posts",
+        "manualMode": "Colar URLs manualmente",
+        "discoverMode": "Descobrir posts virais"
+      },
+      "definitions": {
+        "funding_round": {
+          "title": "Rodadas de Investimento",
+          "badge": "Rodadas de Capital",
+          "desc": "Empresas que acabaram de captar capital semente, Série A/B ou investimento privado. Possuem orçamento novo e urgência em contratar soluções para acelerar crescimento."
+        },
+        "company_news": {
+          "title": "Expansão / Notícias",
+          "badge": "Expansão Rápida",
+          "desc": "Empresas que anunciam novas sedes, expansões internacionais ou lançamentos de produtos. Momentos-chave onde precisam de novos fornecedores e tecnologia."
+        },
+        "acquisition_event": {
+          "title": "Fusões & Aquisições",
+          "badge": "Fusões / M&A",
+          "desc": "Organizações em processos de aquisição, fusão ou reestruturação corporativa. Fases de transição onde avaliam unificar ferramentas e renovar seu stack."
+        },
+        "new_in_role": {
+          "title": "Novo no Cargo (<90 Dias)",
+          "badge": "Janela de Ouro",
+          "desc": "Tomadores de decisão recém-nomeados (CEO, VP, Diretor). Em seus primeiros 90 dias têm orçamento novo para novos fornecedores."
+        },
+        "internal_promotion": {
+          "title": "Promoção Interna a Decisor",
+          "badge": "Poder de Assinatura",
+          "desc": "Profissionais promovidos internamente a cargos de liderança com capacidade de contratação e troca de stack."
+        },
+        "hiring_spree": {
+          "title": "Hiring Intent (Contratação Ativa)",
+          "badge": "Orçamento Aberto",
+          "desc": "Empresas do seu setor com vagas abertas comerciais ou operacionais. Se estão contratando pessoas, precisam de ferramentas."
+        },
+        "company_growth": {
+          "title": "Empresas em Hipercrescimento (+20%)",
+          "badge": "Expansão Rápida",
+          "desc": "Empresas cujo quadro de funcionários está crescendo rapidamente (+20% ao ano) segundo métricas do LinkedIn."
+        },
+        "profile_viewers": {
+          "title": "Visitantes Recentes do Perfil",
+          "badge": "Interesse Direto",
+          "desc": "Prospects e tomadores de decisão que visitaram seu perfil do LinkedIn recentemente. Requer Sales Navigator."
+        },
+        "active_poster": {
+          "title": "Mais Ativos no seu ICP (<48h)",
+          "badge": "Caixa de Entrada Quente",
+          "desc": "Tomadores de decisão que publicam ou comentam ativamente no LinkedIn, garantindo que sua caixa de mensagens está ativa."
+        }
+      },
+      "step3": {
+        "title": "Mensagem IA Anti-Stalker",
+        "stepOf": "PASSO 3 de 4",
+        "objTitle": "1. Objetivo de Conversão da Mensagem",
+        "objConversationTitle": "Iniciar Conversa",
+        "objConversationDesc": "Abre diálogo estratégico sobre gargalos em seus processos.",
+        "objDemoTitle": "Agendar Demo Rápida",
+        "objDemoDesc": "Proposta de valor direta para diretores com dor ativa.",
+        "objResourceTitle": "Compartilhar Recurso / Guia",
+        "objResourceDesc": "Oferece um framework ou playbook sem atrito comercial inicial.",
+        "toneTitle": "2. Tom da IA",
+        "toneConsultive": "Consultivo & Especialista (Recomendado)",
+        "toneProfessional": "Profissional & Direto",
+        "toneDirect": "Próximo & Casual",
+        "langLabel": "Idioma da Mensagem",
+        "maxWordsLabel": "Máximo de Palavras",
+        "previewTitle": "Simulação em Tempo Real (LinkedIn Direct Message Preview)",
+        "previewNotice": "Prévia Orientativa",
+        "customTemplateTitle": "+ Deseja redigir um modelo personalizado com variáveis?",
+        "customTemplatePlaceholder": "Olá {first_name}, vi que segue ativo em {topic}... Como vocês lidam com esse desafio na {company}?"
+      },
+      "step4": {
+        "title": "Lançamento do Monitor de Sinais",
+        "stepOf": "PASSO 4 de 4",
+        "nameLabel": "Nome do Monitor",
+        "namePlaceholder": "Radar: Sinais de ICP",
+        "accountLabel": "Conta do LinkedIn Remetente",
+        "modeLabel": "Modo de Operação",
+        "modeReviewTitle": "Modo Revisão",
+        "modeReviewBadge": "Recomendado",
+        "modeReviewDesc": "Os prospects capturados vão para a fila de «Hot Leads». Você revisa e aprova a mensagem antes de ativar o contato.",
+        "modeAutopilotTitle": "Piloto Automático (Autopilot)",
+        "modeAutopilotBadge": "Gates SDR IA",
+        "modeAutopilotDesc": "A IA qualifica o perfil, valida se atende ao ICP e envia a mensagem de conexão automaticamente sem intervenção manual.",
+        "targetListLabel": "Lista de Destino para Leads Capturados",
+        "selectListPlaceholder": "Selecione uma lista..."
+      }
+    },
+    "modals": {
+      "importTitle": "Importar Leads para Lista",
+      "importDesc": "Os prospects selecionados ({count}) serão adicionados à lista escolhida para iniciar sequências de prospecção.",
+      "importConfirmBtn": "Importar para Lista",
+      "deleteTitle": "Excluir Monitor",
+      "deleteConfirmText": "Tem certeza de que deseja excluir este monitor? Os prospects já capturados nas suas listas serão preservados.",
+      "deleteBtn": "Sim, excluir",
+      "cancelBtn": "Cancelar"
+    },
+    "toasts": {
+      "monitorCreated": "Monitor criado com sucesso",
+      "monitorUpdated": "Monitor atualizado com sucesso",
+      "monitorDeleted": "Monitor excluído",
+      "scanTriggered": "Escaneamento iniciado em segundo plano",
+      "leadApproved": "Lead aprovado e preparado para envio",
+      "leadDismissed": "Lead descartado",
+      "leadPromoted": "Lead promovido para contato com sucesso",
+      "leadsImported": "{count} leads importados para a lista",
+      "roleRequired": "Adicione pelo menos um cargo objetivo",
+      "targetRequired": "Selecione pelo menos uma publicação ou informe sua URL",
+      "keywordsRequired": "Adicione pelo menos uma palavra-chave, concorrente ou evento",
+      "icpSignalRequired": "Selecione pelo menos um sinal disparador de ICP",
+      "templateTooShort": "O modelo personalizado é muito curto",
+      "listRequired": "Selecione uma lista de destino na etapa de lançamento"
+    }
   }
 }
-

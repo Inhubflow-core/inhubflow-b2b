@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { GetServerSideProps } from "next";
 import { getDb } from "@/lib/db";
 import { previewSignalMessage } from "@/lib/signals/message-template";
@@ -443,6 +444,7 @@ export default function SignalsPage({
   workflows,
   accounts,
 }: SignalsPageProps) {
+  const { t, locale } = useTranslation();
 
   // Estados principales
   const [activeTab, setActiveTab] = useState<"leads" | "monitors" | "guide">("leads");
@@ -673,29 +675,29 @@ export default function SignalsPage({
 
   const advanceWizard = () => {
     if (wizardStep === 1 && icpTitles.length === 0) {
-      toast.error("Añade al menos un cargo objetivo");
+      toast.error(t("signalRadar.toasts.roleRequired"));
       return;
     }
     if (wizardStep === 2) {
       if (signalCategoryTab === "posts") {
         if (!newTargetUrl.trim() && selectedPostUrls.length === 0) {
-          toast.error("Selecciona al menos una publicación o introduce su URL de LinkedIn");
+          toast.error(t("signalRadar.toasts.targetRequired"));
           return;
         }
       } else if (signalCategoryTab === "keywords") {
         if (keywordsList.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
-          toast.error("Añade al menos una palabra clave, un competidor o activa al menos un evento");
+          toast.error(t("signalRadar.toasts.keywordsRequired"));
           return;
         }
       } else if (signalCategoryTab === "icp_triggers") {
         if (selectedIcpSignals.length === 0) {
-          toast.error("Selecciona al menos una señal disparadora de ICP");
+          toast.error(t("signalRadar.toasts.icpSignalRequired"));
           return;
         }
       }
     }
     if (wizardStep === 3 && customTemplate.trim() && customTemplate.trim().length < 20) {
-      toast.error("La plantilla personalizada es demasiado corta");
+      toast.error(t("signalRadar.toasts.templateTooShort"));
       return;
     }
     setWizardStep((current) => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
@@ -704,7 +706,7 @@ export default function SignalsPage({
   const [editingDraft, setEditingDraft] = useState("");
   const [creatingMonitor, setCreatingMonitor] = useState(false);
 
-  // Modal Importar Leads a Lista
+  // Modal {t("signalRadar.modals.importTitle")}
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [targetListId, setTargetListId] = useState(lists[0]?.id || "");
@@ -1301,7 +1303,7 @@ export default function SignalsPage({
   // Importar Ask Lead a Lista
   const handleImportAskLead = async (lead: SignalLead) => {
     if (!newTargetList) {
-      toast.error("Selecciona una lista de destino en el paso de lanzamiento");
+      toast.error(t("signalRadar.toasts.listRequired"));
       return;
     }
     const toastId = toast.loading("Guardando prospecto...");
@@ -1418,10 +1420,10 @@ export default function SignalsPage({
   return (
     <>
       <Head>
-        <title>Signal Radar — Prospección Basada en Señales | InHubFlow</title>
+        <title>{t("signalRadar.header.title")} — {t("signalRadar.header.subtitle")} | InHubFlow</title>
         <meta
           name="description"
-          content="Detecta prospectos con intención de compra que interactúan con tu competencia o asumen nuevos cargos."
+          content={t("signalRadar.header.subtitle")}
         />
       </Head>
 
@@ -1434,14 +1436,14 @@ export default function SignalsPage({
                 <RiRadarLine size={20} />
               </span>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Signal Radar
+                {t("signalRadar.header.title")}
               </h1>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
                 Intent Outreach
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Monitorea publicaciones de competidores, cambios de puesto y eventos en tiempo real para prospectar en caliente.
+              {t("signalRadar.header.subtitle")}
             </p>
           </div>
 
@@ -1451,7 +1453,7 @@ export default function SignalsPage({
               onClick={handleOpenNewWizard}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 transition-all shadow-xs"
             >
-              <RiAddLine size={18} /> Nuevo Monitor
+              <RiAddLine size={18} /> {t("signalRadar.header.newMonitor")}
             </button>
             <Link
               href="/sdr"
@@ -1466,7 +1468,7 @@ export default function SignalsPage({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase">
-              <span>Monitores Activos</span>
+              <span>{t("signalRadar.header.stats.activeMonitors")}</span>
               <RiRadarLine className="text-brand-500" size={18} />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
@@ -1479,7 +1481,7 @@ export default function SignalsPage({
 
           <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase">
-              <span>Hot Leads Detectados</span>
+              <span>{t("signalRadar.header.stats.hotLeadsCaptured")}</span>
               <RiSparklingLine className="text-amber-500" size={18} />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
@@ -1492,7 +1494,7 @@ export default function SignalsPage({
 
           <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase">
-              <span>En Cola de Revisión</span>
+              <span>{t("signalRadar.header.stats.reviewQueue")}</span>
               <RiChat1Line className="text-blue-500" size={18} />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
@@ -1505,7 +1507,7 @@ export default function SignalsPage({
 
           <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs">
             <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-xs font-semibold uppercase">
-              <span>Aprobados / Exportados</span>
+              <span>{t("signalRadar.header.stats.sentAutopilot")}</span>
               <RiThumbUpLine className="text-emerald-500" size={18} />
             </div>
             <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
@@ -1523,7 +1525,7 @@ export default function SignalsPage({
             <div className="flex items-center gap-2 flex-wrap">
               <RiSparklingLine className="text-brand-600 dark:text-brand-400" size={20} />
               <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                Ask AI — Investigador Autónomo de Prospectos
+                {t("signalRadar.askAi.title")}
               </h3>
               <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 rounded-md">
                 Búsqueda en Lenguaje Natural
@@ -1593,7 +1595,7 @@ export default function SignalsPage({
                 type="text"
                 value={askPrompt}
                 onChange={(e) => setAskPrompt(e.target.value)}
-                placeholder="Ejemplo: Encuentra 10 CEOs de empresas que recibieron inversion recientemente en Chile..."
+                placeholder={t("signalRadar.askAi.placeholder")}
                 className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-xs md:text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
               />
             </div>
@@ -1605,11 +1607,11 @@ export default function SignalsPage({
               >
                 {askLoading ? (
                   <>
-                    <RiRefreshLine className="animate-spin" size={16} /> Investigando Web & LinkedIn...
+                    <RiRefreshLine className="animate-spin" size={16} /> {t("signalRadar.askAi.btnAnalyzing")}
                   </>
                 ) : (
                   <>
-                    <RiSparklingLine size={16} /> Investigar con IA
+                    <RiSparklingLine size={16} /> {t("signalRadar.askAi.btnCreate")}
                   </>
                 )}
               </button>
@@ -1718,7 +1720,7 @@ export default function SignalsPage({
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
             >
-              Hot Leads / Cola de Revisión
+              {t("signalRadar.tabs.leads")}
               {totalPending > 0 && (
                 <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
                   {totalPending}
@@ -1734,7 +1736,7 @@ export default function SignalsPage({
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
             >
-              Monitores Configurados ({monitors.length})
+              {t("signalRadar.tabs.monitors")} ({monitors.length})
             </button>
 
             <button
@@ -1745,7 +1747,7 @@ export default function SignalsPage({
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
             >
-              Estrategia de Señales
+              {t("signalRadar.tabs.guide")}
             </button>
           </div>
 
@@ -1758,14 +1760,14 @@ export default function SignalsPage({
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-300 disabled:opacity-50"
               >
                 {deletingLeads ? <RiRefreshLine className="animate-spin" size={14} /> : <RiDeleteBinLine size={14} />}
-                Eliminar seleccionados ({selectedLeadIds.length})
+                {t("signalRadar.tabs.bulkDismiss", { count: selectedLeadIds.length })}
               </button>
               <button
                 type="button"
                 onClick={() => setShowImportModal(true)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 shadow-xs"
               >
-                <RiFileList3Line size={14} /> Importar ({selectedLeadIds.length}) a Lista
+                <RiFileList3Line size={14} /> {t("signalRadar.tabs.bulkExport", { count: selectedLeadIds.length })}
               </button>
             </div>
           )}
@@ -1783,7 +1785,7 @@ export default function SignalsPage({
                   onChange={(e) => setSelectedMonitorFilter(e.target.value)}
                   className="rounded-xl border border-gray-300 bg-white py-1.5 px-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 >
-                  <option value="all">Todos los Monitores</option>
+                  <option value="all">{t("signalRadar.tabs.filterAll")}</option>
                   {monitors.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -1796,11 +1798,11 @@ export default function SignalsPage({
                   onChange={(e) => setSelectedStatusFilter(e.target.value)}
                   className="rounded-xl border border-gray-300 bg-white py-1.5 px-3 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 >
-                  <option value="all">Todos los Estados</option>
-                  <option value="pending">Pendientes de Revisión</option>
-                  <option value="approved">Aprobados</option>
+                  <option value="all">{t("signalRadar.tabs.filterAll")}</option>
+                  <option value="pending">{t("signalRadar.tabs.filterPending")}</option>
+                  <option value="approved">{t("signalRadar.tabs.filterApproved")}</option>
                   <option value="imported">Ya Importados</option>
-                  <option value="rejected">Descartados</option>
+                  <option value="rejected">{t("signalRadar.tabs.filterDismissed")}</option>
                 </select>
               </div>
 
@@ -2312,9 +2314,9 @@ export default function SignalsPage({
                 <div className="flex items-center justify-between max-w-4xl mx-auto">
                   {[
                     { num: 1, label: "Definir ICP", icon: RiUserSearchLine },
-                    { num: 2, label: "Disparador", icon: RiRadarLine },
-                    { num: 3, label: "Mensaje IA", icon: RiSparklingLine },
-                    { num: 4, label: "Lanzar", icon: RiPlayLine },
+                    { num: 2, label: t("signalRadar.wizard.stepper.step2Label"), icon: RiRadarLine },
+                    { num: 3, label: t("signalRadar.wizard.stepper.step3Label"), icon: RiSparklingLine },
+                    { num: 4, label: t("signalRadar.wizard.stepper.step4Label"), icon: RiPlayLine },
                   ].map((step, idx) => {
                     const isCurrent = wizardStep === step.num;
                     const isPast = wizardStep > step.num;
@@ -2349,7 +2351,7 @@ export default function SignalsPage({
                                   : "text-gray-400"
                               }`}
                             >
-                              PASO {step.num}
+                              {t(`signalRadar.wizard.stepper.step${step.num}`)}
                             </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                               {step.label}
@@ -2381,15 +2383,15 @@ export default function SignalsPage({
                   <div className="space-y-5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <RiSearchLine className="text-brand-500" /> Criterios de Prospección (ICP)
+                        <RiSearchLine className="text-brand-500" /> {t("signalRadar.wizard.step1.title")}
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 1 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{t("signalRadar.wizard.step1.stepOf")}</span>
                     </div>
 
                     {/* Cargo / Título Profesional */}
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                        Cargo o Título Profesional <span className="text-brand-500">*</span>
+                        {t("signalRadar.wizard.step1.titleLabel")} <span className="text-brand-500">*</span>
                       </label>
                       <div className="relative">
                         <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -2397,7 +2399,7 @@ export default function SignalsPage({
                           type="text"
                           value={icpTitle}
                           onChange={(e) => setIcpTitle(e.target.value)}
-                          placeholder="ej: CEO, Director de Marketing, Dentista, Abogado..."
+                          placeholder={t("signalRadar.wizard.step1.titlePlaceholder")}
                           className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         />
                       </div>
@@ -2580,9 +2582,9 @@ export default function SignalsPage({
                   <div className="space-y-5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <RiRadarLine className="text-brand-500" /> Disparador de Señales de Intención
+                        <RiRadarLine className="text-brand-500" /> {t("signalRadar.wizard.step2.title")} de Intención
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 2 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{t("signalRadar.wizard.step2.stepOf")}</span>
                     </div>
 
                     {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
@@ -3284,7 +3286,7 @@ export default function SignalsPage({
                           </div>
                         </div>
 
-                        {/* 3. Eventos Disparadores de Mercado (Trigger Events) */}
+                        {/* 3. {t("signalRadar.wizard.step2.marketEventsTitle")} */}
                         <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
@@ -3292,7 +3294,7 @@ export default function SignalsPage({
                                 Eventos Disparadores de Mercado (Trigger Events)
                               </span>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                Activa alertas cuando empresas de tu sector protagonicen noticias relevantes en prensa o rondas de capital (puedes marcar 1, 2 o las 3 opciones):
+                                {t("signalRadar.wizard.step2.marketEventsDesc")}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -3307,7 +3309,7 @@ export default function SignalsPage({
                                 }}
                                 className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
-                                {selectedMarketEvents.length === 3 ? "Deseleccionar todos" : "Seleccionar los 3"}
+                                {selectedMarketEvents.length === 3 ? t("signalRadar.wizard.step2.deselectAll") : t("signalRadar.wizard.step2.selectAll3")}
                               </button>
                               <span className="text-gray-300 dark:text-gray-600">|</span>
                               <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Web Pública + LinkedIn</span>
@@ -3319,23 +3321,23 @@ export default function SignalsPage({
                               {
                                 id: "funding_round",
                                 icon: RiLineChartLine,
-                                title: "Rondas de Inversión",
-                                badge: "Rondas de Capital",
-                                desc: "Empresas que acaban de levantar capital semilla, Serie A/B o inversión privada. Tienen presupuesto fresco y urgencia de contratar soluciones para acelerar su crecimiento.",
+                                title: t("signalRadar.wizard.definitions.funding_round.title"),
+                                badge: t("signalRadar.wizard.definitions.funding_round.badge"),
+                                desc: t("signalRadar.wizard.definitions.funding_round.desc"),
                               },
                               {
                                 id: "company_news",
                                 icon: RiMegaphoneLine,
-                                title: "Expansión / Noticias",
-                                badge: "Expansión Rápida",
-                                desc: "Compañías que anuncian nuevas sedes, aperturas internacionales o lanzamientos de producto. Momentos clave donde requieren nuevos proveedores y tecnología.",
+                                title: t("signalRadar.wizard.definitions.company_news.title"),
+                                badge: t("signalRadar.wizard.definitions.company_news.badge"),
+                                desc: t("signalRadar.wizard.definitions.company_news.desc"),
                               },
                               {
                                 id: "acquisition_event",
                                 icon: RiExchangeLine,
-                                title: "Fusiones & Compras",
-                                badge: "Fusiones / M&A",
-                                desc: "Organizaciones en procesos de adquisición, fusión o reestructuración corporativa. Etapas de cambio donde evalúan unificar herramientas y renovar su stack.",
+                                title: t("signalRadar.wizard.definitions.acquisition_event.title"),
+                                badge: t("signalRadar.wizard.definitions.acquisition_event.badge"),
+                                desc: t("signalRadar.wizard.definitions.acquisition_event.desc"),
                               },
                             ].map((ev) => {
                               const isActive = selectedMarketEvents.includes(ev.id);
@@ -3427,55 +3429,55 @@ export default function SignalsPage({
                                 }}
                                 className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                               >
-                                {selectedIcpSignals.length === 6 ? "Restablecer (1)" : "Seleccionar los 6"}
+                                {selectedIcpSignals.length === 6 ? t("signalRadar.wizard.step2.reset1") : t("signalRadar.wizard.step2.selectAll6")}
                               </button>
                             </div>
                           </div>
 
-                          {/* Grid de las 6 Señales Automáticas de ICP */}
+                          {/* Grid de las 6 {t("signalRadar.wizard.step2.tabIcpTriggers")} */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                             {[
                               {
                                 id: "new_in_role",
                                 icon: RiUserAddLine,
-                                title: "Just Hired / Nuevo Cargo (<90 Días)",
-                                badge: "Ventana Dorada",
-                                desc: "Decisores recién nombrados (CEO, VP, Director). En sus primeros 90 días tienen presupuesto fresco para nuevos proveedores.",
+                                title: t("signalRadar.wizard.definitions.new_in_role.title"),
+                                badge: t("signalRadar.wizard.definitions.new_in_role.badge"),
+                                desc: t("signalRadar.wizard.definitions.new_in_role.desc"),
                               },
                               {
                                 id: "internal_promotion",
                                 icon: RiArrowUpLine,
-                                title: "Ascenso Interno a Decisor",
-                                badge: "Poder de Firma",
-                                desc: "Profesionales promovidos internamente a puestos de liderazgo con capacidad de contratación y cambio de stack.",
+                                title: t("signalRadar.wizard.definitions.internal_promotion.title"),
+                                badge: t("signalRadar.wizard.definitions.internal_promotion.badge"),
+                                desc: t("signalRadar.wizard.definitions.internal_promotion.desc"),
                               },
                               {
                                 id: "hiring_spree",
                                 icon: RiBriefcaseLine,
-                                title: "Hiring Intent (Contratación Activa)",
-                                badge: "Presupuesto Abierto",
-                                desc: "Empresas de tu sector que han publicado vacantes comerciales o de operaciones. Si contratan personal, necesitan herramientas.",
+                                title: t("signalRadar.wizard.definitions.hiring_spree.title"),
+                                badge: t("signalRadar.wizard.definitions.hiring_spree.badge"),
+                                desc: t("signalRadar.wizard.definitions.hiring_spree.desc"),
                               },
                               {
                                 id: "company_growth",
                                 icon: RiLineChartLine,
-                                title: "Empresas en Hipercrecimiento (+20%)",
-                                badge: "Expansión Rápida",
-                                desc: "Empresas cuya plantilla esté creciendo rápidamente (+20% anual) según métricas de contratación en LinkedIn.",
+                                title: t("signalRadar.wizard.definitions.company_growth.title"),
+                                badge: t("signalRadar.wizard.definitions.company_growth.badge"),
+                                desc: t("signalRadar.wizard.definitions.company_growth.desc"),
                               },
                               {
                                 id: "profile_viewers",
                                 icon: RiEyeLine,
-                                title: "Visitantes Recientes de tu Perfil",
-                                badge: "Interés Directo",
-                                desc: "Prospectos y decisores que han visitado tu perfil de LinkedIn recientemente. Requiere Sales Navigator.",
+                                title: t("signalRadar.wizard.definitions.profile_viewers.title"),
+                                badge: t("signalRadar.wizard.definitions.profile_viewers.badge"),
+                                desc: t("signalRadar.wizard.definitions.profile_viewers.desc"),
                               },
                               {
                                 id: "active_poster",
                                 icon: RiFireLine,
-                                title: "Más Activos en tu ICP (<48h)",
-                                badge: "Bandeja Caliente",
-                                desc: "Decisores que publican o comentan activamente en LinkedIn, garantizando que su bandeja de mensajes está activa.",
+                                title: t("signalRadar.wizard.definitions.active_poster.title"),
+                                badge: t("signalRadar.wizard.definitions.active_poster.badge"),
+                                desc: t("signalRadar.wizard.definitions.active_poster.desc"),
                               },
                             ].map((sig) => {
                               const isSelected = selectedIcpSignals.includes(sig.id);
@@ -3542,35 +3544,35 @@ export default function SignalsPage({
                   <div className="space-y-5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <RiSparklingLine className="text-brand-500" /> Mensaje IA Anti-Stalker
+                        <RiSparklingLine className="text-brand-500" /> {t("signalRadar.wizard.step3.title")}
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 3 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{t("signalRadar.wizard.step3.stepOf")}</span>
                     </div>
 
                     {/* Selector de Objetivo del Mensaje */}
                     <div className="space-y-2">
                       <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                        1. Objetivo de Conversión del Mensaje
+                        {t("signalRadar.wizard.step3.objTitle")}
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         {[
                           {
                             id: "conversation",
                             icon: RiChat1Line,
-                            title: "Iniciar Conversación",
-                            desc: "Abre diálogo estratégico sobre cuellos de botella en su proceso.",
+                            title: t("signalRadar.wizard.step3.objConversationTitle"),
+                            desc: t("signalRadar.wizard.step3.objConversationDesc"),
                           },
                           {
                             id: "demo",
                             icon: RiCalendarLine,
-                            title: "Agendar Demo Breve",
-                            desc: "Propuesta de valor directa para directores con dolor activo.",
+                            title: t("signalRadar.wizard.step3.objDemoTitle"),
+                            desc: t("signalRadar.wizard.step3.objDemoDesc"),
                           },
                           {
                             id: "resource",
                             icon: RiFileList3Line,
-                            title: "Compartir Recurso / Guía",
-                            desc: "Ofrece un framework o playbook sin fricción comercial inicial.",
+                            title: t("signalRadar.wizard.step3.objResourceTitle"),
+                            desc: t("signalRadar.wizard.step3.objResourceDesc"),
                           },
                         ].map((obj) => {
                           const Icon = obj.icon;
@@ -3613,24 +3615,24 @@ export default function SignalsPage({
                     {/* Selector de Tono */}
                     <div className="space-y-2">
                       <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                        2. Tono de la IA
+                        {t("signalRadar.wizard.step3.toneTitle")}
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {[
                           {
                             id: "consultive",
                             icon: RiSparklingLine,
-                            label: "Consultivo & Experto (Recomendado)",
+                            label: t("signalRadar.wizard.step3.toneConsultive"),
                           },
                           {
                             id: "professional",
                             icon: RiBriefcaseLine,
-                            label: "Profesional & Directo",
+                            label: t("signalRadar.wizard.step3.toneProfessional"),
                           },
                           {
                             id: "direct",
                             icon: RiThumbUpLine,
-                            label: "Cercano & Casual",
+                            label: t("signalRadar.wizard.step3.toneDirect"),
                           },
                         ].map((tn) => {
                           const Icon = tn.icon;
@@ -3660,7 +3662,7 @@ export default function SignalsPage({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                          Idioma del Mensaje
+                          {t("signalRadar.wizard.step3.langLabel")}
                         </label>
                         <select
                           value={msgLanguage}
@@ -3674,7 +3676,7 @@ export default function SignalsPage({
                       </div>
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                          Máximo de Palabras
+                          {t("signalRadar.wizard.step3.maxWordsLabel")}
                         </label>
                         <input
                           type="number"
@@ -3692,10 +3694,10 @@ export default function SignalsPage({
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                          Simulación en Tiempo Real (LinkedIn Direct Message Preview)
+                          {t("signalRadar.wizard.step3.previewTitle")}
                         </label>
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                          <RiShieldCheckLine size={12} /> Vista previa orientativa
+                          <RiShieldCheckLine size={12} /> {t("signalRadar.wizard.step3.previewNotice")}
                         </span>
                       </div>
 
@@ -3750,7 +3752,7 @@ export default function SignalsPage({
                     <div className="pt-2">
                       <details className="text-xs text-gray-600 dark:text-gray-400 group">
                         <summary className="cursor-pointer font-semibold text-brand-600 hover:underline">
-                          + ¿Deseas redactar una plantilla personalizada con variables?
+                          {t("signalRadar.wizard.step3.customTemplateTitle")}
                         </summary>
                         <div className="mt-2 space-y-2">
                           <textarea
@@ -3776,15 +3778,15 @@ export default function SignalsPage({
                   <div className="space-y-5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
                       <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <RiPlayLine className="text-brand-500" /> Lanzamiento del Monitor de Señales
+                        <RiPlayLine className="text-brand-500" /> {t("signalRadar.wizard.step4.title")}
                       </h2>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">PASO 4 de 4</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{t("signalRadar.wizard.step4.stepOf")}</span>
                     </div>
 
                     {/* 1. Nombre del Monitor */}
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                        Nombre del Monitor <span className="text-brand-500">*</span>
+                        {t("signalRadar.wizard.step4.nameLabel")} <span className="text-brand-500">*</span>
                       </label>
                       <div className="relative">
                         <RiRadarLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
@@ -3800,7 +3802,7 @@ export default function SignalsPage({
                       </div>
                     </div>
 
-                    {/* 2. Cuenta de LinkedIn Remitente */}
+                    {/* 2. {t("signalRadar.wizard.step4.accountLabel")} */}
                     {accounts.length > 0 && (
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
@@ -3823,7 +3825,7 @@ export default function SignalsPage({
                       </div>
                     )}
 
-                    {/* 3. Modo de Operación (Review vs Autopilot) */}
+                    {/* 3. {t("signalRadar.wizard.step4.modeLabel")} (Review vs Autopilot) */}
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                         Modo de Operación
@@ -3840,15 +3842,15 @@ export default function SignalsPage({
                         >
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 font-bold text-xs">
-                              Modo Revisión
+                              {t("signalRadar.wizard.step4.modeReviewTitle")}
                               <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300">
-                                Recomendado
+                                {t("signalRadar.wizard.step4.modeReviewBadge")}
                               </span>
                             </span>
                             {newMode === "review" && <RiCheckLine className="text-brand-500" size={18} />}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-normal mt-1 leading-relaxed">
-                            Los prospectos captados van a tu cola de «Hot Leads». Revisas y apruebas el mensaje antes de activar el contacto.
+                            {t("signalRadar.wizard.step4.modeReviewDesc")}
                           </div>
                         </button>
 
@@ -3863,9 +3865,9 @@ export default function SignalsPage({
                         >
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1.5 font-bold text-xs">
-                              Piloto Automático (Autopilot)
+                              {t("signalRadar.wizard.step4.modeAutopilotTitle")}
                               <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300">
-                                Gates SDR IA
+                                {t("signalRadar.wizard.step4.modeAutopilotBadge")}
                               </span>
                             </span>
                             {newMode === "autopilot" && <RiCheckLine className="text-brand-500" size={18} />}
@@ -4025,7 +4027,7 @@ export default function SignalsPage({
                       }}
                       className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
                     >
-                      Cancelar
+                      {t("signalRadar.wizard.buttons.cancel")}
                     </button>
                   ) : (
                     <button
@@ -4033,7 +4035,7 @@ export default function SignalsPage({
                       onClick={() => setWizardStep((prev) => Math.max(1, prev - 1) as 1 | 2 | 3 | 4)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
                     >
-                      <RiArrowLeftLine size={15} /> Atrás
+                      <RiArrowLeftLine size={15} /> {t("signalRadar.wizard.buttons.back")}
                     </button>
                   )}
                 </div>
@@ -4046,10 +4048,10 @@ export default function SignalsPage({
                       className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
                     >
                       {wizardStep === 1
-                        ? "PASO 2: Disparador"
+                        ? t("signalRadar.wizard.buttons.nextStep2")
                         : wizardStep === 2
-                        ? "PASO 3: Mensaje IA"
-                        : "PASO 4: Lanzar"}{" "}
+                        ? t("signalRadar.wizard.buttons.nextStep3")
+                        : t("signalRadar.wizard.buttons.nextStep4")}{" "}
                       <RiArrowRightLine size={15} />
                     </button>
                   ) : (
@@ -4062,12 +4064,12 @@ export default function SignalsPage({
                       {creatingMonitor ? (
                         <>
                           <RiRefreshLine className="animate-spin" size={16} />{" "}
-                          {editingMonitorId ? "Guardando Cambios..." : "Lanzando Monitor..."}
+                          {editingMonitorId ? t("signalRadar.wizard.buttons.savingChanges") : t("signalRadar.wizard.buttons.launching")}
                         </>
                       ) : (
                         <>
                           {editingMonitorId ? <RiCheckLine size={16} /> : <RiRadarLine size={16} />}
-                          {editingMonitorId ? "Guardar Cambios del Monitor" : "Lanzar Monitor de Señales"}
+                          {editingMonitorId ? t("signalRadar.wizard.buttons.saveChanges") : t("signalRadar.wizard.buttons.launch")}
                         </>
                       )}
                     </button>
