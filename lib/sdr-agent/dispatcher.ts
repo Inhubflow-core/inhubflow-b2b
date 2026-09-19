@@ -265,7 +265,7 @@ export async function dispatchApprovedSdrAction(
           id, thread_id, direction, external_message_id, sender_name,
           body, content_hash, sent_at, delivery_status, metadata_json
         ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, datetime('now'), 'delivered', ?)
-        ON CONFLICT(thread_id, external_message_id) DO NOTHING
+        ON CONFLICT(thread_id, external_message_id) WHERE external_message_id IS NOT NULL DO NOTHING
       `).run(
         randomUUID(),
         thread.id,
@@ -374,7 +374,7 @@ export async function dispatchApprovedSdrAction(
           id, thread_id, direction, external_message_id, sender_name,
           body, content_hash, sent_at, delivery_status, metadata_json
         ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, datetime('now'), 'delivered', ?)
-        ON CONFLICT(thread_id, external_message_id) DO NOTHING
+        ON CONFLICT(thread_id, external_message_id) WHERE external_message_id IS NOT NULL DO NOTHING
       `).run(
         randomUUID(),
         thread.id,

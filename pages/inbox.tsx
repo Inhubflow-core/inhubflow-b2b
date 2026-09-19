@@ -428,8 +428,18 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
     setSuggesting(true);
     setAiSuggestionMeta(null);
     try {
+      // Prioritize the latest inbound message from the prospect so the SDR AI responds to them
+      const lastInboundLinkedIn = [...linkedinMessages].reverse().find((m) => m.direction === "inbound")?.body;
+      const lastInboundEmail = [...messages].reverse().find((m) => m.from.includes(reply.email || ""))?.text;
       const lastMsg =
-        reply.linkedin_reply_body || linkedinMessages.at(-1)?.body || messages.at(-1)?.text || "";
+        lastInboundLinkedIn ||
+        lastInboundEmail ||
+        reply.linkedin_reply_body ||
+        reply.reply_body ||
+        linkedinMessages.at(-1)?.body ||
+        messages.at(-1)?.text ||
+        "";
+
       const history = hasLinkedInReply
         ? linkedinMessages.map((m) => ({ direction: m.direction, body: m.body }))
         : messages.map((m) => ({
@@ -458,6 +468,8 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
           confidence: data.confidence ? `${Math.round(data.confidence * 100)}%` : undefined,
         });
         toast.success("Sugerencia de SDR IA generada.");
+      } else {
+        toast.info(data.reasoning || "La IA no cuenta con información suficiente en la base de conocimiento para sugerir una respuesta.");
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al generar sugerencia.");
@@ -581,6 +593,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
     setChangingControl(true);
     try {
       await acquireHumanControl();
+      reply.sdr_thread_state = "HUMAN_ACTIVE";
       toast.success("Control humano activado. La IA permanecerá bloqueada hasta que la liberes.");
       onActionDone();
     } catch (error) {
@@ -601,6 +614,7 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo liberar la IA");
+      reply.sdr_thread_state = "AI_ACTIVE";
       toast.success("Control liberado explícitamente.");
       onActionDone();
     } catch (error) {

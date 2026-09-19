@@ -126,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             sender_name, body, content_hash, sent_at, captured_at,
             delivery_status, metadata_json
           ) VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, ?, 'sent', ?)
-          ON CONFLICT(thread_id, external_message_id) DO NOTHING
+          ON CONFLICT(thread_id, external_message_id) WHERE external_message_id IS NOT NULL DO NOTHING
         `).run(
           randomUUID(), sdrThread.id, result.messageId || outboundMessageId,
           account.from_email, account.from_name, body.trim(),

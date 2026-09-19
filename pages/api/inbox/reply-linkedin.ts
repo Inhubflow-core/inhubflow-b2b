@@ -109,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (sdrThread) {
       db.transaction(() => {
-        db.prepare(`INSERT INTO sdr_messages (id, thread_id, direction, external_message_id, sender_name, body, content_hash, sent_at, captured_at, delivery_status, metadata_json) VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, 'sent', ?) ON CONFLICT(thread_id, external_message_id) DO NOTHING`).run(crypto.randomUUID(), sdrThread.id, externalMessageId, account.name || "Me", finalBody, crypto.createHash("sha256").update(finalBody, "utf8").digest("hex"), sentAt, sentAt, JSON.stringify({ source: "human-inbox-reply", channel: "linkedin" }));
+        db.prepare(`INSERT INTO sdr_messages (id, thread_id, direction, external_message_id, sender_name, body, content_hash, sent_at, captured_at, delivery_status, metadata_json) VALUES (?, ?, 'outbound', ?, ?, ?, ?, ?, ?, 'sent', ?) ON CONFLICT(thread_id, external_message_id) WHERE external_message_id IS NOT NULL DO NOTHING`).run(crypto.randomUUID(), sdrThread.id, externalMessageId, account.name || "Me", finalBody, crypto.createHash("sha256").update(finalBody, "utf8").digest("hex"), sentAt, sentAt, JSON.stringify({ source: "human-inbox-reply", channel: "linkedin" }));
         db.prepare("UPDATE sdr_threads SET last_outbound_at = ?, updated_at = datetime('now') WHERE id = ?").run(sentAt, sdrThread.id);
       })();
     }

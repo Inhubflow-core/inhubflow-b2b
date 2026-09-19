@@ -64,9 +64,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       history: parseHistory(req.body?.history),
       useLiveProvider: true,
     });
+
+    let finalReply = result.decision.reply_draft;
+    if (!finalReply) {
+      const firstName = target.full_name?.split(" ")[0]?.trim() || "";
+      const greeting = firstName ? `Hola ${firstName}, ` : "Hola, ";
+      switch (result.decision.intent) {
+        case "pricing_question":
+          finalReply = `${greeting}con gusto te comparto información sobre nuestros planes y precios. Se adaptan según el volumen y necesidades del equipo. ¿Te gustaría coordinar una breve llamada de 10 minutos para revisar opciones?`;
+          break;
+        case "meeting_request":
+          finalReply = `${greeting}¡por supuesto! Me encantaría conversar. ¿Qué día y horario te quedaría más cómodo esta semana para una llamada rápida?`;
+          break;
+        case "product_question":
+        case "interested":
+          finalReply = `${greeting}gracias por tu interés. ¿Hay alguna funcionalidad o duda puntual sobre la plataforma que te gustaría profundizar?`;
+          break;
+        default:
+          if (result.decision.requires_human) {
+            finalReply = `${greeting}gracias por tu mensaje. Con gusto reviso los detalles con el equipo para darte la mejor respuesta. ¿En qué horario te viene bien conversar brevemente?`;
+          }
+          break;
+      }
+    }
+
     return res.status(200).json({
       ok: true,
-      suggestedReply: result.decision.reply_draft,
+      suggestedReply: finalReply,
       intent: result.decision.intent,
       reasoning: result.decision.reasoning_summary,
       requiresHuman: result.decision.requires_human,

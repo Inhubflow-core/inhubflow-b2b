@@ -241,21 +241,49 @@ function classifyProviderError(error: unknown): {
   code: SdrProviderErrorCode;
   retryable: boolean;
 } {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  if (message.includes("timeout") || message.includes("timed out")) {
-    return { code: "timeout", retryable: true };
-  }
-  if (message.includes("429") || message.includes("rate limit") || message.includes("quota")) {
+  const errObj = error as Record<string, unknown> | null | undefined;
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+      ? error
+      : JSON.stringify(error || "");
+  const message = rawMessage.toLowerCase();
+  const status = Number(errObj?.status ?? errObj?.code ?? 0);
+
+  if (
+    status === 429 ||
+    message.includes("429") ||
+    message.includes("rate limit") ||
+    message.includes("quota") ||
+    message.includes("resource_exhausted") ||
+    message.includes("exceeded")
+  ) {
     return { code: "rate_limited", retryable: true };
   }
   if (
+    status === 503 ||
+    status === 502 ||
+    status === 504 ||
     message.includes("503") ||
     message.includes("502") ||
     message.includes("504") ||
     message.includes("unavailable") ||
-    message.includes("high demand")
+    message.includes("high demand") ||
+    message.includes("overloaded")
   ) {
     return { code: "provider_unavailable", retryable: true };
+  }
+  if (
+    status === 404 ||
+    message.includes("404") ||
+    message.includes("not found") ||
+    message.includes("not supported")
+  ) {
+    return { code: "provider_unavailable", retryable: true };
+  }
+  if (message.includes("timeout") || message.includes("timed out") || message.includes("deadline")) {
+    return { code: "timeout", retryable: true };
   }
   if (message.includes("safety") || message.includes("blocked") || message.includes("refus")) {
     return { code: "refused", retryable: false };
@@ -263,7 +291,8 @@ function classifyProviderError(error: unknown): {
   if (error instanceof SyntaxError || message.includes("invalid json") || message.includes("syntaxerror")) {
     return { code: "invalid_response", retryable: true };
   }
-  return { code: "unknown", retryable: false };
+  // Unknown errors: retryable if fallback models exist
+  return { code: "unknown", retryable: true };
 }
 
 function wait(ms: number): Promise<void> {
@@ -407,22 +436,20 @@ export class GeminiSdrProvider implements SdrProvider {
 
         console.warn(`[GeminiSdrProvider] Attempt ${attempt + 1}/${this.maxRetries + 1} failed with model ${activeModel} (${classified.code}):`, error instanceof Error ? error.message : error);
 
-        // Dynamic fallback on 503 high demand, 429 rate limit or 404: advance through the chain
-        // instead of bouncing back to a model that already failed.
-        if (classified.code === "provider_unavailable" || classified.code === "rate_limited" || String(error).includes("404")) {
-          const nextModel = chain[chainIndex + 1];
-          if (nextModel) {
-            chainIndex += 1;
-            console.warn(`[GeminiSdrProvider] Switching model from ${activeModel} to fallback ${nextModel} due to ${classified.code}`);
-            activeModel = nextModel;
-          }
+        // Always advance to fallback model on any failure if a fallback model is available in the chain
+        const nextModel = chain[chainIndex + 1];
+        if (nextModel) {
+          chainIndex += 1;
+          console.warn(`[GeminiSdrProvider] Switching model from ${activeModel} to fallback ${nextModel} due to ${classified.code}`);
+          activeModel = nextModel;
         }
 
-        if (!classified.retryable || attempt >= this.maxRetries) {
+        if ((!classified.retryable && !nextModel) || attempt >= this.maxRetries) {
+          const detail = error instanceof Error ? error.message : String(error);
           throw error instanceof SdrProviderError
             ? error
             : new SdrProviderError(
-                `Gemini request failed (${classified.code})`,
+                detail ? `Gemini request failed: ${detail}` : `Gemini request failed (${classified.code})`,
                 classified.code,
                 classified.retryable,
                 { cause: error },
@@ -433,8 +460,9 @@ export class GeminiSdrProvider implements SdrProvider {
       }
     }
 
+    const finalDetail = lastError instanceof Error ? lastError.message : String(lastError || "");
     throw new SdrProviderError(
-      "Gemini request failed",
+      finalDetail ? `Gemini request failed: ${finalDetail}` : "Gemini request failed",
       "unknown",
       false,
       { cause: lastError },

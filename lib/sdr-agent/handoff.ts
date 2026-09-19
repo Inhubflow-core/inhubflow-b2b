@@ -339,10 +339,29 @@ export function releaseHumanControl(
   return db.transaction(() => {
     const thread = loadThreadAssignment(db, input.threadId);
     if (workspaceOf(thread) !== input.workspaceOwnerId) throw new Error("SDR thread not found");
-    if (!["HUMAN_REVIEW", "HUMAN_ACTIVE"].includes(thread.state)) {
+    const nextState = input.nextState ?? "AI_ACTIVE";
+    if (thread.state === nextState || (thread.state === "AI_ACTIVE" && nextState === "AI_ACTIVE")) {
+      // Idempotent release: thread is already active for AI, clear any lingering handoffs or locks
+      db.prepare(`
+        UPDATE sdr_threads
+        SET human_takeover_at = NULL, human_takeover_by_user_id = NULL,
+          lock_reason = NULL, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(input.threadId);
+      db.prepare(`
+        UPDATE sdr_handoffs
+        SET state = 'resolved', resolved_at = COALESCE(resolved_at, datetime('now')),
+          released_at = datetime('now'), released_by_user_id = ?, updated_at = datetime('now')
+        WHERE thread_id = ? AND state IN ('open', 'acknowledged')
+      `).run(input.actorUserId, input.threadId);
+      const updated = db.prepare(
+        "SELECT control_epoch FROM sdr_threads WHERE id = ?",
+      ).get(input.threadId) as { control_epoch: number };
+      return { state: nextState, controlEpoch: updated?.control_epoch ?? 0 };
+    }
+    if (!["HUMAN_REVIEW", "HUMAN_ACTIVE", "WAITING_LEAD"].includes(thread.state)) {
       throw new Error(`Cannot release a thread in state ${thread.state}`);
     }
-    const nextState = input.nextState ?? "AI_ACTIVE";
     db.prepare(`
       UPDATE sdr_threads
       SET state = ?, control_epoch = control_epoch + 1,

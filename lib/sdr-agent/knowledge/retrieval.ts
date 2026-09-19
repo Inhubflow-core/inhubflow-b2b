@@ -99,7 +99,8 @@ export function retrieveApprovedKnowledge(
         }));
 
     for (const chunk of chunks) {
-      candidates.push({ ...chunk, score: overlapScore(queryTerms, chunk.content) });
+      const searchable = `${source.title} ${chunk.content}`;
+      candidates.push({ ...chunk, score: overlapScore(queryTerms, searchable) });
     }
   }
 
@@ -117,6 +118,23 @@ export function retrieveApprovedKnowledge(
       content: candidate.content,
     });
     totalCharacters += candidate.content.length;
+  }
+
+  // Fallback: If no chunks scored > 0 but approved sources exist, include initial chunks
+  // from approved sources so conversational messages (e.g. greetings) have company context
+  if (selected.length === 0 && candidates.length > 0) {
+    for (const candidate of candidates) {
+      if (selected.length >= Math.min(limit, 3)) break;
+      if (totalCharacters + candidate.content.length > maxTotalCharacters) continue;
+      selected.push({
+        id: candidate.id,
+        sourceId: candidate.sourceId,
+        sourceTitle: candidate.sourceTitle,
+        revision: candidate.revision,
+        content: candidate.content,
+      });
+      totalCharacters += candidate.content.length;
+    }
   }
 
   return {
