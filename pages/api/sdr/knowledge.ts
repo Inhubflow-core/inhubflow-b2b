@@ -57,7 +57,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         sourceType,
         content: body.content,
       });
-      return res.status(201).json({ ok: true, id: source.id, status: source.status });
+
+      // Si el frontend solicita 'approved' o se crea directamente por el usuario autorizado, aprobar e indexar de inmediato
+      const shouldApprove = (body as { status?: unknown }).status === "approved" || !(body as { status?: unknown }).status;
+      const finalSource = shouldApprove
+        ? approveKnowledgeSource(db, source.id, actor.workspaceOwnerId, actor.id)
+        : source;
+
+      return res.status(201).json({ ok: true, id: finalSource.id, status: finalSource.status });
     }
 
     if (req.method === "DELETE") {

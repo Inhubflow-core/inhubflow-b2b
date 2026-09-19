@@ -407,13 +407,13 @@ export class GeminiSdrProvider implements SdrProvider {
 
         console.warn(`[GeminiSdrProvider] Attempt ${attempt + 1}/${this.maxRetries + 1} failed with model ${activeModel} (${classified.code}):`, error instanceof Error ? error.message : error);
 
-        // Dynamic fallback on 503 high demand or 404: advance through the chain
+        // Dynamic fallback on 503 high demand, 429 rate limit or 404: advance through the chain
         // instead of bouncing back to a model that already failed.
-        if (classified.code === "provider_unavailable" || String(error).includes("404")) {
+        if (classified.code === "provider_unavailable" || classified.code === "rate_limited" || String(error).includes("404")) {
           const nextModel = chain[chainIndex + 1];
           if (nextModel) {
             chainIndex += 1;
-            console.warn(`[GeminiSdrProvider] Switching model from ${activeModel} to fallback ${nextModel}`);
+            console.warn(`[GeminiSdrProvider] Switching model from ${activeModel} to fallback ${nextModel} due to ${classified.code}`);
             activeModel = nextModel;
           }
         }
