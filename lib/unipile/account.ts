@@ -31,17 +31,40 @@ export async function resolveUnipileAccount(
   client: UnipileClient = unipile,
 ): Promise<ResolvedUnipileAccount> {
   const local = db.prepare(`
-    SELECT id, unipile_account_id, unipile_status
+    SELECT id, name, unipile_account_id, unipile_status
     FROM accounts
     WHERE id = ?
   `).get(localAccountId) as {
     id: string;
+    name: string | null;
     unipile_account_id?: string | null;
     unipile_status?: string | null;
   } | undefined;
 
   if (!local) throw new Error("Cuenta local de LinkedIn no encontrada");
   if (!client.isConfigured()) throw new Error("El motor de LinkedIn no está configurado");
+
+  // Fetch available remote accounts from Unipile
+  const remoteAccounts = await client.listAccounts();
+  const usable = (remoteAccounts.items || []).filter(isUsableLinkedInAccount);
+
+  // If local has a name, check if there is an exact name match in Unipile
+  // to auto-correct any mismatch (e.g. mapping "Roberto OrSe" to the actual "Roberto OrSe" Unipile account)
+  if (local.name && usable.length > 0) {
+    const nameMatch = usable.find(
+      (a) => a.name?.trim().toLowerCase() === local.name?.trim().toLowerCase()
+    );
+    if (nameMatch && nameMatch.id !== local.unipile_account_id) {
+      console.log(`[resolveUnipileAccount] Auto-correcting Unipile account ID for "${local.name}" from ${local.unipile_account_id} to ${nameMatch.id}`);
+      db.prepare("UPDATE accounts SET unipile_account_id = ?, unipile_status = ?, is_authenticated = 1 WHERE id = ?")
+        .run(nameMatch.id, accountStatus(nameMatch), local.id);
+      return {
+        localAccountId: local.id,
+        unipileAccountId: nameMatch.id,
+        account: nameMatch,
+      };
+    }
+  }
 
   if (local.unipile_account_id) {
     const remote = await client.getAccount(local.unipile_account_id);
@@ -58,23 +81,22 @@ export async function resolveUnipileAccount(
     };
   }
 
-  const accounts = await client.listAccounts();
   const mappedIds = new Set(
     (db.prepare(`
       SELECT unipile_account_id FROM accounts
       WHERE id != ? AND unipile_account_id IS NOT NULL
     `).all(local.id) as Array<{ unipile_account_id: string }>).map((row) => row.unipile_account_id),
   );
-  const usable = (accounts.items || []).filter(
+  const unmappedUsable = (remoteAccounts.items || []).filter(
     (account) => isUsableLinkedInAccount(account) && !mappedIds.has(account.id),
   );
-  if (usable.length === 0) {
+  if (unmappedUsable.length === 0) {
     throw new Error("No hay una cuenta de LinkedIn conectada y lista (estado OK)");
   }
 
   // The local account is unbound. The first deterministic usable LinkedIn account
   // is the documented fallback; Hosted Auth will persist an explicit mapping later.
-  const selected = usable[0];
+  const selected = unmappedUsable[0];
   db.prepare(`
     UPDATE accounts
     SET unipile_account_id = ?, unipile_status = ?, is_authenticated = 1

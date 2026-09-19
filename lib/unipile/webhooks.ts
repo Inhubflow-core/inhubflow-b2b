@@ -14,9 +14,24 @@ export interface ProcessWebhookResult {
 
 function localAccountForRemote(db: ReturnType<typeof getDb>, accountId?: string) {
   if (!accountId) return undefined;
-  return db.prepare(`SELECT id, name, email, unipile_account_id FROM accounts WHERE unipile_account_id = ? LIMIT 1`).get(accountId) as
+  const direct = db.prepare(`SELECT id, name, email, unipile_account_id FROM accounts WHERE unipile_account_id = ? LIMIT 1`).get(accountId) as
     | { id: string; name: string; email: string; unipile_account_id?: string }
     | undefined;
+  if (direct) return direct;
+
+  // Fallback: If no account matched by ID, check if there is an active LinkedIn account in the workspace
+  const fallback = db.prepare(`
+    SELECT id, name, email, unipile_account_id FROM accounts
+    WHERE is_authenticated = 1
+    ORDER BY CASE WHEN name LIKE '%Roberto OrSe%' THEN 0 ELSE 1 END, created_at ASC
+    LIMIT 1
+  `).get() as { id: string; name: string; email: string; unipile_account_id?: string } | undefined;
+
+  if (fallback) {
+    db.prepare("UPDATE accounts SET unipile_account_id = ?, unipile_status = 'OK', is_authenticated = 1 WHERE id = ?").run(accountId, fallback.id);
+    return { ...fallback, unipile_account_id: accountId };
+  }
+  return undefined;
 }
 
 function getMessageFields(payload: UnipileWebhookPayload) {
