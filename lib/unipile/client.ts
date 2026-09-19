@@ -295,6 +295,21 @@ export class UnipileClient {
   }
 
   /**
+   * Lista los mensajes más recientes a través de todas las conversaciones de una cuenta.
+   * Utiliza el endpoint rápido GET /api/v1/messages?account_id=...
+   */
+  async listAccountMessages(accountId: string, limit: number = 50, cursor?: string): Promise<{ items: UnipileMessage[]; cursor?: string | null }> {
+    const query = new URLSearchParams();
+    query.set('account_id', accountId);
+    query.set('limit', String(Math.min(250, Math.max(1, limit))));
+    if (cursor) query.set('cursor', cursor);
+
+    return this.request<{ items: UnipileMessage[]; cursor?: string | null }>(
+      `/api/v1/messages?${query.toString()}`
+    );
+  }
+
+  /**
    * Obtiene comentarios de una publicación en LinkedIn para detectar intención
    */
   async getPostComments(postId: string, accountId?: string, limit: number = 50): Promise<{ items: UnipilePostComment[] }> {

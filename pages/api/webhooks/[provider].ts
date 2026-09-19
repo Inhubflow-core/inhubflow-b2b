@@ -15,15 +15,20 @@ async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<B
 function configuredSecrets(): string[] {
   return [
     process.env.UNIPILE_WEBHOOK_SECRET,
+    process.env.UNIPILE_WEBHOOK_TOKEN,
+    process.env.UNIPILE_CALLBACK_SECRET,
     ...(process.env.UNIPILE_WEBHOOK_SECRETS || "").split(","),
   ].map((secret) => secret?.trim() || "").filter(Boolean);
 }
 
-function verifyStaticToken(supplied: string | undefined, expected: string): boolean {
-  if (!supplied || !expected) return false;
+function verifyStaticToken(supplied: string | undefined, expectedTokens: string[]): boolean {
+  if (!supplied) return false;
   const suppliedBuffer = Buffer.from(supplied, "utf8");
-  const expectedBuffer = Buffer.from(expected, "utf8");
-  return suppliedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(suppliedBuffer, expectedBuffer);
+  return expectedTokens.some((expected) => {
+    if (!expected) return false;
+    const expectedBuffer = Buffer.from(expected, "utf8");
+    return suppliedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(suppliedBuffer, expectedBuffer);
+  });
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -38,11 +43,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rawBody = await readRawBody(req as unknown as IncomingMessage & { body?: unknown });
     const signatureHeader = req.headers["unipile-signature"];
     const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
-    const tokenHeader = req.headers["x-inhubflow-webhook-token"];
-    const token = Array.isArray(tokenHeader) ? tokenHeader[0] : tokenHeader;
+
+    // Support various header and query formats Unipile / proxies might send
+    const rawAuthHeader = req.headers["authorization"];
+    const authHeaderToken = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
+    const bearerToken = authHeaderToken ? authHeaderToken.replace(/^Bearer\s+/i, "").trim() : undefined;
+
+    const rawTokenHeader = req.headers["x-unipile-token"]
+      || req.headers["x-inhubflow-webhook-token"]
+      || req.headers["token"]
+      || req.headers["x-api-key"]
+      || (typeof req.query.token === "string" ? req.query.token : undefined)
+      || bearerToken;
+    const token = Array.isArray(rawTokenHeader) ? rawTokenHeader[0] : rawTokenHeader;
+
     const validHmac = Boolean(signature) && secrets.some((secret) => verifyUnipileSignature(rawBody, signature!, secret));
-    const validToken = verifyStaticToken(token, expectedToken);
+    const validToken = verifyStaticToken(token, [expectedToken, ...secrets]);
     if (!validHmac && !validToken) {
+      console.warn("[unipile-webhook] Autenticación rechazada. Signature presente:", Boolean(signature), "Token presente:", Boolean(token));
       return res.status(401).json({ error: "Autenticación de webhook inválida" });
     }
 

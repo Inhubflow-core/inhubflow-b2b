@@ -31,8 +31,12 @@ interface LocalTarget {
   workflow_id?: string | null;
 }
 
-function normalize(value: unknown): string {
-  return String(value || "").trim().toLowerCase();
+function normalizeName(value: unknown): string {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function attendeeProfile(attendee?: UnipileChatAttendee | null) {
@@ -70,7 +74,7 @@ function targetForMessage(
   const direct = db.prepare(`
     SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url,
            COALESCE(lta.unipile_provider_id, t.unipile_provider_id) AS unipile_provider_id,
-           COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id) AS unipile_chat_id,
+           COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id, t.unipile_chat_id) AS unipile_chat_id,
            COALESCE(t.messaging_urn, lta.unipile_provider_id) AS messaging_urn,
            (SELECT rp.run_id FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
             WHERE rp.target_id = t.id AND r.account_id = ? ORDER BY rp.created_at DESC LIMIT 1) AS run_id,
@@ -87,6 +91,7 @@ function targetForMessage(
       )
     WHERE (
       lta.unipile_chat_id = ?
+      OR t.unipile_chat_id = ?
       OR scoped_message.external_thread_id = ?
       OR (? IS NOT NULL AND (
         lta.unipile_provider_id = ? OR t.unipile_provider_id = ? OR t.messaging_urn = ?
@@ -94,16 +99,16 @@ function targetForMessage(
       OR (? IS NOT NULL AND lower(t.linkedin_url) = lower(?))
     )
     ORDER BY CASE
-      WHEN lta.unipile_chat_id = ? OR scoped_message.external_thread_id = ? THEN 0
-      WHEN lta.unipile_provider_id = ? THEN 1 ELSE 2 END,
+      WHEN lta.unipile_chat_id = ? OR t.unipile_chat_id = ? OR scoped_message.external_thread_id = ? THEN 0
+      WHEN lta.unipile_provider_id = ? OR t.unipile_provider_id = ? THEN 1 ELSE 2 END,
       t.created_at ASC
     LIMIT 1
   `).get(
     accountId, accountId, accountId,
-    chatId, chatId,
+    chatId, chatId, chatId,
     providerId || senderId, providerId || senderId, providerId || senderId, providerId || senderId,
     profileUrl, profileUrl,
-    chatId, chatId, providerId || senderId,
+    chatId, chatId, chatId, providerId || senderId, providerId || senderId,
   ) as LocalTarget | undefined;
 
   if (direct) return direct;
@@ -114,7 +119,7 @@ function targetForMessage(
     const byUrn = db.prepare(`
       SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url,
              COALESCE(lta.unipile_provider_id, t.unipile_provider_id) AS unipile_provider_id,
-             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id) AS unipile_chat_id,
+             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id, t.unipile_chat_id) AS unipile_chat_id,
              COALESCE(t.messaging_urn, lta.unipile_provider_id) AS messaging_urn,
              (SELECT rp.run_id FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
               WHERE rp.target_id = t.id AND r.account_id = ? ORDER BY rp.created_at DESC LIMIT 1) AS run_id,
@@ -126,9 +131,9 @@ function targetForMessage(
         SELECT m.id FROM linkedin_inbox_messages m WHERE m.account_id = ? AND m.target_id = t.id
         ORDER BY datetime(m.sent_at) DESC, m.id DESC LIMIT 1
       )
-      WHERE t.messaging_urn LIKE ? OR t.unipile_provider_id LIKE ?
+      WHERE t.messaging_urn LIKE ? OR t.unipile_provider_id LIKE ? OR lta.unipile_provider_id LIKE ?
       LIMIT 1
-    `).get(accountId, accountId, accountId, `%${effectiveId}%`, `%${effectiveId}%`) as LocalTarget | undefined;
+    `).get(accountId, accountId, accountId, `%${effectiveId}%`, `%${effectiveId}%`, `%${effectiveId}%`) as LocalTarget | undefined;
     if (byUrn) return byUrn;
   }
 
@@ -138,7 +143,7 @@ function targetForMessage(
     const bySlug = db.prepare(`
       SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url,
              COALESCE(lta.unipile_provider_id, t.unipile_provider_id) AS unipile_provider_id,
-             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id) AS unipile_chat_id,
+             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id, t.unipile_chat_id) AS unipile_chat_id,
              COALESCE(t.messaging_urn, lta.unipile_provider_id) AS messaging_urn,
              (SELECT rp.run_id FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
               WHERE rp.target_id = t.id AND r.account_id = ? ORDER BY rp.created_at DESC LIMIT 1) AS run_id,
@@ -156,13 +161,13 @@ function targetForMessage(
     if (bySlug) return bySlug;
   }
 
-  // 4. Match by senderName / full_name (e.g. "More Fernández")
-  if (senderName && senderName.trim().length >= 3) {
-    const cleanName = senderName.trim().toLowerCase();
-    const byName = db.prepare(`
+  // 4. Match by senderName / full_name (with accent-insensitive comparison)
+  if (senderName && senderName.trim().length >= 2) {
+    const cleanName = normalizeName(senderName);
+    const candidates = db.prepare(`
       SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url,
              COALESCE(lta.unipile_provider_id, t.unipile_provider_id) AS unipile_provider_id,
-             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id) AS unipile_chat_id,
+             COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id, t.unipile_chat_id) AS unipile_chat_id,
              COALESCE(t.messaging_urn, lta.unipile_provider_id) AS messaging_urn,
              (SELECT rp.run_id FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
               WHERE rp.target_id = t.id AND r.account_id = ? ORDER BY rp.created_at DESC LIMIT 1) AS run_id,
@@ -174,10 +179,13 @@ function targetForMessage(
         SELECT m.id FROM linkedin_inbox_messages m WHERE m.account_id = ? AND m.target_id = t.id
         ORDER BY datetime(m.sent_at) DESC, m.id DESC LIMIT 1
       )
-      WHERE lower(trim(t.full_name)) = ?
-      LIMIT 1
-    `).get(accountId, accountId, accountId, cleanName) as LocalTarget | undefined;
-    if (byName) return byName;
+      WHERE t.full_name IS NOT NULL
+      ORDER BY t.created_at DESC
+      LIMIT 150
+    `).all(accountId, accountId, accountId) as LocalTarget[];
+
+    const exactMatch = candidates.find((c) => normalizeName(c.full_name) === cleanName);
+    if (exactMatch) return exactMatch;
   }
 
   return undefined;
@@ -207,8 +215,60 @@ export async function ingestUnipileMessage(
   if (!messageId || !chatId) throw new Error("Evento de mensaje de LinkedIn incompleto");
   const direction = message.is_sender === true || message.is_sender === 1 ? "outbound" : "inbound";
   const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null };
-  const target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId, profile.name);
-  if (!target) return { captured: false, targetId: null, direction };
+  let target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId, profile.name);
+
+  // If no existing target matched, auto-create a contact so messages are never dropped
+  if (!target) {
+    const newTargetId = randomUUID();
+    const effectiveId = profile.providerId || message.sender_id || null;
+    const displayName = profile.name || "Contacto LinkedIn";
+    const nameParts = displayName.trim().split(/\s+/);
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+    const linkedinUrl = profile.profileUrl || (effectiveId ? `https://www.linkedin.com/in/${effectiveId}` : null);
+
+    db.prepare(`
+      INSERT INTO targets (
+        id, full_name, first_name, last_name, linkedin_url,
+        unipile_provider_id, unipile_chat_id, last_replied_account_id,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      newTargetId, displayName, firstName, lastName, linkedinUrl,
+      effectiveId, chatId, input.localAccountId,
+    );
+
+    ensureLinkedInTargetAccountState(db, input.localAccountId, {
+      id: newTargetId,
+      unipile_provider_id: effectiveId,
+      unipile_chat_id: chatId,
+    });
+
+    target = {
+      id: newTargetId,
+      full_name: displayName,
+      first_name: firstName,
+      last_name: lastName,
+      linkedin_url: linkedinUrl,
+      messaging_urn: effectiveId,
+      unipile_provider_id: effectiveId,
+      unipile_chat_id: chatId,
+    };
+  }
+
+  // Ensure target and target-account have the unipile_chat_id and unipile_provider_id updated
+  const effectiveProviderId = profile.providerId || message.sender_id || null;
+  db.prepare(`
+    UPDATE targets
+    SET unipile_chat_id = COALESCE(unipile_chat_id, ?),
+        unipile_provider_id = COALESCE(unipile_provider_id, ?)
+    WHERE id = ?
+  `).run(chatId, effectiveProviderId, target.id);
+
+  markLinkedInTargetState(db, input.localAccountId, target.id, {
+    unipile_chat_id: chatId,
+    ...(effectiveProviderId ? { unipile_provider_id: effectiveProviderId } : {}),
+  });
 
   const sentAt = message.timestamp && !Number.isNaN(Date.parse(message.timestamp)) ? new Date(message.timestamp).toISOString() : new Date().toISOString();
   const text = String(message.text || "").trim();
@@ -231,10 +291,6 @@ export async function ingestUnipileMessage(
   );
   if (result.changes === 0) return { captured: false, targetId: target.id, direction };
 
-  markLinkedInTargetState(db, input.localAccountId, target.id, {
-    unipile_chat_id: chatId,
-    ...(profile.providerId ? { unipile_provider_id: profile.providerId } : {}),
-  });
   if (direction === "inbound") {
     db.prepare("UPDATE targets SET last_replied_at = ?, last_replied_account_id = ? WHERE id = ?").run(sentAt, input.localAccountId, target.id);
     db.prepare(`
@@ -263,71 +319,96 @@ export async function ingestUnipileMessage(
   return { captured: true, targetId: target.id, direction };
 }
 
-async function syncAllPages<T>(load: (cursor?: string) => Promise<{ items: T[]; cursor?: string | null }>, maxPages = 100): Promise<T[]> {
-  const items: T[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < maxPages; page++) {
-    const response = await load(cursor);
-    items.push(...(response.items || []));
-    if (!response.cursor || response.cursor === cursor) break;
-    cursor = response.cursor;
-  }
-  return items;
-}
-
 export async function syncLinkedInInbox(
   db: Database.Database,
   localAccountId: string,
   client: UnipileClient = unipile,
-  options: { maxChats?: number } = {},
+  options: { maxMessages?: number } = {},
 ): Promise<InboxSyncResult> {
   const resolved = await resolveUnipileAccount(db, localAccountId, client);
-  const maxChats = options.maxChats ?? 30;
-  // Fetch the most recent chats (1 page of 30 chats is plenty to catch active campaigns)
-  const chatsResponse = await client.listChats(resolved.unipileAccountId, maxChats);
-  const chats = chatsResponse.items || [];
+  const maxMessages = options.maxMessages ?? 50;
+
   let captured = 0;
   let duplicates = 0;
   let createdTargets = 0;
+  const chatsSeen = new Set<string>();
 
-  // Process chats with controlled concurrency (5 at a time) for sub-5s performance
-  const concurrency = 5;
-  for (let i = 0; i < chats.length; i += concurrency) {
-    const batch = chats.slice(i, i + concurrency);
-    await Promise.all(
-      batch.map(async (chat) => {
+  // 1. Single ultra-fast query for the most recent messages across all chats
+  let remoteMessages: UnipileMessage[] = [];
+  try {
+    const res = await client.listAccountMessages(resolved.unipileAccountId, maxMessages);
+    remoteMessages = res.items || [];
+  } catch (err) {
+    console.warn("[syncLinkedInInbox] Error fetching account messages, fallback to chats:", err);
+  }
+
+  // Cache attendee profiles by chatId to prevent redundant network calls
+  const chatAttendeeCache = new Map<string, { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null }>();
+
+  for (const message of remoteMessages) {
+    const chatId = message.chat_id;
+    if (!chatId) continue;
+    chatsSeen.add(chatId);
+
+    const messageId = message.id || message.message_id;
+    const before = db.prepare(
+      "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?"
+    ).get(localAccountId, chatId, messageId);
+
+    if (!chatAttendeeCache.has(chatId)) {
+      let profile = { providerId: message.sender_id || null, name: null as string | null, profileUrl: null as string | null, memberUrn: null as string | null };
+      const existing = targetForMessage(db, localAccountId, chatId, message.sender_id || null, null, message.sender_id || null);
+      if (existing) {
+        profile = {
+          providerId: existing.unipile_provider_id || message.sender_id || null,
+          name: existing.full_name || null,
+          profileUrl: existing.linkedin_url || null,
+          memberUrn: existing.messaging_urn || null,
+        };
+      } else {
+        try {
+          const attRes = await client.listChatAttendees(chatId);
+          const other = (attRes.items || []).find((a) => !a.is_self) || attRes.items?.[0];
+          if (other) {
+            profile = attendeeProfile(other);
+          }
+        } catch { /* ignore attendee error */ }
+      }
+      chatAttendeeCache.set(chatId, profile);
+    }
+
+    const profile = chatAttendeeCache.get(chatId)!;
+    const result = await ingestUnipileMessage(db, {
+      localAccountId,
+      message: { ...message, chat_id: chatId },
+      profile,
+      source: "linkedin-sync",
+    });
+
+    if (result.captured) captured++;
+    else if (before) duplicates++;
+  }
+
+  // 2. Also check recent chats with unread messages not in the messages list
+  let totalChatsCount = chatsSeen.size;
+  try {
+    const chatsResponse = await client.listChats(resolved.unipileAccountId, 15);
+    const chats = chatsResponse.items || [];
+    totalChatsCount = Math.max(totalChatsCount, chats.length);
+
+    for (const chat of chats) {
+      if (!chatsSeen.has(chat.id) && (chat.unread_count ?? 0) > 0) {
         try {
           const attendeesResponse = await client.listChatAttendees(chat.id);
           const other = (attendeesResponse.items || []).find((attendee) => !attendee.is_self);
           const profile = attendeeProfile(other);
-          const target = targetForMessage(
-            db,
-            localAccountId,
-            chat.id,
-            profile.providerId,
-            profile.profileUrl,
-            profile.providerId,
-            profile.name,
-          );
-          if (!target) return;
+          chatAttendeeCache.set(chat.id, profile);
 
-          if (target.unipile_chat_id !== chat.id) {
-            ensureLinkedInTargetAccountState(db, localAccountId, target);
-            markLinkedInTargetState(db, localAccountId, target.id, {
-              unipile_chat_id: chat.id,
-              ...(profile.providerId ? { unipile_provider_id: profile.providerId } : {}),
-            });
-          }
-
-          // Fetch recent messages for this chat (limit 30)
-          const messagesResponse = await client.listMessages(chat.id, 30);
-          const messages = messagesResponse.items || [];
-          for (const message of messages) {
-            const before = db
-              .prepare(
-                "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?",
-              )
-              .get(localAccountId, chat.id, message.id || message.message_id);
+          const messagesResponse = await client.listMessages(chat.id, 10);
+          for (const message of messagesResponse.items || []) {
+            const before = db.prepare(
+              "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?"
+            ).get(localAccountId, chat.id, message.id || message.message_id);
             const result = await ingestUnipileMessage(db, {
               localAccountId,
               message: { ...message, chat_id: chat.id },
@@ -337,11 +418,12 @@ export async function syncLinkedInInbox(
             if (result.captured) captured++;
             else if (before) duplicates++;
           }
-        } catch (err) {
-          console.warn(`[syncLinkedInInbox] Error processing chat ${chat.id}:`, err);
-        }
-      }),
-    );
+          chatsSeen.add(chat.id);
+        } catch { /* skip */ }
+      }
+    }
+  } catch (err) {
+    console.warn("[syncLinkedInInbox] Error checking additional chats:", err);
   }
 
   db.prepare(
@@ -349,7 +431,7 @@ export async function syncLinkedInInbox(
   ).run(localAccountId);
 
   return {
-    chats: chats.length,
+    chats: totalChatsCount,
     messages: captured,
     duplicates,
     createdTargets,
@@ -362,4 +444,4 @@ export function markInboxSyncError(db: Database.Database, accountId: string, err
   db.prepare("UPDATE accounts SET linkedin_inbox_sync_error = ? WHERE id = ?").run(error instanceof Error ? error.message : String(error), accountId);
 }
 
-export { attendeeProfile, normalize };
+export { attendeeProfile, normalizeName as normalize, normalizeName };

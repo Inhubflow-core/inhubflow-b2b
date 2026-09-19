@@ -1320,7 +1320,7 @@ export default function InboxPage() {
     }
     setSyncingLinkedIn(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20_000);
+    const timeoutId = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch(`/api/accounts/${accId}/sync-linkedin-inbox`, {
         method: "POST",

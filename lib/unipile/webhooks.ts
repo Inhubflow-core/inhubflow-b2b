@@ -59,14 +59,17 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
   if (event === "message_received") {
     if (!localAccount) return { handled: false, event, message: "Cuenta de LinkedIn no asociada a una cuenta local" };
     const fields = getMessageFields(payload);
-    if (!fields.messageId || !fields.chatId) return { handled: false, event, message: "Payload incompleto: falta message_id o chat_id" };
-    const isSender = fields.accountUserId ? fields.accountUserId === fields.senderId : Boolean(payload.data?.is_sender);
+    const isSender = payload.is_sender !== undefined
+      ? Boolean(payload.is_sender)
+      : (payload.data?.is_sender !== undefined
+        ? Boolean(payload.data.is_sender)
+        : (fields.accountUserId ? fields.accountUserId === fields.senderId : false));
     const result = await ingestUnipileMessage(db, {
       localAccountId: localAccount.id,
       message: {
-        id: fields.messageId,
-        message_id: fields.messageId,
-        chat_id: fields.chatId,
+        id: String(fields.messageId),
+        message_id: String(fields.messageId),
+        chat_id: String(fields.chatId),
         account_id: remoteAccountId,
         sender_id: fields.senderId,
         text: fields.text,
