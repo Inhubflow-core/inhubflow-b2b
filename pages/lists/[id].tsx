@@ -457,7 +457,7 @@ export default function ListDetailPage({
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-base-300 text-base-content/60">
             {filteredTargets.length !== targets.length
               ? `${filteredTargets.length} / ${targets.length}`
-              : `${targets.length}`} leads
+              : `${targets.length}`} {t("lists.leadsCountPlural", { count: targets.length }).replace(/^\S+\s*/, "")}
           </span>
           <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => setShowSync(true)}>
             <RiRefreshLine size={15} /> Sync Status
