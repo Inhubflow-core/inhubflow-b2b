@@ -24,6 +24,7 @@ import {
 } from "@/lib/linkedin/step-deliveries";
 import { linkedInDayBounds, nextAllowedLinkedInTime } from "@/lib/linkedin/schedule";
 import { releaseRuntimeLease, tryAcquireRuntimeLease } from "@/lib/runtime-lease";
+import { syncLinkedInInbox, markInboxSyncError } from "@/lib/unipile/inbox-sync";
 import type {
   UnipileAccount,
   UnipileProfile,
@@ -732,6 +733,46 @@ function refreshRunCompletion(db: ReturnType<typeof getDb>, runProfileId: string
 
 let isTicking = false;
 let globalRunnerTimer: NodeJS.Timeout | null = null;
+let lastInboxSyncAt = 0;
+
+const INBOX_SYNC_INTERVAL_MS = 60_000;
+
+function inboxAutoSyncEnabled(): boolean {
+  const raw = String(process.env.LINKEDIN_CAMPAIGN_INBOX_SYNC_ENABLED ?? "true").trim().toLowerCase();
+  return !(raw === "0" || raw === "false" || raw === "no" || raw === "off");
+}
+
+/**
+ * Periodic inbound ingest. Without this the LinkedIn inbox only ever filled via the
+ * manual "sync" endpoint or an inbound webhook, so replies sat unseen in Unipile.
+ * Runs on the campaign tick but throttled to its own interval and rate-limited per
+ * account so a large workspace cannot hammer the provider API.
+ */
+async function syncInboxesOnTick(db: ReturnType<typeof getDb>): Promise<void> {
+  if (!inboxAutoSyncEnabled()) return;
+  const now = Date.now();
+  if (now - lastInboxSyncAt < INBOX_SYNC_INTERVAL_MS) return;
+  lastInboxSyncAt = now;
+
+  const accounts = db.prepare(`
+    SELECT id FROM accounts
+    WHERE is_authenticated = 1 AND unipile_account_id IS NOT NULL AND unipile_account_id != ''
+      AND (linkedin_inbox_synced_at IS NULL OR linkedin_inbox_synced_at <= datetime('now', '-45 seconds'))
+    ORDER BY linkedin_inbox_synced_at ASC NULLS FIRST
+    LIMIT 10
+  `).all() as Array<{ id: string }>;
+
+  for (const account of accounts) {
+    try {
+      // Incremental pass: the recent end of the feed. A full history sweep is done by
+      // the explicit sync endpoint, not on every tick.
+      await syncLinkedInInbox(db, account.id, unipile, { maxMessages: 100, fullBackfill: false });
+    } catch (error) {
+      markInboxSyncError(db, account.id, error);
+      console.error("[campaign-runner] Error sincronizando inbox de LinkedIn:", error);
+    }
+  }
+}
 
 export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<void> {
   if (isTicking) return;
@@ -754,6 +795,7 @@ export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<
       await processSingleTrack(db, tr);
       refreshRunCompletion(db, tr.run_profile_id);
     }
+    await syncInboxesOnTick(db);
   } catch (error) { console.error("[campaign-runner] Error en enqueueTick:", error); }
   finally {
     releaseRuntimeLease(db, leaseKey, leaseOwner);

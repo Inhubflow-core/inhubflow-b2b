@@ -800,14 +800,16 @@ function runMigrations(db: Database.Database) {
     }
   } catch { /* ignore */ }
 
-  // Deduplicate any repeated linkedin_inbox_messages rows
+  // Deduplicate any repeated linkedin_inbox_messages rows. Keyed on the provider's
+  // message id (plus thread/account), NOT on the body: two genuine replies with the
+  // same text ("Gracias", "Ok") are legitimate and must not be collapsed.
   try {
     db.exec(`
       DELETE FROM linkedin_inbox_messages
       WHERE id NOT IN (
         SELECT MIN(id)
         FROM linkedin_inbox_messages
-        GROUP BY target_id, direction, body
+        GROUP BY account_id, external_thread_id, COALESCE(external_message_id, id)
       );
     `);
   } catch { /* ignore */ }
@@ -1013,7 +1015,9 @@ function runMigrations(db: Database.Database) {
   // diagnostics, including historical rows written by older releases.
   sanitizePublicProviderBrandingMigration(db);
 
-  // Purge any orphan non-campaign contacts and inbox messages (e.g. personal DMs, Uber, spam)
+  // Purge orphan non-campaign contacts (e.g. personal DMs, Uber, spam).
+  // Their inbox history is left intact: deleting it on every boot also destroyed
+  // legitimate conversations that had simply not been re-imported yet.
   cleanOrphanNonCampaignInboxDataMigration(db);
 }
 
@@ -1030,15 +1034,9 @@ function cleanOrphanNonCampaignInboxDataMigration(db: Database.Database) {
         );
       `);
 
-      // 2. Delete linkedin_inbox_messages for targets that were never enrolled in a campaign run nor part of a list
-      db.exec(`
-        DELETE FROM linkedin_inbox_messages
-        WHERE target_id IN (
-          SELECT t.id FROM targets t
-          WHERE NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
-            AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)
-        );
-      `);
+      // 2. Inbox history is intentionally preserved. Deleting it here removed real
+      //    conversations on every restart, including threads that were still mid-import.
+      //    Orphan targets themselves are still removed below, so the contacts do not linger.
 
       // 3. Delete linkedin_target_accounts for those orphan targets
       db.exec(`
@@ -1050,15 +1048,16 @@ function cleanOrphanNonCampaignInboxDataMigration(db: Database.Database) {
         );
       `);
 
-      // 4. Delete the orphan targets themselves (specifically those with last_replied_at or created by inbox sync)
+      // 4. Delete the orphan targets themselves (specifically those with last_replied_at or created by inbox sync).
+      //    Targets that have real conversation history are kept: linkedin_inbox_messages
+      //    cascades on target delete, so removing the contact would silently erase the
+      //    conversation too. Only the obvious junk filter (Uber) still applies.
       db.exec(`
         DELETE FROM targets
-        WHERE (
-          last_replied_at IS NOT NULL
-          OR full_name LIKE '%Uber%'
-        )
+        WHERE full_name LIKE '%Uber%'
         AND NOT EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = targets.id)
-        AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = targets.id);
+        AND NOT EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = targets.id)
+        AND NOT EXISTS (SELECT 1 FROM linkedin_inbox_messages m WHERE m.target_id = targets.id);
       `);
     })();
   } catch (err) {

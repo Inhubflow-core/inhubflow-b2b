@@ -87,7 +87,10 @@ function targetForMessage(
       ON scoped_message.id = (
         SELECT m.id FROM linkedin_inbox_messages m
         WHERE m.account_id = ? AND m.target_id = t.id
-        ORDER BY datetime(m.sent_at) DESC, m.id DESC LIMIT 1
+        ORDER BY (SELECT COUNT(*) FROM linkedin_inbox_messages c
+                  WHERE c.account_id = m.account_id AND c.target_id = m.target_id
+                    AND c.external_thread_id = m.external_thread_id) DESC,
+                 datetime(m.sent_at) DESC, m.id DESC LIMIT 1
       )
     WHERE (
       lta.unipile_chat_id = ?
@@ -104,7 +107,7 @@ function targetForMessage(
       t.created_at ASC
     LIMIT 1
   `).get(
-    accountId, accountId, accountId,
+    accountId, accountId, accountId, accountId,
     chatId, chatId, chatId,
     providerId || senderId, providerId || senderId, providerId || senderId, providerId || senderId,
     profileUrl, profileUrl,
@@ -133,7 +136,7 @@ function targetForMessage(
       )
       WHERE t.messaging_urn LIKE ? OR t.unipile_provider_id LIKE ? OR lta.unipile_provider_id LIKE ?
       LIMIT 1
-    `).get(accountId, accountId, accountId, `%${effectiveId}%`, `%${effectiveId}%`, `%${effectiveId}%`) as LocalTarget | undefined;
+    `).get(accountId, accountId, accountId, accountId, `%${effectiveId}%`, `%${effectiveId}%`, `%${effectiveId}%`) as LocalTarget | undefined;
     if (byUrn) return byUrn;
   }
 
@@ -157,7 +160,7 @@ function targetForMessage(
       )
       WHERE lower(t.linkedin_url) LIKE ?
       LIMIT 1
-    `).get(accountId, accountId, accountId, `%${slug}%`) as LocalTarget | undefined;
+    `).get(accountId, accountId, accountId, accountId, `%${slug}%`) as LocalTarget | undefined;
     if (bySlug) return bySlug;
   }
 
@@ -182,13 +185,61 @@ function targetForMessage(
       WHERE t.full_name IS NOT NULL
       ORDER BY t.created_at DESC
       LIMIT 150
-    `).all(accountId, accountId, accountId) as LocalTarget[];
+    `).all(accountId, accountId, accountId, accountId) as LocalTarget[];
 
     const exactMatch = candidates.find((c) => normalizeName(c.full_name) === cleanName);
     if (exactMatch) return exactMatch;
   }
 
   return undefined;
+}
+
+/**
+ * The LinkedIn inbox must only show people tied to InHubFlow activity: someone who is
+ * (or was) enrolled in a campaign, imported into a list, or contacted by a campaign run.
+ * Personal LinkedIn traffic — family, recruiters, vendors, spam — must never reach it.
+ *
+ * Note that "we sent an outbound message" is NOT sufficient evidence on its own: a
+ * provider backfill labels every message the account owner ever typed in LinkedIn as
+ * `outbound`, including purely personal conversations. Only a campaign-attributed row
+ * (linked to a run) proves InHubFlow originated the thread.
+ *
+ * `allowUnmatched` is reserved for the manual full-backfill path, where the operator
+ * explicitly asks for a historical sweep; even then the caller must opt in.
+ */
+export interface IngestPolicy {
+  allowUnmatched?: boolean;
+}
+
+function isCampaignTarget(db: Database.Database, targetId: string): boolean {
+  const row = db.prepare(`
+    SELECT 1 AS ok
+    WHERE EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = ?)
+       OR EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = ?)
+       OR EXISTS (
+            SELECT 1 FROM linkedin_inbox_messages m
+            WHERE m.target_id = ? AND m.direction = 'outbound' AND m.run_id IS NOT NULL
+          )
+       OR EXISTS (
+            SELECT 1 FROM linkedin_step_deliveries d
+            WHERE d.target_id = ? AND d.state IN ('sent', 'delivered')
+          )
+    LIMIT 1
+  `).get(targetId, targetId, targetId, targetId) as { ok?: number } | undefined;
+  return Boolean(row?.ok);
+}
+
+/**
+ * True when a campaign (not the account owner typing in LinkedIn) previously wrote in
+ * this thread — i.e. the conversation genuinely started from InHubFlow.
+ */
+function threadHasCampaignOutbound(db: Database.Database, accountId: string, chatId: string): boolean {
+  const row = db.prepare(`
+    SELECT 1 AS ok FROM linkedin_inbox_messages
+    WHERE account_id = ? AND external_thread_id = ? AND direction = 'outbound' AND run_id IS NOT NULL
+    LIMIT 1
+  `).get(accountId, chatId) as { ok?: number } | undefined;
+  return Boolean(row?.ok);
 }
 
 export async function ingestUnipileMessage(
@@ -207,8 +258,9 @@ export async function ingestUnipileMessage(
     };
     profile?: { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null };
     source?: string;
+    policy?: IngestPolicy;
   },
-): Promise<{ captured: boolean; targetId: string | null; direction: "inbound" | "outbound" }> {
+): Promise<{ captured: boolean; targetId: string | null; direction: "inbound" | "outbound"; skipped?: string }> {
   const message = input.message;
   const messageId = String(message.message_id || message.id || "").trim();
   const chatId = String(message.chat_id || "").trim();
@@ -216,6 +268,15 @@ export async function ingestUnipileMessage(
   const direction = message.is_sender === true || message.is_sender === 1 ? "outbound" : "inbound";
   const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null };
   let target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId, profile.name);
+
+  // Gate: only InHubFlow-related conversations belong in the inbox. A contact with no
+  // campaign/list tie and no campaign-attributed outbound is personal LinkedIn traffic.
+  if (!target || !isCampaignTarget(db, target.id)) {
+    const isOurs = threadHasCampaignOutbound(db, input.localAccountId, chatId);
+    if (!isOurs && !input.policy?.allowUnmatched) {
+      return { captured: false, targetId: target?.id ?? null, direction, skipped: "not_campaign_related" };
+    }
+  }
 
   // If no existing target matched, auto-create a contact so messages are never dropped
   if (!target) {
@@ -323,21 +384,38 @@ export async function syncLinkedInInbox(
   db: Database.Database,
   localAccountId: string,
   client: UnipileClient = unipile,
-  options: { maxMessages?: number } = {},
+  options: { maxMessages?: number; maxChats?: number; fullBackfill?: boolean } = {},
 ): Promise<InboxSyncResult> {
   const resolved = await resolveUnipileAccount(db, localAccountId, client);
-  const maxMessages = options.maxMessages ?? 50;
+  // A single page of account-wide messages only covers a handful of the oldest-active
+  // chats (11 of 250 in production), so replies in any other thread were never seen.
+  // Page through the global feed until we stop getting new data or hit the cap.
+  const maxMessages = options.maxMessages ?? 500;
+  const maxChats = options.maxChats ?? 100;
+  // The paginated account feed already covers every chat (264 of 264 in production),
+  // so the slower chat-by-chat sweep is opt-in rather than part of every tick.
+  const fullBackfill = options.fullBackfill ?? false;
 
   let captured = 0;
   let duplicates = 0;
   let createdTargets = 0;
   const chatsSeen = new Set<string>();
 
-  // 1. Single ultra-fast query for the most recent messages across all chats
+  // 1. Walk the account-wide message feed with cursor pagination
   let remoteMessages: UnipileMessage[] = [];
   try {
-    const res = await client.listAccountMessages(resolved.unipileAccountId, maxMessages);
-    remoteMessages = res.items || [];
+    let cursor: string | null | undefined = undefined;
+    let guard = 0;
+    while (guard++ < 20) {
+      const res = await client.listAccountMessages(resolved.unipileAccountId, Math.min(250, maxMessages), cursor ?? undefined);
+      const batch = res.items || [];
+      remoteMessages.push(...batch);
+      if (batch.length === 0) break;
+      if (remoteMessages.length >= maxMessages) break;
+      const next = res.cursor;
+      if (!next || next === cursor) break;
+      cursor = next;
+    }
   } catch (err) {
     console.warn("[syncLinkedInInbox] Error fetching account messages, fallback to chats:", err);
   }
@@ -389,38 +467,40 @@ export async function syncLinkedInInbox(
     else if (before) duplicates++;
   }
 
-  // 2. Also check recent chats with unread messages not in the messages list
+  // 2. Sweep the chat list so threads missed by the global feed are still ingested.
+  //    The old version only looked at 15 chats *with unread messages*, so any thread
+  //    that had been read elsewhere never got its history imported.
   let totalChatsCount = chatsSeen.size;
   try {
-    const chatsResponse = await client.listChats(resolved.unipileAccountId, 15);
+    const chatsResponse = await client.listChats(resolved.unipileAccountId, Math.min(250, maxChats));
     const chats = chatsResponse.items || [];
     totalChatsCount = Math.max(totalChatsCount, chats.length);
 
     for (const chat of chats) {
-      if (!chatsSeen.has(chat.id) && (chat.unread_count ?? 0) > 0) {
-        try {
-          const attendeesResponse = await client.listChatAttendees(chat.id);
-          const other = (attendeesResponse.items || []).find((attendee) => !attendee.is_self);
-          const profile = attendeeProfile(other);
-          chatAttendeeCache.set(chat.id, profile);
+      if (chatsSeen.has(chat.id)) continue;
+      if (!fullBackfill && (chat.unread_count ?? 0) === 0) continue;
+      try {
+        const attendeesResponse = await client.listChatAttendees(chat.id);
+        const other = (attendeesResponse.items || []).find((attendee) => !attendee.is_self);
+        const profile = attendeeProfile(other);
+        chatAttendeeCache.set(chat.id, profile);
 
-          const messagesResponse = await client.listMessages(chat.id, 10);
-          for (const message of messagesResponse.items || []) {
-            const before = db.prepare(
-              "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?"
-            ).get(localAccountId, chat.id, message.id || message.message_id);
-            const result = await ingestUnipileMessage(db, {
-              localAccountId,
-              message: { ...message, chat_id: chat.id },
-              profile,
-              source: "linkedin-sync",
-            });
-            if (result.captured) captured++;
-            else if (before) duplicates++;
-          }
-          chatsSeen.add(chat.id);
-        } catch { /* skip */ }
-      }
+        const messagesResponse = await client.listMessages(chat.id, 100);
+        for (const message of messagesResponse.items || []) {
+          const before = db.prepare(
+            "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?"
+          ).get(localAccountId, chat.id, message.id || message.message_id);
+          const result = await ingestUnipileMessage(db, {
+            localAccountId,
+            message: { ...message, chat_id: chat.id },
+            profile,
+            source: "linkedin-sync",
+          });
+          if (result.captured) captured++;
+          else if (before) duplicates++;
+        }
+        chatsSeen.add(chat.id);
+      } catch { /* skip */ }
     }
   } catch (err) {
     console.warn("[syncLinkedInInbox] Error checking additional chats:", err);

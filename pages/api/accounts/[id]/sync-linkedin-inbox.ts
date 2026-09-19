@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!unipile.isConfigured()) return res.status(503).json({ error: "El motor de LinkedIn no está configurado" });
 
   try {
-    const result = await syncLinkedInInbox(db, accountId, unipile);
+    const result = await syncLinkedInInbox(db, accountId, unipile, { maxMessages: 500, fullBackfill: true });
     return res.status(200).json({ ok: true, ...result, source: "linkedin-cloud" });
   } catch (error) {
     markInboxSyncError(db, accountId, error);

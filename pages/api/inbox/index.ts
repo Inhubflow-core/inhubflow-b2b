@@ -268,11 +268,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     WHERE 1=1
       ${channelFilter}
       ${accountFilter}
+      -- Only InHubFlow-attributed people: enrolled in a run, imported into a list,
+      -- or actually contacted by a campaign. A plain outbound row is not enough —
+      -- provider backfill labels the owner's personal LinkedIn messages as outbound too.
       AND (
         EXISTS (SELECT 1 FROM run_profiles rp WHERE rp.target_id = t.id)
-        OR lie.id IS NOT NULL
-        OR er.id IS NOT NULL
-        OR sdrt.id IS NOT NULL
+        OR EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)
+        OR EXISTS (SELECT 1 FROM linkedin_inbox_messages ours
+                   WHERE ours.target_id = t.id AND ours.direction = 'outbound'
+                     AND ours.run_id IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM linkedin_step_deliveries d
+                   WHERE d.target_id = t.id AND d.state IN ('sent', 'delivered'))
       )
     ORDER BY replied_at DESC
   `).all(...params) as Array<InboxReply & { classification_json: string | null }>;
