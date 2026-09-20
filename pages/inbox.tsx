@@ -1969,26 +1969,26 @@ export default function InboxPage() {
                       {/* Name & Time */}
                       <div className="flex items-center justify-between gap-1 mb-0.5">
                         <span
-                          className={`text-xs truncate font-bold ${
+                          className={`text-sm truncate font-bold ${
                             isSelected ? "text-primary" : "text-base-content"
                           }`}
                         >
                           {reply.full_name ?? reply.email ?? t("inbox.unknown")}
                         </span>
-                        <span className="text-[10px] text-base-content/40 shrink-0">
+                        <span className="text-[11px] text-base-content/40 shrink-0">
                           {timeAgo(reply.replied_at, locale, t)}
                         </span>
                       </div>
 
                       {/* Company / Headline */}
                       {reply.company && (
-                        <p className="text-[11px] text-base-content/50 font-medium truncate mb-1">
+                        <p className="text-xs text-base-content/50 font-medium truncate mb-1">
                           {reply.company}
                         </p>
                       )}
 
                       {/* Snippet */}
-                      <p className="text-xs text-base-content/70 line-clamp-2 leading-snug mb-1.5">
+                      <p className="text-sm text-base-content/80 line-clamp-2 leading-relaxed mb-1.5">
                         {snippet}
                       </p>
 
