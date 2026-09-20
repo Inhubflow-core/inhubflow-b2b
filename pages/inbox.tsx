@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   RiAlertLine,
+  RiArrowDownSLine,
   RiAttachment2,
   RiBuildingLine,
   RiCheckDoubleLine,
+  RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
   RiEmotionLine,
@@ -19,6 +21,7 @@ import {
   RiLoader4Line,
   RiMailLine,
   RiNotification3Line,
+  RiPriceTag3Line,
   RiPulseLine,
   RiRefreshLine,
   RiRobotLine,
@@ -85,10 +88,87 @@ const VERDICT_CLASSES: Record<string, string> = {
   call_task: "bg-success/15 text-success border-success/30",
   human_reply: "bg-info/15 text-info border-info/30",
   not_interested: "bg-error/15 text-error border-error/30",
+  interested: "bg-warning/15 text-warning border-warning/30",
+  meeting: "bg-success/15 text-success border-success/30",
+  replied: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30",
+  pricing: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+  connected: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
+  contacted: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+  won: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
   cancelled: "bg-base-300/60 text-base-content/50 border-base-300",
   pending: "bg-base-300/60 text-base-content/50 border-base-300",
   failed: "bg-error/15 text-error border-error/30",
   none: "bg-base-300/40 text-base-content/40 border-base-300/50",
+};
+
+export interface ClassificationOption {
+  slug: string;
+  stageId: string | null;
+  labelKey: string;
+  dotColor: string;
+  badgeClass: string;
+  description: string;
+}
+
+export const CLASSIFICATION_OPTIONS: ClassificationOption[] = [
+  {
+    slug: "not_interested",
+    stageId: "stage_not_interested",
+    labelKey: "not_interested",
+    dotColor: "bg-red-500",
+    badgeClass: "bg-error/15 text-error border-error/30",
+    description: "No tiene interés en el producto o rechazó el contacto",
+  },
+  {
+    slug: "interested",
+    stageId: "stage_interested",
+    labelKey: "interested",
+    dotColor: "bg-amber-500",
+    badgeClass: "bg-warning/15 text-warning border-warning/30",
+    description: "Interés positivo o dispuesto a evaluar la propuesta",
+  },
+  {
+    slug: "meeting",
+    stageId: "stage_meeting",
+    labelKey: "meeting",
+    dotColor: "bg-emerald-500",
+    badgeClass: "bg-success/15 text-success border-success/30",
+    description: "Reunión agendada o solicitó llamada",
+  },
+  {
+    slug: "replied",
+    stageId: "stage_replied",
+    labelKey: "replied",
+    dotColor: "bg-purple-500",
+    badgeClass: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30",
+    description: "En conversación o diálogo abierto",
+  },
+  {
+    slug: "pricing",
+    stageId: null,
+    labelKey: "pricing",
+    dotColor: "bg-yellow-500",
+    badgeClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    description: "Preguntó por precios o condiciones comerciales",
+  },
+  {
+    slug: "connected",
+    stageId: "stage_connected",
+    labelKey: "connected",
+    dotColor: "bg-cyan-500",
+    badgeClass: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
+    description: "Conexión aceptada en LinkedIn",
+  },
+];
+
+const STAGE_TO_VERDICT_MAP: Record<string, string> = {
+  stage_interested: "interested",
+  stage_not_interested: "not_interested",
+  stage_meeting: "meeting",
+  stage_replied: "replied",
+  stage_connected: "connected",
+  stage_contacted: "contacted",
+  stage_won: "won",
 };
 
 const EMOJI_CATEGORIES = [
@@ -122,6 +202,10 @@ function verdictKey(reply: InboxReply): string {
   if (reply.classification_error) return "failed";
   if (reply.reply_id && !reply.classified_at) return "pending";
   if (reply.reply_kind && VERDICT_CLASSES[reply.reply_kind]) return reply.reply_kind;
+  if (reply.sdr_intent && VERDICT_CLASSES[reply.sdr_intent]) return reply.sdr_intent;
+  if (reply.stage_id && STAGE_TO_VERDICT_MAP[reply.stage_id]) {
+    return STAGE_TO_VERDICT_MAP[reply.stage_id];
+  }
   return "none";
 }
 
@@ -230,13 +314,14 @@ function getAvatarColor(name: string | null | undefined): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-// ── RIGHT PANE: Full Chat Panel ──
 interface ChatPanelProps {
   reply: InboxReply;
   onActionDone: () => void;
+  onUpdateReply?: (updated: Partial<InboxReply>) => void;
+  onClassifiedByHuman?: (targetId: string) => void;
 }
 
-function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
+function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: ChatPanelProps) {
   const { t, locale } = useTranslation();
   const hasEmailReply = reply.channel === "email" || reply.channel === "both";
   const hasLinkedInReply = reply.channel === "linkedin" || reply.channel === "both";
@@ -263,7 +348,24 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
   const [approvingAction, setApprovingAction] = useState(false);
   const [rejectingAction, setRejectingAction] = useState(false);
   const [actionDismissed, setActionDismissed] = useState(false);
+  const [showClassificationMenu, setShowClassificationMenu] = useState(false);
+  const [applyingClassification, setApplyingClassification] = useState(false);
+  const classificationMenuRef = useRef<HTMLDivElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
+
+  // Close classification menu on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        classificationMenuRef.current &&
+        !classificationMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowClassificationMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Sync autopilot state when reply prop updates
   useEffect(() => {
@@ -695,7 +797,36 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
     }
   }
 
+  async function handleApplyClassification(slug: string, stageId: string | null) {
+    setApplyingClassification(true);
+    setShowClassificationMenu(false);
+    try {
+      const res = await fetch(`/api/targets/${encodeURIComponent(reply.id)}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, stage_id: stageId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar la clasificación");
+
+      reply.reply_kind = slug;
+      if (stageId) reply.stage_id = stageId;
+      onUpdateReply?.({ reply_kind: slug, stage_id: stageId });
+      onClassifiedByHuman?.(reply.id);
+
+      const opt = CLASSIFICATION_OPTIONS.find((o) => o.slug === slug);
+      const optLabel = opt ? t(`inbox.verdicts.${opt.labelKey}`) : slug;
+      toast.success(`Prospecto clasificado como "${optLabel}" y actualizado en Pipeline.`);
+      onActionDone();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al clasificar prospecto");
+    } finally {
+      setApplyingClassification(false);
+    }
+  }
+
   const vBadge = verdictBadge(reply, t);
+  const currentVerdictKey = verdictKey(reply);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base-100 min-w-0 overflow-hidden">
@@ -729,9 +860,66 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
                   <RiExternalLinkLine size={14} />
                 </a>
               )}
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${vBadge.cls}`}>
-                {vBadge.label}
-              </span>
+
+              {/* Interactive Classification Dropdown */}
+              <div className="relative inline-block text-left" ref={classificationMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowClassificationMenu((prev) => !prev)}
+                  disabled={applyingClassification}
+                  title="Clic para cambiar la clasificación del prospecto y mover su etapa en el Pipeline"
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border shadow-sm transition-all hover:brightness-95 cursor-pointer ${vBadge.cls}`}
+                >
+                  {applyingClassification ? (
+                    <RiLoader4Line size={12} className="animate-spin" />
+                  ) : (
+                    <RiPriceTag3Line size={12} />
+                  )}
+                  <span>{vBadge.label}</span>
+                  <RiArrowDownSLine size={13} className="opacity-70" />
+                </button>
+
+                {showClassificationMenu && (
+                  <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-base-100 border border-base-300 shadow-xl z-50 py-1.5 divide-y divide-base-200 animate-fadeIn">
+                    <div className="px-3 py-1.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-base-content/50">
+                        Clasificación & Embudo
+                      </p>
+                      <p className="text-[10px] text-base-content/40">
+                        Moverá la tarjeta en el Pipeline Kanban
+                      </p>
+                    </div>
+                    <div className="py-1">
+                      {CLASSIFICATION_OPTIONS.map((opt) => {
+                        const isSelected = currentVerdictKey === opt.slug;
+                        return (
+                          <button
+                            key={opt.slug}
+                            type="button"
+                            onClick={() => handleApplyClassification(opt.slug, opt.stageId)}
+                            className={`w-full text-left px-3 py-2 text-xs flex items-start gap-2.5 hover:bg-base-200 transition-colors ${
+                              isSelected ? "bg-base-200/70 font-semibold" : ""
+                            }`}
+                          >
+                            <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${opt.dotColor}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="text-base-content font-medium">
+                                  {t(`inbox.verdicts.${opt.labelKey}`)}
+                                </span>
+                                {isSelected && <RiCheckLine size={14} className="text-primary" />}
+                              </div>
+                              <p className="text-[10px] text-base-content/50 leading-snug mt-0.5 truncate">
+                                {opt.description}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 text-xs text-base-content/60 truncate mt-0.5">
@@ -799,32 +987,67 @@ function ChatPanel({ reply, onActionDone }: ChatPanelProps) {
       </div>
 
       {reply.sdr_thread_id && ["HUMAN_REVIEW", "HUMAN_ACTIVE"].includes(reply.sdr_thread_state || "") && (
-        <div className={`mx-5 mt-4 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+        <div className={`mx-5 mt-4 flex flex-col gap-3 rounded-2xl border p-4 ${
           reply.sdr_thread_state === "HUMAN_ACTIVE"
             ? "border-blue-500/30 bg-blue-500/10"
             : "border-amber-500/30 bg-amber-500/10"
         }`}>
-          <div className="flex items-start gap-3">
-            <RiAlertLine className={reply.sdr_thread_state === "HUMAN_ACTIVE" ? "text-blue-500" : "text-amber-500"} size={20} />
-            <div>
-              <p className="text-sm font-semibold text-base-content">
-                {reply.sdr_thread_state === "HUMAN_ACTIVE" ? "Control humano activo" : "Intervención humana requerida"}
-              </p>
-              <p className="mt-0.5 text-xs text-base-content/60">
-                La IA está bloqueada para esta conversación{reply.sdr_handoff_reason ? ` · ${reply.sdr_handoff_reason}` : ""}.
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <RiAlertLine className={reply.sdr_thread_state === "HUMAN_ACTIVE" ? "text-blue-500" : "text-amber-500"} size={20} />
+              <div>
+                <p className="text-sm font-semibold text-base-content">
+                  {reply.sdr_thread_state === "HUMAN_ACTIVE" ? "Control humano activo" : "Intervención humana requerida"}
+                </p>
+                <p className="mt-0.5 text-xs text-base-content/60">
+                  {reply.sdr_thread_state === "HUMAN_ACTIVE"
+                    ? "Tú tienes el control. La IA no responderá hasta que la liberes o clasifiques el prospecto."
+                    : `La IA está pausada${reply.sdr_handoff_reason ? ` · ${reply.sdr_handoff_reason}` : ""}.`}
+                </p>
+              </div>
             </div>
+            {reply.sdr_thread_state === "HUMAN_REVIEW" ? (
+              <button type="button" onClick={handleTakeover} disabled={changingControl}
+                className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {changingControl ? "Tomando control…" : "Tomar control"}
+              </button>
+            ) : (
+              <button type="button" onClick={handleReleaseControl} disabled={changingControl}
+                title="Devuelve la conversación al agente SDR para que responda y clasifique automáticamente"
+                className="rounded-xl border border-blue-500/30 bg-base-100 px-4 py-2 text-xs font-bold text-blue-500 hover:bg-blue-500/10 disabled:opacity-50 transition-colors">
+                {changingControl ? "Actualizando…" : "Devolver a IA (SDR)"}
+              </button>
+            )}
           </div>
-          {reply.sdr_thread_state === "HUMAN_REVIEW" ? (
-            <button type="button" onClick={handleTakeover} disabled={changingControl}
-              className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
-              {changingControl ? "Tomando control…" : "Tomar control"}
-            </button>
-          ) : (
-            <button type="button" onClick={handleReleaseControl} disabled={changingControl}
-              className="rounded-xl border border-blue-500/30 bg-base-100 px-4 py-2 text-xs font-bold text-blue-500 disabled:opacity-50">
-              {changingControl ? "Actualizando…" : "Liberar IA"}
-            </button>
+
+          {reply.sdr_thread_state === "HUMAN_ACTIVE" && (
+            <div className="mt-1 pt-3 border-t border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                <RiPriceTag3Line size={14} />
+                <span>Etiquetar prospecto:</span>
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {CLASSIFICATION_OPTIONS.slice(0, 4).map((opt) => {
+                  const isSelected = currentVerdictKey === opt.slug;
+                  return (
+                    <button
+                      key={opt.slug}
+                      type="button"
+                      onClick={() => handleApplyClassification(opt.slug, opt.stageId)}
+                      disabled={applyingClassification}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 shadow-sm ${
+                        isSelected
+                          ? "bg-blue-600 text-white border-blue-600 shadow"
+                          : "bg-base-100 hover:bg-base-200 border-base-300 text-base-content"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${opt.dotColor}`} />
+                      <span>{t(`inbox.verdicts.${opt.labelKey}`)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -1195,6 +1418,10 @@ export default function InboxPage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [accountId, setAccountId] = useState("");
   const [selectedReply, setSelectedReply] = useState<InboxReply | null>(null);
+  const [classifiedByHuman, setClassifiedByHuman] = useState<Set<string>>(new Set());
+  const [pendingNavigationReply, setPendingNavigationReply] = useState<InboxReply | null>(null);
+  const [showClassificationCheckpoint, setShowClassificationCheckpoint] = useState(false);
+  const [savingCheckpoint, setSavingCheckpoint] = useState(false);
   const [syncingLinkedIn, setSyncingLinkedIn] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<LinkedInDiagnosticReport | null>(null);
@@ -1418,6 +1645,105 @@ export default function InboxPage() {
       setSelectedReply(filtered[0] || null);
     }
   }, [filtered, router.query.thread, selectedReply]);
+
+  function handleSelectReplyWithGuard(targetReply: InboxReply) {
+    if (selectedReply && selectedReply.id === targetReply.id) return;
+
+    // Si el usuario humano tiene el control activo y no ha clasificado/confirmado el prospecto en esta sesión
+    if (
+      selectedReply &&
+      selectedReply.sdr_thread_state === "HUMAN_ACTIVE" &&
+      !classifiedByHuman.has(selectedReply.id)
+    ) {
+      setPendingNavigationReply(targetReply);
+      setShowClassificationCheckpoint(true);
+      return;
+    }
+
+    proceedSelectReply(targetReply);
+  }
+
+  function proceedSelectReply(targetReply: InboxReply) {
+    setSelectedReply(targetReply);
+    const query = { ...router.query };
+    if (targetReply.sdr_thread_id) query.thread = targetReply.sdr_thread_id;
+    else delete query.thread;
+    delete query.message;
+    void router.replace({ pathname: "/inbox", query }, undefined, { shallow: true });
+  }
+
+  async function handleCheckpointClassify(slug: string, stageId: string | null) {
+    if (!selectedReply) return;
+    setSavingCheckpoint(true);
+    try {
+      const res = await fetch(`/api/targets/${encodeURIComponent(selectedReply.id)}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, stage_id: stageId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar la clasificación");
+
+      setClassifiedByHuman((prev) => new Set(prev).add(selectedReply.id));
+      setReplies((prev) =>
+        prev.map((r) =>
+          r.id === selectedReply.id
+            ? { ...r, reply_kind: slug, stage_id: stageId ?? r.stage_id }
+            : r
+        )
+      );
+
+      const opt = CLASSIFICATION_OPTIONS.find((o) => o.slug === slug);
+      const optLabel = opt ? t(`inbox.verdicts.${opt.labelKey}`) : slug;
+      toast.success(`Prospecto clasificado como "${optLabel}" y guardado en Pipeline.`);
+      setShowClassificationCheckpoint(false);
+
+      if (pendingNavigationReply) {
+        proceedSelectReply(pendingNavigationReply);
+        setPendingNavigationReply(null);
+      }
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al clasificar");
+    } finally {
+      setSavingCheckpoint(false);
+    }
+  }
+
+  async function handleCheckpointReleaseToAi() {
+    if (!selectedReply?.sdr_thread_id) return;
+    setSavingCheckpoint(true);
+    try {
+      const res = await fetch(`/api/sdr/threads/${selectedReply.sdr_thread_id}/release`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextState: "AI_ACTIVE" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo devolver el control a la IA");
+
+      toast.success("Control devuelto al SDR IA para que clasifique y actúe automáticamente.");
+      setShowClassificationCheckpoint(false);
+
+      if (pendingNavigationReply) {
+        proceedSelectReply(pendingNavigationReply);
+        setPendingNavigationReply(null);
+      }
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al devolver a la IA");
+    } finally {
+      setSavingCheckpoint(false);
+    }
+  }
+
+  function handleCheckpointBypass() {
+    setShowClassificationCheckpoint(false);
+    if (pendingNavigationReply) {
+      proceedSelectReply(pendingNavigationReply);
+      setPendingNavigationReply(null);
+    }
+  }
 
   return (
     <>
@@ -1649,14 +1975,7 @@ export default function InboxPage() {
                 return (
                   <div
                     key={reply.id}
-                    onClick={() => {
-                      setSelectedReply(reply);
-                      const query = { ...router.query };
-                      if (reply.sdr_thread_id) query.thread = reply.sdr_thread_id;
-                      else delete query.thread;
-                      delete query.message;
-                      void router.replace({ pathname: "/inbox", query }, undefined, { shallow: true });
-                    }}
+                    onClick={() => handleSelectReplyWithGuard(reply)}
                     className={`relative p-3.5 cursor-pointer transition-all flex items-start gap-3 hover:bg-base-200/60 ${
                       isSelected
                         ? "bg-primary/10 border-l-4 border-primary"
@@ -1740,6 +2059,15 @@ export default function InboxPage() {
               key={selectedReply.id}
               reply={selectedReply}
               onActionDone={load}
+              onUpdateReply={(updated) => {
+                setSelectedReply((prev) => (prev ? { ...prev, ...updated } : prev));
+                setReplies((prev) =>
+                  prev.map((r) => (r.id === selectedReply.id ? { ...r, ...updated } : r))
+                );
+              }}
+              onClassifiedByHuman={(id) => {
+                setClassifiedByHuman((prev) => new Set(prev).add(id));
+              }}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-base-200/10">
@@ -1757,6 +2085,85 @@ export default function InboxPage() {
           )}
         </div>
       </div>
+
+      {/* ── Checkpoint Modal: Clasificar antes de salir con control humano ── */}
+      {showClassificationCheckpoint && selectedReply && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-5 animate-scaleUp">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
+                <RiPriceTag3Line size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-base text-base-content">
+                  Etiqueta al prospecto antes de salir
+                </h3>
+                <p className="text-xs text-base-content/70 mt-1 leading-relaxed">
+                  Tienes el <strong className="text-blue-500">control humano activo</strong> en la conversación con{" "}
+                  <strong>{selectedReply.full_name ?? selectedReply.email ?? "este prospecto"}</strong>.
+                  Para mantener tu Pipeline sincronizado, selecciona cómo clasificarlo:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {CLASSIFICATION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.slug}
+                  type="button"
+                  onClick={() => handleCheckpointClassify(opt.slug, opt.stageId)}
+                  disabled={savingCheckpoint}
+                  className="flex items-center gap-2.5 p-3 rounded-xl border border-base-300 hover:border-primary/50 hover:bg-base-200/60 text-left transition-all group active:scale-[0.98]"
+                >
+                  <span className={`w-3 h-3 rounded-full shrink-0 ${opt.dotColor}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-base-content group-hover:text-primary transition-colors">
+                      {t(`inbox.verdicts.${opt.labelKey}`)}
+                    </p>
+                    <p className="text-[10px] text-base-content/50 truncate">
+                      {opt.description}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-base-300 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+              <button
+                type="button"
+                onClick={handleCheckpointReleaseToAi}
+                disabled={savingCheckpoint}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 font-semibold transition-colors"
+              >
+                <RiRobotLine size={14} />
+                <span>Devolver a IA para auto-clasificar</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowClassificationCheckpoint(false);
+                    setPendingNavigationReply(null);
+                  }}
+                  disabled={savingCheckpoint}
+                  className="px-3 py-2 rounded-xl text-base-content/60 hover:text-base-content font-medium transition-colors"
+                >
+                  Permanecer aquí
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCheckpointBypass}
+                  disabled={savingCheckpoint}
+                  className="px-3 py-2 rounded-xl text-base-content/40 hover:text-base-content/70 text-[11px] font-medium transition-colors"
+                >
+                  Continuar sin clasificar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

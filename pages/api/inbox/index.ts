@@ -4,6 +4,7 @@ import { canAccessEmailAccount, canAccessLinkedInAccount, canAccessSdrThread, re
 
 export interface InboxReply {
   id: string;
+  stage_id: string | null;
   full_name: string | null;
   linkedin_url: string | null;
   email: string | null;
@@ -58,6 +59,7 @@ export interface InboxReply {
   sdr_reply_draft: string | null;
   sdr_policy_outcome: string | null;
   sdr_knowledge_status: string | null;
+  sdr_intent: string | null;
 }
 
 const VALID_CHANNELS = new Set(["email", "linkedin"]);
@@ -175,6 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     )
     SELECT
       t.id,
+      t.stage_id,
       t.full_name,
       t.linkedin_url,
       t.email,
@@ -233,7 +236,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sdra.state AS sdr_action_state,
       sdrd.reply_draft AS sdr_reply_draft,
       sdrd.policy_outcome AS sdr_policy_outcome,
-      sdrd.knowledge_status AS sdr_knowledge_status
+      sdrd.knowledge_status AS sdr_knowledge_status,
+      sdrd.intent AS sdr_intent
     FROM targets t
     LEFT JOIN latest_email_reply er ON er.target_id = t.id
     LEFT JOIN latest_linkedin_event lie ON lie.target_id = t.id
@@ -300,6 +304,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         reply_kind = cls.kind ?? null;
         reply_summary = cls.summary ?? null;
       } catch { /* malformed — leave null */ }
+    }
+    if (!reply_kind && row.sdr_intent) {
+      reply_kind = row.sdr_intent;
+    }
+    if (!reply_kind && row.stage_id) {
+      const stageMap: Record<string, string> = {
+        stage_interested: "interested",
+        stage_not_interested: "not_interested",
+        stage_meeting: "meeting",
+        stage_replied: "replied",
+        stage_connected: "connected",
+        stage_contacted: "contacted",
+      };
+      reply_kind = stageMap[row.stage_id] || null;
     }
     const { classification_json: _omit, ...rest } = row;
     void _omit;
