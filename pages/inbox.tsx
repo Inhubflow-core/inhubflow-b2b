@@ -1019,36 +1019,6 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
               </button>
             )}
           </div>
-
-          {reply.sdr_thread_state === "HUMAN_ACTIVE" && (
-            <div className="mt-1 pt-3 border-t border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                <RiPriceTag3Line size={14} />
-                <span>Etiquetar prospecto:</span>
-              </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {CLASSIFICATION_OPTIONS.slice(0, 4).map((opt) => {
-                  const isSelected = currentVerdictKey === opt.slug;
-                  return (
-                    <button
-                      key={opt.slug}
-                      type="button"
-                      onClick={() => handleApplyClassification(opt.slug, opt.stageId)}
-                      disabled={applyingClassification}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 shadow-sm ${
-                        isSelected
-                          ? "bg-blue-600 text-white border-blue-600 shadow"
-                          : "bg-base-100 hover:bg-base-200 border-base-300 text-base-content"
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${opt.dotColor}`} />
-                      <span>{t(`inbox.verdicts.${opt.labelKey}`)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
