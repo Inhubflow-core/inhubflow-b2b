@@ -119,12 +119,20 @@ function tagClause(filters: PipelineFilterOptions): { clauses: string[]; params:
   const params: unknown[] = [];
   const slugs = (filters.tagSlugs ?? []).filter((s) => typeof s === "string" && s.length > 0);
   if (slugs.length > 0) {
-    // OR semantics: a card matches if it carries any of the selected tags.
-    clauses.push(`EXISTS (
-      SELECT 1 FROM target_tags tt JOIN tags tg ON tg.id = tt.tag_id
-      WHERE tt.target_id = t.id AND tg.slug IN (${slugs.map(() => "?").join(",")})
+    // Un lead coincide si lleva alguno de los tags seleccionados en target_tags
+    // O si su etapa actual en el pipeline (stage_id) corresponde a alguno de los tags seleccionados.
+    const inPlaceholders = slugs.map(() => "?").join(",");
+    clauses.push(`(
+      EXISTS (
+        SELECT 1 FROM target_tags tt JOIN tags tg ON tg.id = tt.tag_id
+        WHERE tt.target_id = t.id AND tg.slug IN (${inPlaceholders})
+      )
+      OR t.stage_id IN (
+        SELECT tg.stage_id FROM tags tg
+        WHERE tg.slug IN (${inPlaceholders}) AND tg.stage_id IS NOT NULL
+      )
     )`);
-    params.push(...slugs);
+    params.push(...slugs, ...slugs);
   }
   return { clauses, params };
 }
@@ -213,6 +221,16 @@ export function moveTargetToStage(
       SET stage_id = ?, stage_updated_at = datetime('now')
       WHERE id = ?
     `).run(stageId, targetId);
+
+    // Si la etapa destino tiene un tag de sistema asociado, asegurar que el lead lo tenga en target_tags
+    const sysTag = db.prepare("SELECT id FROM tags WHERE stage_id = ? AND kind = 'system' LIMIT 1").get(stageId) as { id: string } | undefined;
+    if (sysTag) {
+      db.prepare(`
+        INSERT INTO target_tags (target_id, tag_id, source, applied_by, created_at)
+        VALUES (?, ?, 'manual', 'pipeline', datetime('now'))
+        ON CONFLICT(target_id, tag_id) DO NOTHING
+      `).run(targetId, sysTag.id);
+    }
 
     if (note) {
       db.prepare(`
