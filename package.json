@@ -22,7 +22,9 @@
     "test:linkedin-runner": "node scripts/test-linkedin-runner.cjs",
     "test:unipile-migrations": "node scripts/test-unipile-migrations.cjs",
     "typecheck": "tsc --noEmit",
-    "mirror:ee": "node scripts/mirror-ee.js"
+    "mirror:ee": "node scripts/mirror-ee.js",
+    "test:pipeline": "node scripts/test-pipeline.cjs",
+    "test:pipeline-tags": "node scripts/test-pipeline-tags.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

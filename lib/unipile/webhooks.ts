@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { ingestUnipileMessage } from "@/lib/unipile/inbox-sync";
 import { recordCampaignActivityOnce } from "@/lib/linkedin/activity";
 import { markLinkedInTargetState } from "@/lib/linkedin/account-state";
+import { applyTag } from "@/lib/tags/tags-service";
 import type { UnipileWebhookPayload } from "./types";
 
 export interface ProcessWebhookResult {
@@ -110,6 +111,17 @@ export async function handleUnipileWebhook(payload: UnipileWebhookPayload, custo
           degree: 1,
           connected_at: new Date().toISOString(),
         });
+        // Symmetric with the Voyager scraping path: accepting a connection
+        // advances the lead through the funnel.
+        try {
+          applyTag(db, target.id, "connected", {
+            source: "rule",
+            appliedBy: "unipile",
+            reason: "Conexión aceptada (webhook)",
+          });
+        } catch {
+          // Non-blocking pipeline tag
+        }
       }
     })();
     const affectedTracks = db.prepare(`

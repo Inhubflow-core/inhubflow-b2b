@@ -25,6 +25,7 @@ import {
 import { linkedInDayBounds, nextAllowedLinkedInTime } from "@/lib/linkedin/schedule";
 import { releaseRuntimeLease, tryAcquireRuntimeLease } from "@/lib/runtime-lease";
 import { syncLinkedInInbox, markInboxSyncError } from "@/lib/unipile/inbox-sync";
+import { applyTag } from "@/lib/tags/tags-service";
 import type {
   UnipileAccount,
   UnipileProfile,
@@ -99,6 +100,23 @@ export interface RunnerDependencies {
 }
 
 function nowIso(now = Date.now()): string { return new Date(now).toISOString(); }
+
+/**
+ * Marks the lead as contacted so it appears in the pipeline funnel. Never throws:
+ * a tag failure must not break the campaign run.
+ */
+function tagContacted(db: ReturnType<typeof getDb>, targetId: string, runId?: string | null): void {
+  try {
+    applyTag(db, targetId, "contacted", {
+      source: "rule",
+      runId: runId ?? null,
+      appliedBy: "campaign",
+      reason: "Contacto enviado por campaña",
+    });
+  } catch {
+    // Non-blocking pipeline tag
+  }
+}
 function addHours(hours: number, now = Date.now()): string { return new Date(now + hours * 3600 * 1000).toISOString(); }
 
 function log(db: ReturnType<typeof getDb>, runId: string, targetId: string | null, level: "info" | "warn" | "error", message: string) {
@@ -520,6 +538,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         unipile_provider_id: providerId,
       });
       logOnce(db, runProfile.run_id, target.id, "info", pendingAcceptanceActivity(name));
+      tagContacted(db, target.id, runProfile.run_id);
       trWait(db, tr, 6, now());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -692,6 +711,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         trAdvance(db, tr, steps);
       })();
       log(db, runProfile.run_id, target.id, "info", `Mensaje enviado a ${name} con éxito!`);
+      tagContacted(db, target.id, runProfile.run_id);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("ya está reservada")) {

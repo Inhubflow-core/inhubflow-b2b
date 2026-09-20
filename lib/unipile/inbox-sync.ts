@@ -4,6 +4,7 @@ import { unipile, UnipileClient } from "@/lib/unipile/client";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
 import type { UnipileChat, UnipileChatAttendee, UnipileMessage } from "@/lib/unipile/types";
 import { captureSdrInboundMessage } from "@/lib/sdr-agent/repository";
+import { applyTag } from "@/lib/tags/tags-service";
 import {
   ensureLinkedInTargetAccountState,
   markLinkedInTargetState,
@@ -354,6 +355,18 @@ export async function ingestUnipileMessage(
 
   if (direction === "inbound") {
     db.prepare("UPDATE targets SET last_replied_at = ?, last_replied_account_id = ? WHERE id = ?").run(sentAt, input.localAccountId, target.id);
+    // A reply moves the lead into conversation without waiting for the SDR:
+    // the SDR enriches the stage afterwards with its intent tags.
+    try {
+      applyTag(db, target.id, "replied", {
+        source: "rule",
+        runId,
+        appliedBy: "inbox",
+        reason: "Respondió por LinkedIn",
+      });
+    } catch {
+      // Non-blocking pipeline tag
+    }
     db.prepare(`
       UPDATE run_profile_tracks SET state = 'skipped', next_step_at = NULL, error_message = 'Lead replied via LinkedIn'
       WHERE state NOT IN ('completed', 'failed', 'skipped') AND run_profile_id IN (

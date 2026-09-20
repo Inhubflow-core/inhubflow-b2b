@@ -18,8 +18,10 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import type { PipelineCard, PipelineStageWithCount } from "@/lib/pipeline/pipeline-service";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { ScheduleModal } from "@/components/calendar/ScheduleModal";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import { TagPicker, type AppliedTag, type TagOption } from "@/components/pipeline/TagPicker";
 
 interface LeadDrawerProps {
   card: PipelineCard | null;
@@ -49,6 +51,12 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
   const [loadingMeetings, setLoadingMeetings] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
+  // Tag system: AI-applied and manual labels
+  const { t } = useTranslation();
+  const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
+  const [appliedTags, setAppliedTags] = useState<AppliedTag[]>([]);
+  const [tagBusy, setTagBusy] = useState(false);
+
   useEffect(() => {
     if (card) {
       setAutopilot(Boolean(card.sdr_autopilot));
@@ -64,6 +72,19 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
         })
         .catch(() => setNotes(""));
 
+      // Fetch the tag catalogue and this lead's tags
+      fetch("/api/tags")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => setAvailableTags(data?.tags || []))
+        .catch(() => setAvailableTags([]));
+
+      fetch(`/api/targets/${card.id}/tags`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          setAppliedTags((data?.tags || []) as AppliedTag[]);
+        })
+        .catch(() => setAppliedTags([]));
+
       // Fetch calendar meetings
       setLoadingMeetings(true);
       fetch(`/api/calendar/events?target_id=${encodeURIComponent(card.id)}`)
@@ -75,8 +96,55 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
         .finally(() => setLoadingMeetings(false));
     } else {
       setMeetings([]);
+      setAppliedTags([]);
     }
   }, [card]);
+
+  async function handleAddTag(slug: string) {
+    if (!card || tagBusy) return;
+    setTagBusy(true);
+    try {
+      const res = await fetch(`/api/targets/${card.id}/tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      if (!res.ok) throw new Error(t("pipeline.tagError"));
+      const tag = availableTags.find((t) => t.slug === slug);
+      setAppliedTags((prev) =>
+        prev.some((t) => t.slug === slug)
+          ? prev
+          : [...prev, { slug, name: tag?.name ?? slug, color: tag?.color ?? "#3b82f6", source: "manual" }]
+      );
+      onCardUpdated?.({ tags: [...appliedTags, { slug, name: tag?.name ?? slug, color: tag?.color ?? "#3b82f6", source: "manual" }] });
+      toast.success(t("pipeline.tagApplied"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("pipeline.tagError"));
+    } finally {
+      setTagBusy(false);
+    }
+  }
+
+  async function handleRemoveTag(slug: string) {
+    if (!card || tagBusy) return;
+    setTagBusy(true);
+    try {
+      const res = await fetch(`/api/targets/${card.id}/tags`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      if (!res.ok) throw new Error(t("pipeline.tagError"));
+      const next = appliedTags.filter((t) => t.slug !== slug);
+      setAppliedTags(next);
+      onCardUpdated?.({ tags: next });
+      toast.success(t("pipeline.tagRemoved"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("pipeline.tagError"));
+    } finally {
+      setTagBusy(false);
+    }
+  }
 
   if (!isOpen || !card) return null;
 
@@ -85,7 +153,7 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
     setChangingStage(true);
     try {
       await onStageChange(card.id, stageId);
-      toast.success("Etapa actualizada");
+      toast.success(t("pipeline.stageUpdated"));
     } catch {
       toast.error("Error al mover de etapa");
     } finally {
@@ -205,9 +273,23 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: currentStage.color }}
                 />
-                <span>Etapa actual: <strong>{currentStage.name}</strong></span>
+                <span>{t("pipeline.currentStage")}: <strong>{currentStage.name}</strong></span>
               </div>
             )}
+          </div>
+
+          {/* AI / manual labels — these drive the automatic funnel progression */}
+          <div className="bg-base-200/50 p-4 rounded-xl border border-base-300/60">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-2.5">
+              {t("pipeline.tagsTitle")}
+            </label>
+            <TagPicker
+              available={availableTags}
+              applied={appliedTags}
+              onAdd={handleAddTag}
+              onRemove={handleRemoveTag}
+              busy={tagBusy}
+            />
           </div>
 
           {/* SDR Autopilot control */}

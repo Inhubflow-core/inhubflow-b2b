@@ -7,6 +7,7 @@ import { encryptSecret, isEncrypted } from "@/lib/crypto";
 import { autoSeedInstance } from "@/lib/auto-seed";
 import { applySdrSchema } from "@/lib/sdr-agent/schema";
 import { applyPipelineSchema } from "@/lib/pipeline/schema";
+import { applyTagsSchema } from "@/lib/tags/schema";
 import { applyCalendarSchema } from "@/lib/calendar/schema";
 import { applySignalSchema } from "@/lib/signals/schema";
 import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
@@ -1004,6 +1005,9 @@ function runMigrations(db: Database.Database) {
 
   // Pipeline CRM module: Kanban stages and target stage associations.
   applyPipelineSchema(db);
+
+  // Tags module: AI/manual conversation labels that drive funnel progression.
+  applyTagsSchema(db);
 
   // Calendar and scheduling module
   applyCalendarSchema(db);

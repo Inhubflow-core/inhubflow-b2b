@@ -7,6 +7,7 @@ import {
   RiTimeLine,
   RiExternalLinkLine,
   RiChat3Line,
+  RiListCheck,
 } from "react-icons/ri";
 import type { PipelineCard } from "@/lib/pipeline/pipeline-service";
 
@@ -156,18 +157,47 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
         </div>
       </div>
 
-      {/* Badges: Intent / Campaign */}
+      {/* Badges: AI tags / Intent / Campaign / Lists */}
       <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        {card.tags?.map((tag) => (
+          <span
+            key={tag.slug}
+            title={tag.source === "ai" ? `Etiqueta aplicada por la IA: ${tag.name}` : `Etiqueta: ${tag.name}`}
+            className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md border"
+            style={{
+              borderColor: `${tag.color}55`,
+              backgroundColor: `${tag.color}1a`,
+              color: tag.color,
+            }}
+          >
+            {tag.source === "ai" ? <RiRobotLine size={9} /> : null}
+            {tag.name}
+          </span>
+        ))}
         {intentBadge && (
           <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${intentBadge.cls}`}>
             {intentBadge.text}
           </span>
         )}
-        {card.workflow_name && (
-          <span className="text-[10px] text-base-content/50 bg-base-200 px-1.5 py-0.5 rounded truncate max-w-[140px]" title={card.workflow_name}>
-            {card.workflow_name}
+        {(card.workflow_names ?? []).slice(0, 2).map((name) => (
+          <span
+            key={name}
+            className="text-[10px] text-base-content/50 bg-base-200 px-1.5 py-0.5 rounded truncate max-w-[140px]"
+            title={`Campaña: ${name}`}
+          >
+            {name}
           </span>
-        )}
+        ))}
+        {(card.list_names ?? []).slice(0, 2).map((name) => (
+          <span
+            key={name}
+            className="inline-flex items-center gap-0.5 text-[10px] text-base-content/50 bg-base-200 px-1.5 py-0.5 rounded truncate max-w-[140px]"
+            title={`Lista: ${name}`}
+          >
+            <RiListCheck size={9} />
+            {name}
+          </span>
+        ))}
       </div>
 
       {/* Card Footer: Last Activity + Quick Action */}

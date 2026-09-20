@@ -1,8 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
-import { requireApiActor } from "@/lib/authz";
+import { actorCanAccessWorkspace, requireApiActor, type ApiActor } from "@/lib/authz";
 import { getPipelineStagesWithCounts, type PipelineFilterOptions } from "@/lib/pipeline/pipeline-service";
 import { randomUUID } from "crypto";
+
+/**
+ * Global stages (workspace_owner_id NULL) are shared by every workspace, so only
+ * an owner/admin may rename or delete them. Custom stages are workspace-scoped.
+ */
+function canManageStage(
+  actor: ApiActor,
+  stage: { workspace_owner_id: string | null }
+): boolean {
+  if (stage.workspace_owner_id === null) {
+    return actor.isWorkspaceAdmin || actor.isSuperAdmin;
+  }
+  return actorCanAccessWorkspace(actor, stage.workspace_owner_id);
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const actor = await requireApiActor(req, res);
@@ -15,6 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const filters: PipelineFilterOptions = {
         listId: typeof req.query.listId === "string" ? req.query.listId : undefined,
         workflowId: typeof req.query.workflowId === "string" ? req.query.workflowId : undefined,
+        workspaceOwnerId: actor.workspaceOwnerId,
         search: typeof req.query.search === "string" ? req.query.search : undefined,
         channel: req.query.channel === "linkedin" || req.query.channel === "email" ? req.query.channel : undefined,
         onlyHumanIntervention: req.query.onlyHumanIntervention === "true",
@@ -70,8 +85,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Stage id is required" });
       }
 
-      const existing = db.prepare("SELECT * FROM pipeline_stages WHERE id = ?").get(id);
+      const existing = db.prepare("SELECT * FROM pipeline_stages WHERE id = ?").get(id) as
+        | { id: string; workspace_owner_id: string | null }
+        | undefined;
       if (!existing) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      if (!canManageStage(actor, existing)) {
         return res.status(404).json({ error: "Stage not found" });
       }
 
@@ -116,9 +136,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!id) return res.status(400).json({ error: "Stage id is required" });
 
       const stage = db.prepare("SELECT * FROM pipeline_stages WHERE id = ?").get(id) as
-        | { id: string; is_system: number }
+        | { id: string; is_system: number; workspace_owner_id: string | null }
         | undefined;
       if (!stage) return res.status(404).json({ error: "Stage not found" });
+
+      if (!canManageStage(actor, stage)) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
 
       if (stage.is_system === 1) {
         return res.status(403).json({ error: "System stages cannot be deleted" });

@@ -7,10 +7,13 @@ const ts = require("typescript");
 const Database = require("better-sqlite3");
 
 // TypeScript on-the-fly transpiler
+// NOTE: the replacement must emit forward slashes — a Windows path with
+// backslashes would be parsed as escape sequences inside the require() literal.
+const LIB_ROOT = path.resolve(__dirname, "../lib").replace(/\\/g, "/");
 Module._extensions[".ts"] = (module, filename) => {
   let source = fs.readFileSync(filename, "utf8");
   // replace alias "@/lib/" with relative paths
-  source = source.replace(/@\/lib\//g, path.resolve(__dirname, "../lib") + "/");
+  source = source.replace(/@\/lib\//g, () => LIB_ROOT + "/");
   const output = ts.transpileModule(source, {
     fileName: filename,
     compilerOptions: {

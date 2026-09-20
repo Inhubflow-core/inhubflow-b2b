@@ -20,9 +20,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const db = getDb();
 
   try {
+    const asArray = (value: unknown): string[] | undefined => {
+      if (typeof value !== "string" || !value.trim()) return undefined;
+      const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
+      return parts.length > 0 ? parts : undefined;
+    };
+
     const filters: PipelineFilterOptions = {
       listId: typeof req.query.listId === "string" ? req.query.listId : undefined,
       workflowId: typeof req.query.workflowId === "string" ? req.query.workflowId : undefined,
+      listIds: asArray(req.query.listIds),
+      workflowIds: asArray(req.query.workflowIds),
+      tagSlugs: asArray(req.query.tagSlugs),
+      workspaceOwnerId: actor.workspaceOwnerId,
       search: typeof req.query.search === "string" ? req.query.search : undefined,
       channel: req.query.channel === "linkedin" || req.query.channel === "email" ? req.query.channel : undefined,
       onlyHumanIntervention: req.query.onlyHumanIntervention === "true",

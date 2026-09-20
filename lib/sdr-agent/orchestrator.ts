@@ -20,6 +20,7 @@ import { resolveSdrOperationalStatus, type SdrOperationalStatus } from "./runtim
 import { type SdrAgentRecord, type SdrAgentVersionRecord } from "./seed";
 import { hasProviderBudget, recordProviderFailure, recordProviderSuccess } from "./usage";
 import { autoAdvanceTargetByTrigger } from "@/lib/pipeline/pipeline-service";
+import { applyDecisionTags } from "@/lib/tags/tags-service";
 
 interface TargetContext {
   full_name: string | null;
@@ -311,6 +312,22 @@ function finishDecision(
       }
     } catch {
       // Non-blocking pipeline trigger
+    }
+
+    // Persist the AI-emitted conversation labels. Each tag that maps to a stage
+    // advances the lead through the funnel (no-regression rules included).
+    try {
+      const tags = input.decision.tags ?? [];
+      if (tags.length > 0) {
+        applyDecisionTags(db, input.context.thread.target_id, tags, {
+          confidence: input.decision.confidence,
+          decisionId: persisted.id,
+          threadId: input.context.thread.id,
+          reasoning: input.decision.tag_reasoning ?? null,
+        });
+      }
+    } catch {
+      // Non-blocking tag persistence
     }
 
     let handoffId: string | undefined;

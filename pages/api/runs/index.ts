@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
+import { applyTag } from "@/lib/tags/tags-service";
 import { randomUUID } from "crypto";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -169,6 +170,20 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     });
     insertMany(targets);
+
+    // The lead enters the funnel as soon as it is enrolled in a campaign.
+    for (const t of targets) {
+      try {
+        applyTag(db, t.target_id, "contacted", {
+          source: "rule",
+          runId,
+          appliedBy: "campaign",
+          reason: "Inscrito en campaña",
+        });
+      } catch {
+        // Non-blocking pipeline tag
+      }
+    }
 
     return res.status(201).json({ id: runId });
   }

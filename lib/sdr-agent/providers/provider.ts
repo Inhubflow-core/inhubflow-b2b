@@ -46,6 +46,8 @@ export const SdrDecisionOutputSchema = z.object({
   knowledge_status: SdrKnowledgeStatusSchema,
   knowledge_citations: z.array(z.string().min(1).max(200)).max(20).default([]),
   missing_information: z.array(z.string().min(1).max(500)).max(20).default([]),
+  tags: z.array(z.string().min(1).max(60)).max(10).optional(),
+  tag_reasoning: z.string().max(500).nullable().optional(),
 });
 export type SdrDecisionOutput = z.infer<typeof SdrDecisionOutputSchema>;
 

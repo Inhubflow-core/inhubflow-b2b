@@ -2,6 +2,7 @@ import Imap from "imap";
 import { simpleParser } from "mailparser";
 import { createHash, randomUUID } from "crypto";
 import { captureSdrInboundMessage } from "@/lib/sdr-agent/repository";
+import { applyTag } from "@/lib/tags/tags-service";
 import { getDb } from "@/lib/db";
 import { premium } from "@/lib/premium";
 import { decryptSecret } from "@/lib/crypto";
@@ -160,6 +161,18 @@ export function captureReplyBody(
               JSON.stringify(references),
               JSON.stringify({ messageId, inReplyTo, references }),
             );
+            // The premium classifier lives in ee/; the open-core path still has to
+            // move the lead into conversation when it answers by email.
+            try {
+              applyTag(db, targetId, "replied", {
+                source: "rule",
+                runId: runRow?.id ?? null,
+                appliedBy: "inbox",
+                reason: "Respondió por email",
+              });
+            } catch {
+              // Non-blocking pipeline tag
+            }
             captureSdrInboundMessage(db, {
               eventId: `email:${emailAccountId}:${messageId}`,
               channel: "email",

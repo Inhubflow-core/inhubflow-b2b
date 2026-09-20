@@ -1299,5 +1299,35 @@
       "templateTooShort": "O modelo personalizado é muito curto",
       "listRequired": "Selecione uma lista de destino na etapa de lançamento"
     }
+  },
+  "pipeline": {
+    "title": "Pipeline de Vendas",
+    "subtitle": "Funil de prospects com marcação automática por IA e avanço entre etapas.",
+    "refresh": "Atualizar",
+    "search": "Buscar prospect, empresa...",
+    "allLists": "Todas as listas",
+    "allCampaigns": "Todas as campanhas",
+    "allTags": "Todas as tags",
+    "allChannels": "Todos",
+    "linkedin": "LinkedIn",
+    "email": "Email",
+    "onlyHuman": "Somente intervenção humana",
+    "emptyStage": "Sem prospects nesta etapa",
+    "tagsTitle": "Tags da conversa",
+    "tagsHint": "A IA marca a conversa e o prospect avança de etapa automaticamente.",
+    "addTag": "Adicionar tag",
+    "removeTag": "Remover tag",
+    "tagApplied": "Tag aplicada",
+    "tagRemoved": "Tag removida",
+    "tagError": "Erro ao marcar",
+    "tagAiTooltip": "Tag aplicada pela IA",
+    "currentStage": "Etapa atual",
+    "noActivity": "Sem atividade",
+    "view": "Ver",
+    "loadError": "Não foi possível carregar o pipeline",
+    "saveError": "Erro ao salvar",
+    "stageError": "Erro ao mover de etapa",
+    "stageUpdated": "Etapa atualizada",
+    "emptyStageHint": "Arraste os prospects aqui"
   }
 }

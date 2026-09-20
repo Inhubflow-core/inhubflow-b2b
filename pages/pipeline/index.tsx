@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect, useCallback, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef } from "react";
 import type { GetServerSideProps } from "next";
 import { getDb } from "@/lib/db";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -26,6 +26,7 @@ import type {
 interface PipelinePageProps {
   initialLists: Array<{ id: string; name: string }>;
   initialWorkflows: Array<{ id: string; name: string }>;
+  initialTags: Array<{ id: string; slug: string; name: string; color: string }>;
 }
 
 export const getServerSideProps: GetServerSideProps<PipelinePageProps> = async () => {
@@ -38,10 +39,19 @@ export const getServerSideProps: GetServerSideProps<PipelinePageProps> = async (
     .prepare("SELECT id, name FROM workflows ORDER BY name COLLATE NOCASE ASC")
     .all() as Array<{ id: string; name: string }>;
 
+  const initialTags = db
+    .prepare(
+      `SELECT id, slug, name, color FROM tags
+       WHERE is_active = 1
+       ORDER BY kind DESC, name COLLATE NOCASE ASC`
+    )
+    .all() as Array<{ id: string; slug: string; name: string; color: string }>;
+
   return {
     props: {
       initialLists,
       initialWorkflows,
+      initialTags,
     },
   };
 };
@@ -49,12 +59,18 @@ export const getServerSideProps: GetServerSideProps<PipelinePageProps> = async (
 export default function PipelinePage({
   initialLists,
   initialWorkflows,
+  initialTags,
 }: PipelinePageProps) {
   const { t } = useTranslation();
+  // Kept in a ref so the fetch callback stays stable across language changes
+  // without re-fetching the board — the toast text is read at call time.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // Filters state
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
   const [selectedList, setSelectedList] = useState<string>("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [channelFilter, setChannelFilter] = useState<"all" | "linkedin" | "email">("all");
   const [onlyHuman, setOnlyHuman] = useState(false);
@@ -71,6 +87,7 @@ export default function PipelinePage({
       const params = new URLSearchParams();
       if (selectedWorkflow) params.set("workflowId", selectedWorkflow);
       if (selectedList) params.set("listId", selectedList);
+      if (selectedTags.length > 0) params.set("tagSlugs", selectedTags.join(","));
       if (searchTerm.trim()) params.set("search", searchTerm.trim());
       if (channelFilter !== "all") params.set("channel", channelFilter);
       if (onlyHuman) params.set("onlyHumanIntervention", "true");
@@ -93,12 +110,12 @@ export default function PipelinePage({
       });
     } catch (err: unknown) {
       console.error(err);
-      toast.error("No se pudo cargar el Pipeline");
+      toast.error(tRef.current("pipeline.loadError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedWorkflow, selectedList, searchTerm, channelFilter, onlyHuman]);
+  }, [selectedWorkflow, selectedList, selectedTags, searchTerm, channelFilter, onlyHuman]);
 
   useEffect(() => {
     setLoading(true);
@@ -185,14 +202,14 @@ export default function PipelinePage({
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Pipeline
+                {t("pipeline.title")}
               </h1>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
                 {totalCards.toLocaleString()} {totalCards === 1 ? "prospecto" : "prospectos"}
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Gestión visual de embudo comercial y sincronización en tiempo real con SDR IA.
+              {t("pipeline.subtitle")}
             </p>
           </div>
 
@@ -230,7 +247,7 @@ export default function PipelinePage({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-all shadow-xs"
             >
               <RiRefreshLine size={16} className={refreshing ? "animate-spin" : ""} />
-              Actualizar
+              {t("pipeline.refresh")}
             </button>
           </div>
         </div>
@@ -245,7 +262,7 @@ export default function PipelinePage({
             <input
               type="text"
               className="w-56 bg-white dark:bg-gray-850 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500 shadow-xs"
-              placeholder="Buscar prospecto, empresa..."
+              placeholder={t("pipeline.search")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -257,7 +274,7 @@ export default function PipelinePage({
             value={selectedList}
             onChange={(e) => setSelectedList(e.target.value)}
           >
-            <option value="">Todas las listas</option>
+            <option value="">{t("pipeline.allLists")}</option>
             {initialLists.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
@@ -271,13 +288,43 @@ export default function PipelinePage({
             value={selectedWorkflow}
             onChange={(e) => setSelectedWorkflow(e.target.value)}
           >
-            <option value="">Todas las campañas</option>
+            <option value="">{t("pipeline.allCampaigns")}</option>
             {initialWorkflows.map((w) => (
               <option key={w.id} value={w.id}>
                 {w.name}
               </option>
             ))}
           </select>
+
+          {/* Tag filter — multi-select chips */}
+          {initialTags.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {initialTags.map((tag) => {
+                const active = selectedTags.includes(tag.slug);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedTags((prev) =>
+                        prev.includes(tag.slug)
+                          ? prev.filter((s) => s !== tag.slug)
+                          : [...prev, tag.slug]
+                      )
+                    }
+                    className="text-[11px] px-2 py-1 rounded-lg border transition-colors"
+                    style={
+                      active
+                        ? { borderColor: tag.color, backgroundColor: `${tag.color}26`, color: tag.color, fontWeight: 600 }
+                        : { borderColor: "#d1d5db", color: "#6b7280" }
+                    }
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Channel selector */}
           <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-gray-100 dark:bg-gray-800 h-8 flex items-center shadow-xs">
@@ -288,7 +335,7 @@ export default function PipelinePage({
                 channelFilter === "all" ? "bg-brand-500 text-white font-medium shadow-xs" : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              Todos
+              {t("pipeline.allChannels")}
             </button>
             <button
               type="button"

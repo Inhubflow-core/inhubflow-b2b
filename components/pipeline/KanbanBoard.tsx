@@ -7,6 +7,7 @@ import {
   RiLoader4Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { KanbanCard } from "./KanbanCard";
 import { LeadDrawer } from "./LeadDrawer";
 import type { PipelineCard, PipelineStageWithCount } from "@/lib/pipeline/pipeline-service";
@@ -37,6 +38,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onReload,
   loading = false,
 }) => {
+  const { t } = useTranslation();
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null);
@@ -277,7 +279,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                 {cards.length === 0 && (
                   <div className="h-28 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-900/40">
-                    Arrastra prospectos aquí
+                    {t("pipeline.emptyStageHint")}
                   </div>
                 )}
               </div>

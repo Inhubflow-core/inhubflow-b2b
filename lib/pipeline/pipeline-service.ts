@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { getTagsForTargets } from "@/lib/tags/tags-repository";
 
 export interface PipelineCard {
   id: string;
@@ -24,6 +25,9 @@ export interface PipelineCard {
   last_interaction_at: string | null;
   last_interaction_type: "reply" | "email_reply" | "message" | "connected" | "contacted" | "none";
   workflow_name: string | null;
+  workflow_names: string[];
+  list_names: string[];
+  tags: Array<{ slug: string; name: string; color: string; source: string }>;
 }
 
 export interface PipelineStageWithCount {
@@ -39,9 +43,146 @@ export interface PipelineStageWithCount {
 export interface PipelineFilterOptions {
   listId?: string;
   workflowId?: string;
+  /** Multiple lists / campaigns, for the "all my campaigns" view. */
+  listIds?: string[];
+  workflowIds?: string[];
+  tagSlugs?: string[];
+  workspaceOwnerId?: string | null;
   search?: string;
   channel?: "linkedin" | "email";
   onlyHumanIntervention?: boolean;
+}
+
+/**
+ * Targets have no owner column, so workspace isolation is derived by joining the
+ * LinkedIn/email accounts that touched them — the same rule already used by
+ * `targetBelongsToLinkedInAccount` in lib/authz.ts.
+ */
+function workspaceClause(filters: PipelineFilterOptions): { sql: string; params: unknown[] } {
+  if (!filters.workspaceOwnerId) return { sql: "", params: [] };
+  return {
+    sql: `(
+      EXISTS (
+        SELECT 1 FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
+        JOIN accounts a ON a.id = r.account_id
+        WHERE rp.target_id = t.id AND a.owner_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM linkedin_inbox_messages m
+        JOIN accounts a ON a.id = m.account_id
+        WHERE m.target_id = t.id AND a.owner_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM email_replies er
+        JOIN email_accounts ea ON ea.id = er.email_account_id
+        WHERE er.target_id = t.id AND ea.owner_id = ?
+      )
+    )`,
+    params: [filters.workspaceOwnerId, filters.workspaceOwnerId, filters.workspaceOwnerId],
+  };
+}
+
+function listClause(filters: PipelineFilterOptions): { clauses: string[]; params: unknown[] } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  const ids = [filters.listId, ...(filters.listIds ?? [])].filter(
+    (v): v is string => typeof v === "string" && v.length > 0
+  );
+  if (ids.length > 0) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id AND lt.list_id IN (${ids.map(() => "?").join(",")})
+    )`);
+    params.push(...ids);
+  }
+  return { clauses, params };
+}
+
+function workflowClause(filters: PipelineFilterOptions): { clauses: string[]; params: unknown[] } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  const ids = [filters.workflowId, ...(filters.workflowIds ?? [])].filter(
+    (v): v is string => typeof v === "string" && v.length > 0
+  );
+  if (ids.length > 0) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM run_profiles rp JOIN runs r ON r.id = rp.run_id
+      WHERE rp.target_id = t.id AND r.workflow_id IN (${ids.map(() => "?").join(",")})
+    )`);
+    params.push(...ids);
+  }
+  return { clauses, params };
+}
+
+function tagClause(filters: PipelineFilterOptions): { clauses: string[]; params: unknown[] } {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  const slugs = (filters.tagSlugs ?? []).filter((s) => typeof s === "string" && s.length > 0);
+  if (slugs.length > 0) {
+    // OR semantics: a card matches if it carries any of the selected tags.
+    clauses.push(`EXISTS (
+      SELECT 1 FROM target_tags tt JOIN tags tg ON tg.id = tt.tag_id
+      WHERE tt.target_id = t.id AND tg.slug IN (${slugs.map(() => "?").join(",")})
+    )`);
+    params.push(...slugs);
+  }
+  return { clauses, params };
+}
+
+function searchClause(filters: PipelineFilterOptions): { clauses: string[]; params: unknown[] } {
+  if (!filters.search || !filters.search.trim()) return { clauses: [], params: [] };
+  const q = `%${filters.search.trim().toLowerCase()}%`;
+  return {
+    clauses: [
+      "(LOWER(t.full_name) LIKE ? OR LOWER(t.company) LIKE ? OR LOWER(t.email) LIKE ? OR LOWER(t.title) LIKE ?)",
+    ],
+    params: [q, q, q, q],
+  };
+}
+
+function channelClause(filters: PipelineFilterOptions): string[] {
+  if (filters.channel === "linkedin") {
+    return ["(t.linkedin_url IS NOT NULL OR t.connection_requested_at IS NOT NULL)"];
+  }
+  if (filters.channel === "email") {
+    return ["(t.email IS NOT NULL AND t.email != '')"];
+  }
+  return [];
+}
+
+function humanInterventionClause(filters: PipelineFilterOptions): string[] {
+  if (!filters.onlyHumanIntervention) return [];
+  return [
+    `EXISTS (
+      SELECT 1 FROM sdr_threads st
+      WHERE st.target_id = t.id AND st.state IN ('HUMAN_REVIEW', 'HUMAN_ACTIVE')
+    )`,
+  ];
+}
+
+/** Builds the shared WHERE clause used by both the counts and the cards query. */
+function buildWhere(
+  filters: PipelineFilterOptions,
+  extra: string[] = [],
+  extraParams: unknown[] = []
+): { sql: string; params: unknown[] } {
+  const ws = workspaceClause(filters);
+  const list = listClause(filters);
+  const wf = workflowClause(filters);
+  const tag = tagClause(filters);
+  const search = searchClause(filters);
+
+  const clauses = [
+    ...extra,
+    ...(ws.sql ? [ws.sql] : []),
+    ...list.clauses,
+    ...wf.clauses,
+    ...tag.clauses,
+    ...search.clauses,
+    ...channelClause(filters),
+    ...humanInterventionClause(filters),
+  ];
+  const params = [...extraParams, ...ws.params, ...list.params, ...wf.params, ...tag.params, ...search.params];
+  return { sql: clauses.length ? clauses.join(" AND ") : "1=1", params };
 }
 
 /**
@@ -158,41 +299,7 @@ export function getPipelineStagesWithCounts(
   db: Database.Database,
   filters: PipelineFilterOptions = {}
 ): PipelineStageWithCount[] {
-  let whereClauses: string[] = [];
-  const params: unknown[] = [];
-
-  if (filters.listId) {
-    whereClauses.push("EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id AND lt.list_id = ?)");
-    params.push(filters.listId);
-  }
-
-  if (filters.workflowId) {
-    whereClauses.push("EXISTS (SELECT 1 FROM run_profiles rp JOIN runs r ON r.id = rp.run_id WHERE rp.target_id = t.id AND r.workflow_id = ?)");
-    params.push(filters.workflowId);
-  }
-
-  if (filters.search && filters.search.trim()) {
-    const q = `%${filters.search.trim().toLowerCase()}%`;
-    whereClauses.push("(LOWER(t.full_name) LIKE ? OR LOWER(t.company) LIKE ? OR LOWER(t.email) LIKE ? OR LOWER(t.title) LIKE ?)");
-    params.push(q, q, q, q);
-  }
-
-  if (filters.channel === "linkedin") {
-    whereClauses.push("(t.linkedin_url IS NOT NULL OR t.connection_requested_at IS NOT NULL)");
-  } else if (filters.channel === "email") {
-    whereClauses.push("(t.email IS NOT NULL AND t.email != '')");
-  }
-
-  if (filters.onlyHumanIntervention) {
-    whereClauses.push(`
-      EXISTS (
-        SELECT 1 FROM sdr_threads st
-        WHERE st.target_id = t.id AND st.state IN ('HUMAN_REVIEW', 'HUMAN_ACTIVE')
-      )
-    `);
-  }
-
-  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  const { sql: whereSql, params } = buildWhere(filters);
 
   const stages = db.prepare(`
     SELECT
@@ -205,10 +312,11 @@ export function getPipelineStagesWithCounts(
       COUNT(t.id) as target_count
     FROM pipeline_stages ps
     LEFT JOIN targets t ON t.stage_id = ps.id
-      ${whereSql ? `AND t.id IN (SELECT t.id FROM targets t ${whereSql})` : ""}
+      AND t.id IN (SELECT t.id FROM targets t WHERE ${whereSql})
+    WHERE ps.workspace_owner_id IS NULL ${filters.workspaceOwnerId ? "OR ps.workspace_owner_id = ?" : ""}
     GROUP BY ps.id
     ORDER BY ps.order_index ASC
-  `).all(...params) as PipelineStageWithCount[];
+  `).all(...(filters.workspaceOwnerId ? [...params, filters.workspaceOwnerId] : params)) as PipelineStageWithCount[];
 
   return stages;
 }
@@ -223,41 +331,7 @@ export function getPipelineCardsByStage(
   limit = 50,
   offset = 0
 ): PipelineCard[] {
-  let whereClauses: string[] = ["t.stage_id = ?"];
-  const params: unknown[] = [stageId];
-
-  if (filters.listId) {
-    whereClauses.push("EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id AND lt.list_id = ?)");
-    params.push(filters.listId);
-  }
-
-  if (filters.workflowId) {
-    whereClauses.push("EXISTS (SELECT 1 FROM run_profiles rp JOIN runs r ON r.id = rp.run_id WHERE rp.target_id = t.id AND r.workflow_id = ?)");
-    params.push(filters.workflowId);
-  }
-
-  if (filters.search && filters.search.trim()) {
-    const q = `%${filters.search.trim().toLowerCase()}%`;
-    whereClauses.push("(LOWER(t.full_name) LIKE ? OR LOWER(t.company) LIKE ? OR LOWER(t.email) LIKE ? OR LOWER(t.title) LIKE ?)");
-    params.push(q, q, q, q);
-  }
-
-  if (filters.channel === "linkedin") {
-    whereClauses.push("(t.linkedin_url IS NOT NULL OR t.connection_requested_at IS NOT NULL)");
-  } else if (filters.channel === "email") {
-    whereClauses.push("(t.email IS NOT NULL AND t.email != '')");
-  }
-
-  if (filters.onlyHumanIntervention) {
-    whereClauses.push(`
-      EXISTS (
-        SELECT 1 FROM sdr_threads st
-        WHERE st.target_id = t.id AND st.state IN ('HUMAN_REVIEW', 'HUMAN_ACTIVE')
-      )
-    `);
-  }
-
-  params.push(limit, offset);
+  const { sql: whereSql, params } = buildWhere(filters, ["t.stage_id = ?"], [stageId]);
 
   const rows = db.prepare(`
     SELECT
@@ -291,19 +365,12 @@ export function getPipelineCardsByStage(
         JOIN sdr_threads st ON st.id = sd.thread_id
         WHERE st.target_id = t.id
         ORDER BY sd.created_at DESC LIMIT 1
-      ) as sdr_intent,
-      (
-        SELECT w.name FROM run_profiles rp
-        JOIN runs r ON r.id = rp.run_id
-        JOIN workflows w ON w.id = r.workflow_id
-        WHERE rp.target_id = t.id
-        ORDER BY rp.created_at DESC LIMIT 1
-      ) as workflow_name
+      ) as sdr_intent
     FROM targets t
-    WHERE ${whereClauses.join(" AND ")}
+    WHERE ${whereSql}
     ORDER BY COALESCE(t.stage_updated_at, t.last_replied_at, t.email_replied_at, t.created_at) DESC
     LIMIT ? OFFSET ?
-  `).all(...params) as Array<{
+  `).all(...params, limit, offset) as Array<{
     id: string;
     full_name: string | null;
     first_name: string | null;
@@ -326,8 +393,42 @@ export function getPipelineCardsByStage(
     email_replied_at: string | null;
     sdr_thread_state: string | null;
     sdr_intent: string | null;
-    workflow_name: string | null;
   }>;
+
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id);
+  const placeholders = ids.map(() => "?").join(",");
+
+  const tagsByTarget = getTagsForTargets(db, ids);
+
+  const listRows = db
+    .prepare(
+      `SELECT lt.target_id, l.name
+       FROM list_targets lt JOIN lists l ON l.id = lt.list_id
+       WHERE lt.target_id IN (${placeholders})
+       ORDER BY l.name ASC`
+    )
+    .all(...ids) as Array<{ target_id: string; name: string }>;
+  const listsByTarget: Record<string, string[]> = {};
+  for (const row of listRows) (listsByTarget[row.target_id] ??= []).push(row.name);
+
+  const campaignRows = db
+    .prepare(
+      `SELECT rp.target_id, w.name
+       FROM run_profiles rp
+       JOIN runs r ON r.id = rp.run_id
+       JOIN workflows w ON w.id = r.workflow_id
+       WHERE rp.target_id IN (${placeholders})
+       ORDER BY rp.created_at DESC`
+    )
+    .all(...ids) as Array<{ target_id: string; name: string | null }>;
+  const campaignsByTarget: Record<string, string[]> = {};
+  for (const row of campaignRows) {
+    if (!row.name) continue;
+    const bucket = (campaignsByTarget[row.target_id] ??= []);
+    if (!bucket.includes(row.name)) bucket.push(row.name);
+  }
 
   return rows.map((r) => {
     let channel: "linkedin" | "email" | "both" = "linkedin";
@@ -352,6 +453,8 @@ export function getPipelineCardsByStage(
       lastInteractionType = interactions[0].type;
     }
 
+    const campaigns = campaignsByTarget[r.id] ?? [];
+
     return {
       id: r.id,
       full_name: (r.full_name ?? [r.first_name, r.last_name].filter(Boolean).join(" ")) || "Sin nombre",
@@ -374,7 +477,10 @@ export function getPipelineCardsByStage(
       channel,
       last_interaction_at: lastInteractionAt,
       last_interaction_type: lastInteractionType,
-      workflow_name: r.workflow_name,
+      workflow_name: campaigns[0] ?? null,
+      workflow_names: campaigns,
+      list_names: listsByTarget[r.id] ?? [],
+      tags: tagsByTarget[r.id] ?? [],
     };
   });
 }

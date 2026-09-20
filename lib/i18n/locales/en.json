@@ -1299,5 +1299,35 @@
       "templateTooShort": "Custom template is too short",
       "listRequired": "Select a destination list in the launch step"
     }
+  },
+  "pipeline": {
+    "title": "Sales Pipeline",
+    "subtitle": "Prospect funnel with AI auto-tagging and automatic stage progression.",
+    "refresh": "Refresh",
+    "search": "Search prospect, company...",
+    "allLists": "All lists",
+    "allCampaigns": "All campaigns",
+    "allTags": "All tags",
+    "allChannels": "All",
+    "linkedin": "LinkedIn",
+    "email": "Email",
+    "onlyHuman": "Human intervention only",
+    "emptyStage": "No prospects in this stage",
+    "tagsTitle": "Conversation tags",
+    "tagsHint": "The AI tags the conversation and the prospect advances through stages automatically.",
+    "addTag": "Add tag",
+    "removeTag": "Remove tag",
+    "tagApplied": "Tag applied",
+    "tagRemoved": "Tag removed",
+    "tagError": "Could not apply tag",
+    "tagAiTooltip": "Tag applied by the AI",
+    "currentStage": "Current stage",
+    "noActivity": "No activity",
+    "view": "View",
+    "loadError": "Could not load the pipeline",
+    "saveError": "Could not save",
+    "stageError": "Could not move stage",
+    "stageUpdated": "Stage updated",
+    "emptyStageHint": "Drag prospects here"
   }
 }

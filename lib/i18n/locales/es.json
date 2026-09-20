@@ -1299,5 +1299,35 @@
       "templateTooShort": "La plantilla personalizada es demasiado corta",
       "listRequired": "Selecciona una lista de destino en el paso de lanzamiento"
     }
+  },
+  "pipeline": {
+    "title": "Pipeline de Ventas",
+    "subtitle": "Embudo de prospectos con etiquetado automático por IA y avance entre etapas.",
+    "refresh": "Actualizar",
+    "search": "Buscar prospecto, empresa...",
+    "allLists": "Todas las listas",
+    "allCampaigns": "Todas las campañas",
+    "allTags": "Todas las etiquetas",
+    "allChannels": "Todos",
+    "linkedin": "LinkedIn",
+    "email": "Email",
+    "onlyHuman": "Solo intervención humana",
+    "emptyStage": "Sin prospectos en esta etapa",
+    "tagsTitle": "Etiquetas de la conversación",
+    "tagsHint": "La IA etiqueta la conversación y el prospecto avanza de etapa automáticamente.",
+    "addTag": "Añadir etiqueta",
+    "removeTag": "Quitar etiqueta",
+    "tagApplied": "Etiqueta aplicada",
+    "tagRemoved": "Etiqueta eliminada",
+    "tagError": "Error al etiquetar",
+    "tagAiTooltip": "Etiqueta aplicada por la IA",
+    "currentStage": "Etapa actual",
+    "noActivity": "Sin actividad",
+    "view": "Ver",
+    "loadError": "No se pudo cargar el Pipeline",
+    "saveError": "Error al guardar",
+    "stageError": "Error al mover de etapa",
+    "stageUpdated": "Etapa actualizada",
+    "emptyStageHint": "Arrastra prospectos aquí"
   }
 }
