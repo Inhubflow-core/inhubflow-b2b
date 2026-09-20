@@ -48,25 +48,56 @@ interface Template {
   id: number; name: string; body: string; created_at: string;
 }
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
 // ─── Server-side data ─────────────────────────────────────────────────────────
 
-export const getServerSideProps: GetServerSideProps = async ({ query }) => {
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  if (!session?.user) {
+    return { redirect: { destination: "/login", permanent: false } };
+  }
+
+  const currentUser = session.user as any;
+  const isSuperAdmin =
+    currentUser?.role === "admin" ||
+    currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+  const workspaceOwnerId = currentUser?.owner_id || currentUser?.id;
+
   const db = getDb();
-  const liAccounts = db
-    .prepare(
-      `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
+
+  const liQuery = isSuperAdmin
+    ? `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
               a.unipile_status AS linkedin_connection_status,
               (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
        FROM accounts a ORDER BY a.created_at DESC`
-    )
-    .all();
-  const emailAccounts = db
-    .prepare("SELECT id, name, from_email, from_name, reply_to, smtp_host, smtp_port, smtp_secure, imap_host, imap_port, username, daily_email_limit, active_hours_start, active_hours_end, timezone, working_days, is_verified, signature, ramp_up_enabled, ramp_start_date, created_at FROM email_accounts ORDER BY created_at DESC")
-    .all();
+    : `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
+              a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
+              a.unipile_status AS linkedin_connection_status,
+              (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
+       FROM accounts a WHERE a.owner_id = ? ORDER BY a.created_at DESC`;
+
+  const liAccounts = isSuperAdmin
+    ? db.prepare(liQuery).all()
+    : db.prepare(liQuery).all(workspaceOwnerId);
+
+  const emailQuery = isSuperAdmin
+    ? `SELECT id, name, from_email, from_name, reply_to, smtp_host, smtp_port, smtp_secure, imap_host, imap_port, username, imap_username, daily_email_limit, active_hours_start, active_hours_end, timezone, working_days, is_verified, signature, ramp_up_enabled, ramp_start_date, created_at,
+              (SELECT COUNT(DISTINCT rp.run_id) FROM run_profiles rp JOIN runs r ON rp.run_id = r.id WHERE rp.email_account_id = ea.id AND r.status IN ('running', 'paused')) AS active_run_count
+       FROM email_accounts ea ORDER BY ea.created_at DESC`
+    : `SELECT id, name, from_email, from_name, reply_to, smtp_host, smtp_port, smtp_secure, imap_host, imap_port, username, imap_username, daily_email_limit, active_hours_start, active_hours_end, timezone, working_days, is_verified, signature, ramp_up_enabled, ramp_start_date, created_at,
+              (SELECT COUNT(DISTINCT rp.run_id) FROM run_profiles rp JOIN runs r ON rp.run_id = r.id WHERE rp.email_account_id = ea.id AND r.status IN ('running', 'paused')) AS active_run_count
+       FROM email_accounts ea WHERE ea.owner_id = ? ORDER BY ea.created_at DESC`;
+
+  const emailAccounts = isSuperAdmin
+    ? db.prepare(emailQuery).all()
+    : db.prepare(emailQuery).all(workspaceOwnerId);
+
   const templates = db.prepare("SELECT * FROM templates ORDER BY created_at DESC").all();
   const validTabs: Tab[] = ["linkedin", "email", "templates", "integrations", "general"];
-  const tab: Tab = validTabs.includes(query.tab as Tab) ? (query.tab as Tab) : "linkedin";
+  const tab: Tab = validTabs.includes(context.query.tab as Tab) ? (context.query.tab as Tab) : "linkedin";
   return { props: { liAccounts, emailAccounts, templates, initialTab: tab } };
 };
 

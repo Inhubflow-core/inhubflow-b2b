@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import Imap from "imap";
+import { decryptSecret } from "@/lib/crypto";
 
 export interface EmailAccount {
   id: string;
@@ -26,6 +27,16 @@ export interface SendEmailResult {
   response: string | null;
 }
 
+function resolvePassword(pw: string | null | undefined): string {
+  if (!pw) return "";
+  try {
+    const decrypted = decryptSecret(pw);
+    return decrypted || pw;
+  } catch {
+    return pw;
+  }
+}
+
 export async function sendEmail(
   account: EmailAccount,
   to: string,
@@ -33,13 +44,15 @@ export async function sendEmail(
   body: string,
   options: SendEmailOptions = {},
 ): Promise<SendEmailResult> {
+  const authPassword = resolvePassword(account.password);
+
   const transporter = nodemailer.createTransport({
     host: account.smtp_host,
     port: account.smtp_port,
     secure: account.smtp_secure === 1,
     auth: {
       user: account.username,
-      pass: account.password,
+      pass: authPassword,
     },
     // Allow self-signed certs (common in some corp SMTP setups)
     tls: { rejectUnauthorized: process.env.SMTP_ALLOW_SELF_SIGNED !== "true" },
@@ -70,11 +83,12 @@ export async function sendEmail(
  */
 export async function testSmtpConnection(account: Omit<EmailAccount, "id">): Promise<string | null> {
   try {
+    const authPassword = resolvePassword(account.password);
     const transporter = nodemailer.createTransport({
       host: account.smtp_host,
       port: account.smtp_port,
       secure: account.smtp_secure === 1,
-      auth: { user: account.username, pass: account.password },
+      auth: { user: account.username, pass: authPassword },
       tls: { rejectUnauthorized: process.env.SMTP_ALLOW_SELF_SIGNED !== "true" },
       connectionTimeout: 10_000,
       greetingTimeout: 10_000,
@@ -101,13 +115,14 @@ export interface ImapTestAccount {
  */
 export async function testImapConnection(account: ImapTestAccount): Promise<string | null> {
   return new Promise((resolve) => {
+    const authPassword = resolvePassword(account.imap_password ?? account.password);
     const imap = new Imap({
       host: account.imap_host,
       port: account.imap_port,
       tls: true,
       tlsOptions: { rejectUnauthorized: false },
       user: account.imap_username ?? account.username,
-      password: account.imap_password ?? account.password,
+      password: authPassword,
       authTimeout: 10_000,
       connTimeout: 12_000,
     });
@@ -124,3 +139,4 @@ export async function testImapConnection(account: ImapTestAccount): Promise<stri
     imap.connect();
   });
 }
+

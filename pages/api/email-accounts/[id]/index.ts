@@ -1,10 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { encryptSecret } from "@/lib/crypto";
+import { canAccessEmailAccount, requireApiActor } from "@/lib/authz";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
+
   const db = getDb();
   const id = req.query.id as string;
+
+  if (!canAccessEmailAccount(db, actor, id)) {
+    return res.status(404).json({ error: "Cuenta de correo no encontrada o no autorizada" });
+  }
 
   if (req.method === "GET") {
     const account = db

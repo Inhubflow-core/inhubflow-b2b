@@ -794,6 +794,36 @@ async function syncInboxesOnTick(db: ReturnType<typeof getDb>): Promise<void> {
   }
 }
 
+let lastEmailInboxSyncAt = 0;
+const EMAIL_INBOX_SYNC_INTERVAL_MS = 60_000; // Revisar periódicamente cuentas pendientes
+
+async function syncEmailInboxesOnTick(db: ReturnType<typeof getDb>): Promise<void> {
+  const now = Date.now();
+  if (now - lastEmailInboxSyncAt < EMAIL_INBOX_SYNC_INTERVAL_MS) return;
+  lastEmailInboxSyncAt = now;
+
+  try {
+    const { syncEmailInbox, shouldSyncEmailInbox } = await import("@/lib/email/inbox");
+    const accounts = db.prepare(`
+      SELECT id FROM email_accounts
+      WHERE imap_host IS NOT NULL AND imap_host != ''
+      LIMIT 10
+    `).all() as Array<{ id: string }>;
+
+    for (const acc of accounts) {
+      if (shouldSyncEmailInbox(acc.id)) {
+        try {
+          await syncEmailInbox(acc.id);
+        } catch (err) {
+          console.warn(`[campaign-runner] Error sincronizando IMAP para cuenta ${acc.id}:`, err);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[campaign-runner] Error en syncEmailInboxesOnTick:", error);
+  }
+}
+
 export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<void> {
   if (isTicking) return;
   isTicking = true;
@@ -816,6 +846,7 @@ export async function enqueueTick(customDb?: ReturnType<typeof getDb>): Promise<
       refreshRunCompletion(db, tr.run_profile_id);
     }
     await syncInboxesOnTick(db);
+    await syncEmailInboxesOnTick(db);
   } catch (error) { console.error("[campaign-runner] Error en enqueueTick:", error); }
   finally {
     releaseRuntimeLease(db, leaseKey, leaseOwner);

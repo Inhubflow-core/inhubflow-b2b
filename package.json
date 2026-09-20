@@ -26,7 +26,8 @@
     "test:pipeline": "node scripts/test-pipeline.cjs",
     "test:pipeline-tags": "node scripts/test-pipeline-tags.cjs",
     "test:calendar": "node scripts/test-calendar.cjs",
-    "test:companies": "node scripts/test-companies.cjs"
+    "test:companies": "node scripts/test-companies.cjs",
+    "test:email": "node scripts/test-email-service.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

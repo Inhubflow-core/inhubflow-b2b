@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { testSmtpConnection, testImapConnection } from "@/lib/email/sender";
 import { decryptSecret } from "@/lib/crypto";
+import { canAccessEmailAccount, requireApiActor } from "@/lib/authz";
 
 interface AccountRow {
   from_email: string;
@@ -23,8 +24,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end();
   }
 
+  const actor = await requireApiActor(req, res);
+  if (!actor) return;
+
   const db = getDb();
   const id = req.query.id as string;
+
+  if (!canAccessEmailAccount(db, actor, id)) {
+    return res.status(404).json({ error: "Cuenta de correo no encontrada o no autorizada" });
+  }
 
   const row = db
     .prepare("SELECT * FROM email_accounts WHERE id = ?")
