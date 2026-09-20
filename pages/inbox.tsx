@@ -830,8 +830,8 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base-100 min-w-0 overflow-hidden">
-      {/* ── Chat Header ── */}
-      <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-base-100/90 backdrop-blur-sm flex items-center justify-between gap-4 shrink-0">
+      {/* ── Chat Header (z-30 ensures floating popovers stay on top of message timeline) ── */}
+      <div className="relative z-30 px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-base-100/95 backdrop-blur-md flex items-center justify-between gap-4 shrink-0 shadow-xs">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
             <div
@@ -862,7 +862,7 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
               )}
 
               {/* Interactive Classification Dropdown */}
-              <div className="relative inline-block text-left" ref={classificationMenuRef}>
+              <div className="relative inline-block text-left z-40" ref={classificationMenuRef}>
                 <button
                   type="button"
                   onClick={() => setShowClassificationMenu((prev) => !prev)}
@@ -880,8 +880,8 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
                 </button>
 
                 {showClassificationMenu && (
-                  <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-base-100 border border-base-300 shadow-xl z-50 py-1.5 divide-y divide-base-200 animate-fadeIn">
-                    <div className="px-3 py-1.5">
+                  <div className="absolute left-0 mt-1.5 w-72 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl z-50 py-1.5 divide-y divide-gray-100 dark:divide-gray-800 animate-fadeIn">
+                    <div className="px-3.5 py-2">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-base-content/50">
                         Clasificación & Embudo
                       </p>
@@ -1053,7 +1053,7 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
       )}
 
       {/* ── Messages Timeline Area ── */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-base-200/20">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-base-200/20 relative z-0">
         {activeChannelTab === "linkedin" ? (
           loadingLinkedInThread ? (
             <div className="flex flex-col items-center justify-center py-16 text-base-content/40 gap-2">
