@@ -1,10 +1,12 @@
 import React from "react";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
-import { RiVideoLine, RiUserLine, RiBuildingLine } from "react-icons/ri";
+import { dayKeyInZone, timeLabelInZone } from "@/lib/calendar/time";
 
 interface MonthViewProps {
   currentDate: Date;
   events: CalendarEventWithTarget[];
+  /** IANA zone of the workspace; all day bucketing follows it, not the browser's. */
+  timezone: string;
   onSelectEvent: (event: CalendarEventWithTarget) => void;
   onSelectDate: (date: Date) => void;
 }
@@ -14,6 +16,7 @@ const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export const MonthView: React.FC<MonthViewProps> = ({
   currentDate,
   events,
+  timezone,
   onSelectEvent,
   onSelectDate,
 }) => {
@@ -25,8 +28,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
 
-    // Days in week: Sunday=0, Monday=1, ... Saturday=6
-    // We want Monday as index 0, Sunday as index 6
+    // Days in week: Sunday=0 … Saturday=6 → Monday as index 0.
     let startDayOfWeek = firstDayOfMonth.getDay() - 1;
     if (startDayOfWeek === -1) startDayOfWeek = 6;
 
@@ -37,61 +39,39 @@ export const MonthView: React.FC<MonthViewProps> = ({
       events: CalendarEventWithTarget[];
     }> = [];
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = dayKeyInZone(new Date(), timezone);
+    const eventsByDay = groupByDay(events, timezone);
+
+    const push = (date: Date, isCurrentMonth: boolean) => {
+      const key = dateKeyOf(date);
+      days.push({
+        date,
+        isCurrentMonth,
+        isToday: key === todayStr,
+        events: eventsByDay.get(key) ?? [],
+      });
+    };
 
     // Padding days from previous month
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     for (let i = startDayOfWeek - 1; i >= 0; i--) {
-      const d = new Date(year, month - 1, prevMonthLastDay - i);
-      const dStr = d.toISOString().split("T")[0];
-      days.push({
-        date: d,
-        isCurrentMonth: false,
-        isToday: dStr === todayStr,
-        events: events.filter((e) => e.start_time.startsWith(dStr)),
-      });
+      push(new Date(year, month - 1, prevMonthLastDay - i), false);
     }
 
-    // Days in current month
     for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
-      const d = new Date(year, month, i);
-      // Ensure local date matching
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const dayNum = String(d.getDate()).padStart(2, "0");
-      const dStr = `${y}-${m}-${dayNum}`;
-
-      days.push({
-        date: d,
-        isCurrentMonth: true,
-        isToday: dStr === todayStr,
-        events: events.filter((e) => {
-          const eDate = new Date(e.start_time);
-          const ey = eDate.getFullYear();
-          const em = String(eDate.getMonth() + 1).padStart(2, "0");
-          const ed = String(eDate.getDate()).padStart(2, "0");
-          return `${ey}-${em}-${ed}` === dStr;
-        }),
-      });
+      push(new Date(year, month, i), true);
     }
 
     // Padding days for next month to complete rows of 7
     const remainingDays = 42 - days.length; // 6 weeks standard grid
     if (remainingDays > 0 && remainingDays < 7) {
       for (let i = 1; i <= remainingDays; i++) {
-        const d = new Date(year, month + 1, i);
-        const dStr = d.toISOString().split("T")[0];
-        days.push({
-          date: d,
-          isCurrentMonth: false,
-          isToday: dStr === todayStr,
-          events: events.filter((e) => e.start_time.startsWith(dStr)),
-        });
+        push(new Date(year, month + 1, i), false);
       }
     }
 
     return days;
-  }, [year, month, events]);
+  }, [year, month, events, timezone]);
 
   function getStatusStyle(status: string) {
     switch (status) {
@@ -106,26 +86,14 @@ export const MonthView: React.FC<MonthViewProps> = ({
     }
   }
 
-  function formatTime(iso: string) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "";
-    }
-  }
-
   return (
     <div className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs overflow-hidden">
-      {/* Weekday headers */}
       <div className="grid grid-cols-7 border-b border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-850 divide-x divide-gray-300 dark:divide-gray-700">
         {WEEKDAYS.map((wd, idx) => (
           <div
             key={wd}
             className={`py-3 text-center text-xs font-bold uppercase tracking-wider ${
-              idx >= 5
-                ? "text-gray-400 dark:text-gray-500"
-                : "text-gray-700 dark:text-gray-300"
+              idx >= 5 ? "text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-300"
             }`}
           >
             {wd}
@@ -133,7 +101,6 @@ export const MonthView: React.FC<MonthViewProps> = ({
         ))}
       </div>
 
-      {/* Days Grid - Acentuado con líneas continuas y nítidas */}
       <div className="grid grid-cols-7 gap-px bg-gray-300 dark:bg-gray-700">
         {calendarDays.map((cell, idx) => {
           const maxVisible = 3;
@@ -150,7 +117,6 @@ export const MonthView: React.FC<MonthViewProps> = ({
                   : "bg-gray-50/70 dark:bg-gray-950/60 text-gray-400 dark:text-gray-600"
               }`}
             >
-              {/* Day Number and Today Indicator */}
               <div className="flex items-center justify-between mb-1.5">
                 <span
                   className={`inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 transition-colors ${
@@ -171,7 +137,6 @@ export const MonthView: React.FC<MonthViewProps> = ({
                 )}
               </div>
 
-              {/* Event chips */}
               <div className="flex-1 space-y-1 overflow-hidden">
                 {visibleEvents.map((evt) => (
                   <div
@@ -180,17 +145,13 @@ export const MonthView: React.FC<MonthViewProps> = ({
                       e.stopPropagation();
                       onSelectEvent(evt);
                     }}
-                    title={`${formatTime(evt.start_time)} - ${evt.title} (${evt.target_name || "Sin prospecto"})`}
-                    className={`px-2 py-1 rounded-md text-[11px] font-medium border truncate transition-transform hover:scale-[1.02] shadow-2xs flex items-center gap-1.5 ${getStatusStyle(
-                      evt.status
-                    )}`}
+                    title={`${timeLabelInZone(evt.start_time, timezone)} - ${evt.title} (${evt.target_name || "Sin prospecto"})`}
+                    className={`px-2 py-1 rounded-md text-[11px] font-medium border truncate transition-transform hover:scale-[1.02] shadow-2xs flex items-center gap-1.5 ${getStatusStyle(evt.status)}`}
                   >
                     <span className="shrink-0 font-bold opacity-80">
-                      {formatTime(evt.start_time)}
+                      {timeLabelInZone(evt.start_time, timezone)}
                     </span>
-                    <span className="truncate">
-                      {evt.target_name || evt.title}
-                    </span>
+                    <span className="truncate">{evt.target_name || evt.title}</span>
                   </div>
                 ))}
 
@@ -207,3 +168,29 @@ export const MonthView: React.FC<MonthViewProps> = ({
     </div>
   );
 };
+
+function dateKeyOf(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function groupByDay(
+  events: CalendarEventWithTarget[],
+  timezone: string
+): Map<string, CalendarEventWithTarget[]> {
+  const map = new Map<string, CalendarEventWithTarget[]>();
+  for (const evt of events) {
+    // Previously `start_time.split("T")[0]` — a UTC prefix against a local grid,
+    // so late-evening meetings showed up under the wrong day.
+    const key = dayKeyInZone(evt.start_time, timezone);
+    const list = map.get(key);
+    if (list) list.push(evt);
+    else map.set(key, [evt]);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }
+  return map;
+}

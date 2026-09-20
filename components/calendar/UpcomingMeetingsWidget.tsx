@@ -10,10 +10,13 @@ import {
   RiAddLine,
 } from "react-icons/ri";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import { dayKeyInZone, timeLabelInZone } from "@/lib/calendar/time";
+import { useWorkspaceTimezone } from "@/lib/calendar/use-workspace-timezone";
 
 export const UpcomingMeetingsWidget: React.FC = () => {
   const [events, setEvents] = useState<CalendarEventWithTarget[]>([]);
   const [loading, setLoading] = useState(true);
+  const timezone = useWorkspaceTimezone();
 
   useEffect(() => {
     async function fetchUpcoming() {
@@ -35,26 +38,27 @@ export const UpcomingMeetingsWidget: React.FC = () => {
   }, []);
 
   function formatRelativeDate(iso: string) {
-    const d = new Date(iso);
-    const today = new Date();
-    const isToday =
-      d.getDate() === today.getDate() &&
-      d.getMonth() === today.getMonth() &&
-      d.getFullYear() === today.getFullYear();
+    // Day bucketing and the clock label both follow the workspace zone, not the
+    // browser's — otherwise "Hoy/Mañana" flips for any viewer outside that zone.
+    const dayKey = dayKeyInZone(iso, timezone);
+    const todayKey = dayKeyInZone(new Date(), timezone);
 
-    const tomorrow = new Date(today);
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const isTomorrow =
-      d.getDate() === tomorrow.getDate() &&
-      d.getMonth() === tomorrow.getMonth() &&
-      d.getFullYear() === tomorrow.getFullYear();
+    const tomorrowKey = dayKeyInZone(tomorrow, timezone);
 
-    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const timeStr = timeLabelInZone(iso, timezone);
+    const d = new Date(iso);
 
-    if (isToday) return `Hoy a las ${timeStr}`;
-    if (isTomorrow) return `Mañana a las ${timeStr}`;
+    if (dayKey === todayKey) return `Hoy a las ${timeStr}`;
+    if (dayKey === tomorrowKey) return `Mañana a las ${timeStr}`;
 
-    return `${d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })} a las ${timeStr}`;
+    return `${d.toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: timezone,
+    })} a las ${timeStr}`;
   }
 
   return (

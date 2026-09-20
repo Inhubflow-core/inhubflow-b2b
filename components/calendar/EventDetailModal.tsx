@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   RiCloseLine,
   RiTimeLine,
@@ -13,27 +13,107 @@ import {
   RiAlertLine,
   RiCalendarCheckLine,
   RiExternalLinkLine,
+  RiHistoryLine,
+  RiFlowChart,
+  RiRobotLine,
+  RiEditLine,
+  RiLoader4Line,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import { timeLabelInZone } from "@/lib/calendar/time";
+
+export type CalendarEventStatus = "confirmed" | "completed" | "cancelled" | "no_show";
+
+interface AuditEntry {
+  id: number;
+  event_id: string;
+  action: string;
+  actor_email: string | null;
+  detail_json: string | null;
+  created_at: string;
+}
 
 interface EventDetailModalProps {
   event: CalendarEventWithTarget | null;
   isOpen: boolean;
+  /** IANA zone of the workspace — every time label in this modal follows it. */
+  timezone: string;
   onClose: () => void;
   onEventUpdated: (event: CalendarEventWithTarget) => void;
   onEventDeleted: (eventId: string) => void;
+  onStatusChange: (eventId: string, status: CalendarEventStatus) => Promise<void>;
+  onReschedule: (event: CalendarEventWithTarget) => void;
 }
+
+const STATUS_OPTIONS: Array<{
+  value: CalendarEventStatus;
+  label: string;
+  icon: React.ReactNode;
+  activeClass: string;
+}> = [
+  {
+    value: "confirmed",
+    label: "Confirmada",
+    icon: <RiCheckDoubleLine size={12} />,
+    activeClass: "bg-brand-500 text-white border-brand-500 shadow-xs",
+  },
+  {
+    value: "completed",
+    label: "Completada",
+    icon: <RiCheckDoubleLine size={12} />,
+    activeClass: "bg-emerald-500 text-white border-emerald-500 shadow-xs",
+  },
+  {
+    value: "no_show",
+    label: "No asistió",
+    icon: <RiAlertLine size={12} />,
+    activeClass: "bg-rose-500 text-white border-rose-500 shadow-xs",
+  },
+  {
+    value: "cancelled",
+    label: "Cancelada",
+    icon: <RiCloseCircleLine size={12} />,
+    activeClass: "bg-gray-600 text-white border-gray-600 shadow-xs",
+  },
+];
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   isOpen,
+  timezone,
   onClose,
   onEventUpdated,
   onEventDeleted,
+  onStatusChange,
+  onReschedule,
 }) => {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const eventId = event?.id ?? null;
+
+  useEffect(() => {
+    if (!isOpen || !eventId) {
+      setAudit([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingAudit(true);
+    fetch(`/api/calendar/events/${eventId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setAudit((data?.audit ?? []) as AuditEntry[]);
+      })
+      .catch(() => !cancelled && setAudit([]))
+      .finally(() => !cancelled && setLoadingAudit(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, eventId]);
 
   if (!isOpen || !event) return null;
 
@@ -47,31 +127,20 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: timezone,
       });
     } catch {
       return iso;
     }
   }
 
-  async function handleStatusChange(
-    newStatus: "confirmed" | "completed" | "cancelled" | "no_show"
-  ) {
+  async function handleStatusChange(newStatus: CalendarEventStatus) {
     if (!event) return;
     setUpdating(true);
     try {
-      const res = await fetch(`/api/calendar/events/${event.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!res.ok) throw new Error("Error al actualizar el estado");
-
-      const data = await res.json();
-      toast.success("Estado de la reunión actualizado");
-      onEventUpdated(data.event);
+      await onStatusChange(event.id, newStatus);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Error al actualizar");
+      toast.error(err instanceof Error ? err.message : "Error al actualizar el estado");
     } finally {
       setUpdating(false);
     }
@@ -101,18 +170,28 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between">
-          <div className="space-y-1">
-            <h3 className="font-bold text-gray-900 dark:text-white text-base">
-              {event.title}
-            </h3>
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-gray-900 dark:text-white text-base">
+                {event.title}
+              </h3>
+              {event.channel === "sdr_ai" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  <RiRobotLine size={11} /> SDR IA
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
               <RiTimeLine size={14} className="text-brand-500" />
               <span>
-                {formatDateTime(event.start_time)} — {formatDateTime(event.end_time)}
+                {formatDateTime(event.start_time)} — {timeLabelInZone(event.end_time, timezone)}
               </span>
+            </div>
+            <div className="text-[10px] text-gray-400">
+              {timezone}
             </div>
           </div>
           <button
@@ -125,7 +204,23 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-5 overflow-y-auto">
+          {/* Ecosystem context: where in the funnel this meeting came from */}
+          {(event.run_name || event.list_name || (event.workflow_names ?? []).length > 0) && (
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700/60 space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                <RiFlowChart size={12} /> Origen en el ecosistema
+              </div>
+              <div className="text-xs text-gray-700 dark:text-gray-300 flex flex-wrap gap-x-3 gap-y-1">
+                {event.run_name ? <span>Campaña: <b>{event.run_name}</b></span> : null}
+                {(event.workflow_names ?? []).length > 0 ? (
+                  <span>Campañas: <b>{(event.workflow_names ?? []).join(", ")}</b></span>
+                ) : null}
+                {event.list_name ? <span>Lista: <b>{event.list_name}</b></span> : null}
+              </div>
+            </div>
+          )}
+
           {/* Prospect Card */}
           {event.target_name ? (
             <div className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-850/50 space-y-2">
@@ -219,55 +314,61 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               Estado de la Reunión
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                disabled={updating}
-                onClick={() => handleStatusChange("confirmed")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  event.status === "confirmed"
-                    ? "bg-brand-500 text-white border-brand-500 shadow-xs"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Confirmada
-              </button>
-              <button
-                type="button"
-                disabled={updating}
-                onClick={() => handleStatusChange("completed")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  event.status === "completed"
-                    ? "bg-emerald-500 text-white border-emerald-500 shadow-xs"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-emerald-50/50"
-                }`}
-              >
-                Completada
-              </button>
-              <button
-                type="button"
-                disabled={updating}
-                onClick={() => handleStatusChange("no_show")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  event.status === "no_show"
-                    ? "bg-rose-500 text-white border-rose-500 shadow-xs"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-rose-50/50"
-                }`}
-              >
-                No asistió
-              </button>
-              <button
-                type="button"
-                disabled={updating}
-                onClick={() => handleStatusChange("cancelled")}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                  event.status === "cancelled"
-                    ? "bg-gray-600 text-white border-gray-600 shadow-xs"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                Cancelada
-              </button>
+              {STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={updating}
+                  onClick={() => handleStatusChange(opt.value)}
+                  className={`inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    event.status === opt.value
+                      ? opt.activeClass
+                      : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.icon} {opt.label}
+                </button>
+              ))}
             </div>
+          </div>
+
+          {/* Audit trail — who moved this meeting and when */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+              <RiHistoryLine size={12} /> Historial
+            </div>
+            {loadingAudit ? (
+              <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                <RiLoader4Line size={14} className="animate-spin" /> Cargando...
+              </div>
+            ) : audit.length === 0 ? (
+              <div className="text-[11px] text-gray-400 italic">
+                Sin movimientos registrados todavía.
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {audit.slice(0, 8).map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-start gap-2 text-[11px] text-gray-600 dark:text-gray-400"
+                  >
+                    <RiCalendarCheckLine size={12} className="mt-0.5 text-brand-500 shrink-0" />
+                    <span className="min-w-0">
+                      <b className="text-gray-800 dark:text-gray-200">{entry.action}</b>
+                      {entry.actor_email ? ` · ${entry.actor_email}` : ""}
+                      {" · "}
+                      {new Date(entry.created_at).toLocaleString("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: timezone,
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -281,13 +382,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           >
             <RiDeleteBinLine size={14} /> Eliminar
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cerrar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onReschedule(event)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-brand-700 dark:text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 transition-colors"
+            >
+              <RiEditLine size={14} /> Reprogramar
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>

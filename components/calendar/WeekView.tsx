@@ -1,24 +1,26 @@
 import React from "react";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
-import { RiVideoLine, RiTimeLine } from "react-icons/ri";
+import { dayKeyInZone, timeLabelInZone } from "@/lib/calendar/time";
 
 interface WeekViewProps {
   currentDate: Date;
   events: CalendarEventWithTarget[];
+  timezone: string;
   onSelectEvent: (event: CalendarEventWithTarget) => void;
   onSelectSlot: (date: Date, hour: number) => void;
 }
 
 const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const HOUR_HEIGHT = 60; // px per hour slot
+const DAY_START_HOUR = 8;
 
 export const WeekView: React.FC<WeekViewProps> = ({
   currentDate,
   events,
+  timezone,
   onSelectEvent,
   onSelectSlot,
 }) => {
-  // Calculate 7 days of current week (Monday to Sunday)
   const weekDays = React.useMemo(() => {
     const day = currentDate.getDay();
     const diffToMonday = (day === 0 ? -6 : 1) - day;
@@ -35,12 +37,18 @@ export const WeekView: React.FC<WeekViewProps> = ({
     }> = [];
 
     const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = dayKeyInZone(new Date(), timezone);
+    const eventsByDay = new Map<string, CalendarEventWithTarget[]>();
+    for (const evt of events) {
+      const key = dayKeyInZone(evt.start_time, timezone);
+      const list = eventsByDay.get(key);
+      if (list) list.push(evt);
+      else eventsByDay.set(key, [evt]);
+    }
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const dayNum = String(d.getDate()).padStart(2, "0");
@@ -52,18 +60,14 @@ export const WeekView: React.FC<WeekViewProps> = ({
         dayName: dayNames[i],
         dayNum: d.getDate(),
         isToday: dStr === todayStr,
-        events: events.filter((e) => {
-          const eDate = new Date(e.start_time);
-          const ey = eDate.getFullYear();
-          const em = String(eDate.getMonth() + 1).padStart(2, "0");
-          const ed = String(eDate.getDate()).padStart(2, "0");
-          return `${ey}-${em}-${ed}` === dStr;
-        }),
+        events: (eventsByDay.get(dStr) ?? []).slice().sort(
+          (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        ),
       });
     }
 
     return days;
-  }, [currentDate, events]);
+  }, [currentDate, events, timezone]);
 
   function getStatusStyle(status: string) {
     switch (status) {
@@ -78,32 +82,24 @@ export const WeekView: React.FC<WeekViewProps> = ({
     }
   }
 
-  function formatTime(iso: string) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "";
-    }
-  }
-
-  // Calculate event positioning within the day column (08:00 to 21:00)
+  // Position within the day column, measured in workspace-local time.
   function calculateEventPosition(event: CalendarEventWithTarget) {
-    const start = new Date(event.start_time);
-    const end = new Date(event.end_time);
+    const startLabel = timeLabelInZone(event.start_time, timezone);
+    const [startHour, startMinute] = startLabel.split(":").map(Number);
+    const startMinutesFrom8 = (startHour - DAY_START_HOUR) * 60 + startMinute;
+    const durationMinutes = Math.max(
+      25,
+      (new Date(event.end_time).getTime() - new Date(event.start_time).getTime()) / (1000 * 60)
+    );
 
-    const startMinutesFrom8 = (start.getHours() - 8) * 60 + start.getMinutes();
-    const durationMinutes = Math.max(25, (end.getTime() - start.getTime()) / (1000 * 60));
-
-    const top = (startMinutesFrom8 / 60) * HOUR_HEIGHT;
-    const height = Math.max(30, (durationMinutes / 60) * HOUR_HEIGHT - 2);
-
-    return { top, height };
+    return {
+      top: (startMinutesFrom8 / 60) * HOUR_HEIGHT,
+      height: Math.max(30, (durationMinutes / 60) * HOUR_HEIGHT - 2),
+    };
   }
 
   return (
     <div className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs overflow-hidden flex flex-col">
-      {/* Week header row */}
       <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-850 sticky top-0 z-10">
         <div className="py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 border-r border-gray-300 dark:border-gray-700">
           Hora
@@ -120,9 +116,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
             </div>
             <div
               className={`inline-flex items-center justify-center text-sm font-bold rounded-full w-7 h-7 mt-0.5 ${
-                wd.isToday
-                  ? "bg-brand-500 text-white shadow-xs"
-                  : "text-gray-900 dark:text-white"
+                wd.isToday ? "bg-brand-500 text-white shadow-xs" : "text-gray-900 dark:text-white"
               }`}
             >
               {wd.dayNum}
@@ -131,10 +125,8 @@ export const WeekView: React.FC<WeekViewProps> = ({
         ))}
       </div>
 
-      {/* Grid container with hours and day columns */}
       <div className="overflow-y-auto max-h-[620px] relative">
         <div className="grid grid-cols-[60px_repeat(7,1fr)] relative">
-          {/* Time axis */}
           <div className="border-r border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/60 select-none">
             {HOURS.map((hour) => (
               <div
@@ -147,7 +139,6 @@ export const WeekView: React.FC<WeekViewProps> = ({
             ))}
           </div>
 
-          {/* 7 Day columns */}
           {weekDays.map((wd) => (
             <div
               key={wd.dateStr}
@@ -155,7 +146,6 @@ export const WeekView: React.FC<WeekViewProps> = ({
                 wd.isToday ? "bg-brand-500/[0.02]" : ""
               }`}
             >
-              {/* Hourly slot click targets */}
               {HOURS.map((hour) => (
                 <div
                   key={hour}
@@ -165,10 +155,8 @@ export const WeekView: React.FC<WeekViewProps> = ({
                 />
               ))}
 
-              {/* Event blocks */}
               {wd.events.map((evt) => {
                 const { top, height } = calculateEventPosition(evt);
-                // Only render if within visible window (top >= 0)
                 if (top < 0) return null;
 
                 return (
@@ -178,40 +166,23 @@ export const WeekView: React.FC<WeekViewProps> = ({
                       e.stopPropagation();
                       onSelectEvent(evt);
                     }}
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      left: "3px",
-                      right: "3px",
-                    }}
-                    title={`${formatTime(evt.start_time)} - ${formatTime(evt.end_time)} | ${evt.title}`}
-                    className={`absolute rounded-xl border p-2 text-xs font-medium cursor-pointer shadow-xs transition-all hover:scale-[1.02] hover:z-20 overflow-hidden flex flex-col justify-between ${getStatusStyle(
-                      evt.status
-                    )}`}
+                    style={{ top: `${top}px`, height: `${height}px`, left: "3px", right: "3px" }}
+                    title={`${timeLabelInZone(evt.start_time, timezone)} - ${timeLabelInZone(evt.end_time, timezone)} | ${evt.title}`}
+                    className={`absolute rounded-xl border p-2 text-xs font-medium cursor-pointer shadow-xs transition-all hover:scale-[1.02] hover:z-20 overflow-hidden flex flex-col justify-between ${getStatusStyle(evt.status)}`}
                   >
                     <div className="space-y-0.5 min-w-0">
                       <div className="flex items-center gap-1 font-bold text-[11px]">
-                        <RiTimeLine size={12} className="shrink-0" />
                         <span>
-                          {formatTime(evt.start_time)} - {formatTime(evt.end_time)}
+                          {timeLabelInZone(evt.start_time, timezone)} - {timeLabelInZone(evt.end_time, timezone)}
                         </span>
                       </div>
                       <div className="font-semibold truncate text-xs">
                         {evt.target_name || evt.title}
                       </div>
                       {evt.target_company && (
-                        <div className="text-[10px] opacity-75 truncate">
-                          {evt.target_company}
-                        </div>
+                        <div className="text-[10px] opacity-75 truncate">{evt.target_company}</div>
                       )}
                     </div>
-
-                    {evt.meeting_link && (
-                      <div className="flex items-center gap-1 text-[10px] font-semibold opacity-90 pt-1">
-                        <RiVideoLine size={11} className="shrink-0" />
-                        <span className="truncate">Videollamada</span>
-                      </div>
-                    )}
                   </div>
                 );
               })}

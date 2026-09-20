@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import type { PipelineCard, PipelineStageWithCount } from "@/lib/pipeline/pipeline-service";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { ScheduleModal } from "@/components/calendar/ScheduleModal";
+import { useWorkspaceTimezone } from "@/lib/calendar/use-workspace-timezone";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
 import { TagPicker, type AppliedTag, type TagOption } from "@/components/pipeline/TagPicker";
 
@@ -50,6 +51,7 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
   const [meetings, setMeetings] = useState<CalendarEventWithTarget[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const timezone = useWorkspaceTimezone();
 
   // Tag system: AI-applied and manual labels
   const { t } = useTranslation();
@@ -495,6 +497,7 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
         <ScheduleModal
           isOpen={showScheduleModal}
           onClose={() => setShowScheduleModal(false)}
+          timezone={timezone}
           initialTarget={{
             id: card.id,
             full_name: card.full_name,

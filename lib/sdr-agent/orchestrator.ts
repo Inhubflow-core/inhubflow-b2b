@@ -21,6 +21,7 @@ import { type SdrAgentRecord, type SdrAgentVersionRecord } from "./seed";
 import { hasProviderBudget, recordProviderFailure, recordProviderSuccess } from "./usage";
 import { autoAdvanceTargetByTrigger } from "@/lib/pipeline/pipeline-service";
 import { applyDecisionTags } from "@/lib/tags/tags-service";
+import { proposeMeetingSlots } from "@/lib/calendar/meeting-requests";
 
 interface TargetContext {
   full_name: string | null;
@@ -54,6 +55,7 @@ export interface ProcessClassificationResult {
   decisionId?: string;
   actionId?: string;
   handoffId?: string;
+  meetingRequestId?: string;
   decision?: SdrDecisionOutput;
   policy?: SdrPolicyResult;
   latencyMs?: number;
@@ -330,6 +332,33 @@ function finishDecision(
       // Non-blocking tag persistence
     }
 
+    // Calendar: when the lead asks for a meeting (or the agent wants to offer
+    // slots), the agent only *proposes* candidate times. The booking itself is a
+    // human decision (module runs in `approval` mode), taken on /calendar or via
+    // POST /api/calendar/requests/[id]/approve.
+    let meetingRequestId: string | undefined;
+    const wantsMeeting =
+      input.decision.intent === "meeting_request" ||
+      input.decision.recommended_action === "offer_slots" ||
+      (input.decision.tags ?? []).includes("meeting");
+    if (wantsMeeting && input.context.runtime.calendarEnabled) {
+      try {
+        const proposal = proposeMeetingSlots(db, {
+          threadId: input.context.thread.id,
+          decisionId: persisted.id,
+          targetId: input.context.thread.target_id,
+          workspaceOwnerId: input.context.thread.workspace_owner_id,
+          notes: input.decision.tag_reasoning ?? null,
+        });
+        if (proposal.requested && proposal.requestId) {
+          meetingRequestId = proposal.requestId;
+          notifyMeetingRequest(db, input.context, proposal.slots.length, proposal.requestId);
+        }
+      } catch {
+        // Non-blocking: a failed proposal must never lose the decision.
+      }
+    }
+
     let handoffId: string | undefined;
     let actionId: string | undefined;
 
@@ -406,11 +435,57 @@ function finishDecision(
       decisionId: persisted.id,
       actionId,
       handoffId,
+      meetingRequestId,
       decision: input.decision,
       policy: input.policy,
       latencyMs: input.latencyMs,
     };
   })();
+}
+
+/**
+ * Alerts the responsible human that the lead is asking for a meeting and that the
+ * agent has left candidate slots waiting for approval. Uses the same assignment
+ * order as a handoff (account assignee → workspace owner → admin).
+ */
+function notifyMeetingRequest(
+  db: Database.Database,
+  context: LoadedExecutionContext,
+  slotCount: number,
+  requestId: string,
+): void {
+  try {
+    const workspaceOwnerId = context.thread.workspace_owner_id;
+    if (!workspaceOwnerId) return;
+
+    let assignee: { userId: string } | null = null;
+    try {
+      assignee = resolveHandoffAssignee(db, context.thread.id);
+    } catch {
+      assignee = null;
+    }
+
+    const userId = assignee?.userId ?? workspaceOwnerId;
+    const name = context.target.full_name || "un prospecto";
+
+    createAppNotification(db, {
+      workspaceOwnerId,
+      userId,
+      notificationType: "sdr_meeting_request",
+      priority: "normal",
+      title: "El SDR IA propuso horarios de reunión",
+      body: `${name} quiere agendar. Hay ${slotCount} horarios propuestos esperando tu aprobación.`,
+      href: "/calendar",
+      entityType: "calendar_meeting_request",
+      entityId: requestId,
+      threadId: context.thread.id,
+      data: { request_id: requestId, target_id: context.thread.target_id, slots: slotCount },
+      idempotencyKey: `calendar-meeting-request:${requestId}`,
+      queueWebPush: true,
+    });
+  } catch (error) {
+    console.error("[sdr] meeting request notification failed:", error);
+  }
 }
 
 async function callProviderWithLease(

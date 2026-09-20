@@ -12,6 +12,7 @@ import {
 } from "react-icons/ri";
 import { toast } from "sonner";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import { utcFromZoned } from "@/lib/calendar/time";
 
 interface TargetOption {
   id: string;
@@ -29,6 +30,16 @@ interface ScheduleModalProps {
   initialDate?: Date;
   initialHour?: number;
   initialTarget?: TargetOption | null;
+  /**
+   * IANA zone of the workspace. The date/hour the user picks are wall-clock in this
+   * zone; without it `new Date("YYYY-MM-DDTHH:mm")` would be parsed as browser-local
+   * and the meeting could land in the wrong day for any non-UTC workspace.
+   */
+  timezone: string;
+  /** Optional campaign (run) this meeting belongs to. */
+  initialRunId?: string | null;
+  /** Optional list this meeting belongs to. */
+  initialListId?: string | null;
 }
 
 export const ScheduleModal: React.FC<ScheduleModalProps> = ({
@@ -38,6 +49,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   initialDate,
   initialHour = 10,
   initialTarget = null,
+  timezone,
+  initialRunId = null,
+  initialListId = null,
 }) => {
   const [title, setTitle] = useState("");
   const [targetId, setTargetId] = useState<string>("");
@@ -50,6 +64,12 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [channel, setChannel] = useState<"linkedin" | "email" | "manual">("linkedin");
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Ecosystem linkage: which campaign / list this meeting belongs to.
+  const [runId, setRunId] = useState<string>("");
+  const [listId, setListId] = useState<string>("");
+  const [runs, setRuns] = useState<Array<{ id: string; name: string }>>([]);
+  const [lists, setLists] = useState<Array<{ id: string; name: string }>>([]);
 
   // Live prospect search
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,8 +97,42 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
         setTargetId("");
         setTitle("Reunión Comercial");
       }
+
+      setRunId(initialRunId ?? "");
+      setListId(initialListId ?? "");
     }
-  }, [isOpen, initialDate, initialHour, initialTarget]);
+  }, [isOpen, initialDate, initialHour, initialTarget, initialRunId, initialListId]);
+
+  // Load campaigns + lists once, so a meeting can be attached to the funnel.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/runs?limit=50").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch("/api/lists").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([runsData, listsData]) => {
+      if (cancelled) return;
+      const runRows = (runsData?.runs ?? runsData?.items ?? []) as Array<{
+        id: string;
+        name?: string | null;
+        workflow_name?: string | null;
+      }>;
+      const listRows = (listsData?.lists ?? listsData?.items ?? []) as Array<{
+        id: string;
+        name?: string | null;
+      }>;
+      setRuns(
+        runRows.map((r) => ({
+          id: r.id,
+          name: r.name || r.workflow_name || `Campaña ${r.id.slice(0, 8)}`,
+        }))
+      );
+      setLists(listRows.map((l) => ({ id: l.id, name: l.name || `Lista ${l.id.slice(0, 8)}` })));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   // Debounced search for targets
   useEffect(() => {
@@ -126,8 +180,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
       return;
     }
 
-    // Build ISO start & end times
-    const startDateTime = new Date(`${dateStr}T${timeStr}:00`);
+    // Build ISO start & end times. `dateStr`/`timeStr` are wall-clock in the workspace
+    // zone, so they must be converted with the zone — not parsed as browser-local.
+    const [y, mo, d] = dateStr.split("-").map(Number);
+    const [hh, mm] = timeStr.split(":").map(Number);
+    if (!y || !mo || !d || !Number.isFinite(hh) || !Number.isFinite(mm)) {
+      toast.error("Formato de fecha u hora no válido");
+      return;
+    }
+    const startDateTime = utcFromZoned(y, mo, d, hh, mm, timezone);
     if (isNaN(startDateTime.getTime())) {
       toast.error("Formato de fecha u hora no válido");
       return;
@@ -149,6 +210,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           meeting_link: meetingLink.trim() || null,
           channel,
           auto_advance_pipeline: autoAdvance,
+          run_id: runId || null,
+          list_id: listId || null,
         }),
       });
 
@@ -189,6 +252,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Programa una cita con tu prospecto y sincronízala con tu CRM.
               </p>
+              <p className="text-[10px] text-gray-400">Zona horaria: {timezone}</p>
             </div>
           </div>
           <button
@@ -351,6 +415,41 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 placeholder="https://meet.google.com/xxx-xxxx-xxx"
                 className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500"
               />
+            </div>
+          </div>
+
+          {/* Ecosystem linkage: campaign + list */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                Campaña (opcional)
+              </label>
+              <select
+                value={runId}
+                onChange={(e) => setRunId(e.target.value)}
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500"
+              >
+                <option value="">Sin campaña</option>
+                {runs.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                Lista (opcional)
+              </label>
+              <select
+                value={listId}
+                onChange={(e) => setListId(e.target.value)}
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500"
+              >
+                <option value="">Sin lista</option>
+                {lists.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 

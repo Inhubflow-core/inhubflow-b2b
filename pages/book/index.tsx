@@ -18,6 +18,7 @@ import {
   RiSparklingLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
+import { dayKeyInZone, normalizeTimeZone, DEFAULT_TIMEZONE } from "@/lib/calendar/time";
 
 interface SlotItem {
   time: string;
@@ -26,7 +27,15 @@ interface SlotItem {
   available: boolean;
 }
 
-export default function PublicBookingPage() {
+/**
+ * Public booking page. Slots come from /api/calendar/availability, which resolves
+ * the requested YYYY-MM-DD in the *workspace* timezone — so the date picker here
+ * must bucket days in that same zone, not in the visitor's browser zone, or a
+ * visitor abroad would request the wrong calendar day and see empty slots.
+ */
+export default function PublicBookingPage({ initialTimezone }: { initialTimezone: string }) {
+  const [timezone, setTimezone] = useState<string>(normalizeTimeZone(initialTimezone));
+
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     // Default to tomorrow or next business day
     const d = new Date();
@@ -59,13 +68,12 @@ export default function PublicBookingPage() {
   } | null>(null);
 
   const selectedDateStr = useMemo(() => {
-    const y = selectedDate.getFullYear();
-    const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const d = String(selectedDate.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }, [selectedDate]);
+    // Bucketed in the workspace zone, matching how the API resolves the day.
+    return dayKeyInZone(selectedDate, timezone);
+  }, [selectedDate, timezone]);
 
-  // Fetch available slots for the selected date
+  // The availability endpoint reports the zone it used; adopt it so the day grid,
+  // the slot labels and the confirmation all speak the same clock.
   useEffect(() => {
     async function loadSlots() {
       setLoadingSlots(true);
@@ -73,6 +81,9 @@ export default function PublicBookingPage() {
         const res = await fetch(`/api/calendar/availability?date=${selectedDateStr}`);
         if (res.ok) {
           const data = await res.json();
+          if (typeof data?.timezone === "string") {
+            setTimezone(normalizeTimeZone(data.timezone));
+          }
           setSlots(data.slots || []);
         } else {
           setSlots([]);
@@ -100,8 +111,9 @@ export default function PublicBookingPage() {
     if (startDayOfWeek === -1) startDayOfWeek = 6;
 
     const days: Array<{ date: Date; isCurrentMonth: boolean; isPast: boolean; isSelected: boolean }> = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // "Past" and "weekend" are decided in the workspace zone, since that is the
+    // calendar the visitor is actually booking against.
+    const todayKey = dayKeyInZone(new Date(), timezone);
 
     // Padding previous month
     const prevMonthLastDay = new Date(year, month, 0).getDate();
@@ -110,7 +122,7 @@ export default function PublicBookingPage() {
       days.push({
         date: d,
         isCurrentMonth: false,
-        isPast: d < today,
+        isPast: dayKeyInZone(d, timezone) < todayKey,
         isSelected: false,
       });
     }
@@ -118,11 +130,9 @@ export default function PublicBookingPage() {
     // Days in month
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const d = new Date(year, month, i);
-      const isPast = d < today || d.getDay() === 0 || d.getDay() === 6; // disabled past and weekends
-      const isSelected =
-        d.getFullYear() === selectedDate.getFullYear() &&
-        d.getMonth() === selectedDate.getMonth() &&
-        d.getDate() === selectedDate.getDate();
+      const key = dayKeyInZone(d, timezone);
+      const isPast = key < todayKey || d.getDay() === 0 || d.getDay() === 6; // disabled past and weekends
+      const isSelected = key === dayKeyInZone(selectedDate, timezone);
 
       days.push({
         date: d,
@@ -133,7 +143,7 @@ export default function PublicBookingPage() {
     }
 
     return days;
-  }, [currentMonth, selectedDate]);
+  }, [currentMonth, selectedDate, timezone]);
 
   async function handleBookSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -293,7 +303,7 @@ export default function PublicBookingPage() {
                     Selecciona una fecha y hora
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Horarios mostrados en tu zona horaria local.
+                    Horarios mostrados en {timezone}.
                   </p>
                 </div>
 
@@ -541,7 +551,9 @@ export default function PublicBookingPage() {
                         year: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      })}
+                        timeZone: timezone,
+                      })}{" "}
+                      ({timezone})
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
@@ -585,5 +597,16 @@ export default function PublicBookingPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async () => {
-  return { props: {} };
+  // Seed the workspace zone so the first paint already buckets days correctly;
+  // the client still adopts whatever the availability endpoint reports.
+  let timezone = DEFAULT_TIMEZONE;
+  try {
+    const { getDb } = await import("@/lib/db");
+    const { getCalendarSettings } = await import("@/lib/calendar/settings");
+    const db = getDb();
+    timezone = getCalendarSettings(db).timezone || DEFAULT_TIMEZONE;
+  } catch (err) {
+    console.error("[book] could not resolve workspace timezone:", err);
+  }
+  return { props: { initialTimezone: timezone } };
 };
