@@ -9,6 +9,7 @@ export interface PipelineCard {
   last_name: string | null;
   title: string | null;
   company: string | null;
+  company_id: string | null;
   location: string | null;
   profile_image_url: string | null;
   linkedin_url: string | null;
@@ -341,6 +342,7 @@ export function getPipelineCardsByStage(
       t.last_name,
       t.title,
       t.company,
+      t.company_id,
       t.location,
       t.profile_image_url,
       t.linkedin_url,
@@ -377,6 +379,7 @@ export function getPipelineCardsByStage(
     last_name: string | null;
     title: string | null;
     company: string | null;
+    company_id: string | null;
     location: string | null;
     profile_image_url: string | null;
     linkedin_url: string | null;
@@ -462,6 +465,7 @@ export function getPipelineCardsByStage(
       last_name: r.last_name,
       title: r.title,
       company: r.company,
+      company_id: r.company_id ?? null,
       location: r.location,
       profile_image_url: r.profile_image_url,
       linkedin_url: r.linkedin_url,

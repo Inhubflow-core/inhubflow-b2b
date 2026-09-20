@@ -19,6 +19,16 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: "csv content is required" });
   }
 
-  const result = importCsv(db, listId, csv);
+  // Derive workspaceOwnerId from list or accounts
+  const listOwner = (db.prepare(`
+    SELECT a.owner_id
+    FROM lists l
+    LEFT JOIN runs r ON r.list_id = l.id
+    LEFT JOIN accounts a ON a.id = r.account_id
+    WHERE l.id = ? AND a.owner_id IS NOT NULL
+    LIMIT 1
+  `).get(listId) as { owner_id: string } | undefined)?.owner_id;
+
+  const result = importCsv(db, listId, csv, listOwner);
   res.json(result);
 }

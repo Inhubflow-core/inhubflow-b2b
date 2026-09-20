@@ -10,6 +10,7 @@ import { applyPipelineSchema } from "@/lib/pipeline/schema";
 import { applyTagsSchema } from "@/lib/tags/schema";
 import { applyCalendarSchema } from "@/lib/calendar/schema";
 import { applySignalSchema } from "@/lib/signals/schema";
+import { applyCompaniesSchema } from "@/lib/companies/schema";
 import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
 
 function resolveDbPath(): string {
@@ -1014,6 +1015,9 @@ function runMigrations(db: Database.Database) {
 
   // Signal Radar module: Intent-based signal monitors, hot leads, and events
   applySignalSchema(db);
+
+  // Companies and Account-Based Marketing (ABM) module
+  applyCompaniesSchema(db);
 
   // Keep provider implementation details out of customer-facing activity and
   // diagnostics, including historical rows written by older releases.

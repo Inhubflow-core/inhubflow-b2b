@@ -6,6 +6,7 @@ import {
   RiMailLine,
   RiPhoneLine,
   RiMapPinLine,
+  RiBuildingLine,
   RiLinkedinBoxFill,
   RiRobotLine,
   RiChat3Line,
@@ -236,7 +237,21 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
                 <p className="text-xs text-base-content/70 truncate mt-0.5">{card.title}</p>
               )}
               {card.company && (
-                <p className="text-xs font-semibold text-primary truncate mt-0.5">{card.company}</p>
+                card.company_id ? (
+                  <Link
+                    href={`/companies/${card.company_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline truncate mt-0.5"
+                    title={card.company}
+                  >
+                    <RiBuildingLine size={12} className="shrink-0" />
+                    <span className="truncate">{card.company}</span>
+                    <RiExternalLinkLine size={10} className="shrink-0 opacity-70" />
+                  </Link>
+                ) : (
+                  <p className="text-xs font-semibold text-primary truncate mt-0.5">{card.company}</p>
+                )
               )}
             </div>
           </div>

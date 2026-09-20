@@ -28,6 +28,13 @@ interface TargetContext {
   first_name: string | null;
   company: string | null;
   title: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  employee_count?: number | null;
+  annual_revenue?: string | null;
+  technology_names?: string | null;
+  company_description?: string | null;
 }
 
 interface LoadedExecutionContext {
@@ -94,9 +101,14 @@ function loadExecutionContext(
     "SELECT * FROM sdr_agent_versions WHERE id = ? AND agent_id = ?",
   ).get(versionId, agent.id) as SdrAgentVersionRecord | undefined;
   if (!version) throw new Error(`SDR agent version ${versionId} not found`);
-  const target = db.prepare(
-    "SELECT full_name, first_name, company, title FROM targets WHERE id = ?",
-  ).get(thread.target_id) as TargetContext | undefined;
+  const target = db.prepare(`
+    SELECT t.full_name, t.first_name, t.company, t.title, t.company_id,
+           c.name as company_name, c.industry, c.employee_count, c.annual_revenue,
+           c.technology_names, c.description as company_description
+    FROM targets t
+    LEFT JOIN companies c ON c.id = t.company_id
+    WHERE t.id = ?
+  `).get(thread.target_id) as TargetContext | undefined;
   if (!target) throw new Error(`Target ${thread.target_id} not found`);
 
   return {
@@ -648,13 +660,25 @@ export async function processLeasedClassificationJob(
       .filter((message) => message.id !== context.message.id)
       .slice(-20)
       .map((message) => ({ direction: message.direction, body: message.body.slice(0, 5_000), sentAt: message.sent_at }));
+    const companyContextParts = [
+      (context.target.company_name || context.target.company) ? `Empresa: ${context.target.company_name || context.target.company}` : null,
+      context.target.title ? `Cargo: ${context.target.title}` : null,
+      context.target.industry ? `Sector: ${context.target.industry}` : null,
+      context.target.employee_count ? `Tamaño: ~${context.target.employee_count} empleados` : null,
+      context.target.annual_revenue ? `Facturación: ${context.target.annual_revenue}` : null,
+      context.target.technology_names ? `Tecnologías detectadas: ${context.target.technology_names}` : null,
+    ].filter(Boolean);
+    const prospectProfileNotice = companyContextParts.length > 0
+      ? `\n[Contexto B2B del prospecto: ${companyContextParts.join(" | ")}]`
+      : "";
+
     providerResult = await callProviderWithLease(db, job, provider, {
       inboundMessage: context.message.body,
       senderName: context.target.full_name ?? context.target.first_name ?? "Prospecto",
       conversationHistory: history,
       systemPrompt: context.version.system_prompt,
       companyContext: context.policy.company_context,
-      customInstructions: context.config.custom_instructions,
+      customInstructions: [context.config.custom_instructions, prospectProfileNotice].filter(Boolean).join("\n"),
       handoffRules: context.policy.handoff_rules,
       knowledgeChunks: knowledge.chunks,
     });

@@ -335,7 +335,19 @@
     "deleteConfirm": "Deseja excluir esta empresa? Os contatos serão desvinculados, mas não apagados.",
     "companyCreated": "Empresa criada",
     "companyUpdated": "Empresa atualizada",
-    "companyDeleted": "Excluída"
+    "companyDeleted": "Excluída",
+    "syncContacts": "Sincronizar Contatos",
+    "syncing": "Sincronizando...",
+    "syncSuccess": "Sincronização concluída: {linked} contatos vinculados ({created} novas empresas)",
+    "statTotal": "Total de Empresas",
+    "statWithContacts": "Com Contatos",
+    "statIndustries": "Setores / Indústrias",
+    "techStack": "Tecnologias",
+    "employees": "Funcionários",
+    "viewPipeline": "Ver no Funil",
+    "filterIndustry": "Todos os setores",
+    "enrollAll": "Inscrever na Campanha",
+    "backToList": "Voltar para Empresas"
   },
   "workflows": {
     "title": "Campanhas",

@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { canonicalLinkedInProfileUrl } from "@/lib/signals/scanners/scoring";
+import { resolveOrCreateCompany, linkTargetToCompany } from "@/lib/companies/service";
 
 export interface CampaignTargetInput {
   linkedinUrl: string;
@@ -27,6 +28,8 @@ export function upsertCampaignTarget(db: Database.Database, input: CampaignTarge
   const nameParts = input.fullName.trim().split(/\s+/);
   const firstName = nameParts[0] || null;
   const lastName = nameParts.slice(1).join(" ") || null;
+  let targetId: string;
+
   if (existing) {
     db.prepare(`
       UPDATE targets SET
@@ -40,17 +43,28 @@ export function upsertCampaignTarget(db: Database.Database, input: CampaignTarge
         unipile_provider_id = COALESCE(unipile_provider_id, ?)
       WHERE id = ?
     `).run(input.fullName, firstName, lastName, input.headline || null, input.headline || null, input.company || null, input.location || null, input.providerId || null, existing.id);
-    return existing.id;
+    targetId = existing.id;
+  } else {
+    targetId = randomUUID();
+    db.prepare(`
+      INSERT INTO targets (
+        id, linkedin_url, first_name, last_name, full_name, headline, title,
+        company, location, unipile_provider_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(targetId, canonical, firstName, lastName, input.fullName, input.headline || null, input.headline || null, input.company || null, input.location || null, input.providerId || null);
   }
 
-  const id = randomUUID();
-  db.prepare(`
-    INSERT INTO targets (
-      id, linkedin_url, first_name, last_name, full_name, headline, title,
-      company, location, unipile_provider_id, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-  `).run(id, canonical, firstName, lastName, input.fullName, input.headline || null, input.headline || null, input.company || null, input.location || null, input.providerId || null);
-  return id;
+  if (input.company) {
+    const companyId = resolveOrCreateCompany(db, {
+      name: input.company,
+      location: input.location,
+    });
+    if (companyId) {
+      linkTargetToCompany(db, targetId, companyId, input.company);
+    }
+  }
+
+  return targetId;
 }
 
 export function attachTargetToList(db: Database.Database, listId: string, targetId: string): void {

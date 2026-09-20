@@ -3,6 +3,7 @@ import type DatabaseType from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
 import { getSessionPage, markNeedsReauth } from "@/lib/linkedin/session";
+import { resolveOrCreateCompany, linkTargetToCompany, extractDomain } from "@/lib/companies/service";
 
 type DB = DatabaseType.Database;
 
@@ -1129,6 +1130,7 @@ export function saveProfilesToList(
     listName: string;
     description?: string;
     profiles: SearchLead[];
+    workspaceOwnerId?: string | null;
   }
 ): { listId: string; listName: string; importedCount: number; updatedCount: number } {
   const { listName, description, profiles } = options;
@@ -1219,6 +1221,19 @@ export function saveProfilesToList(
       }
 
       linkToList.run(listId, targetId);
+
+      // Automatically resolve and link company
+      if (lead.company || lead.email) {
+        const companyId = resolveOrCreateCompany(db, {
+          name: lead.company,
+          domain: extractDomain(lead.email),
+          location: lead.location,
+          workspaceOwnerId: options.workspaceOwnerId,
+        });
+        if (companyId) {
+          linkTargetToCompany(db, targetId, companyId, lead.company);
+        }
+      }
     }
   })();
 

@@ -335,7 +335,19 @@
     "deleteConfirm": "Delete this company? Contacts will be unlinked but not deleted.",
     "companyCreated": "Company created",
     "companyUpdated": "Company updated",
-    "companyDeleted": "Deleted"
+    "companyDeleted": "Deleted",
+    "syncContacts": "Sync Contacts",
+    "syncing": "Syncing...",
+    "syncSuccess": "Sync completed: {linked} contacts linked ({created} new companies)",
+    "statTotal": "Total Companies",
+    "statWithContacts": "With Contacts",
+    "statIndustries": "Industries / Sectors",
+    "techStack": "Tech Stack",
+    "employees": "Employees",
+    "viewPipeline": "View in Pipeline",
+    "filterIndustry": "All industries",
+    "enrollAll": "Enroll in Campaign",
+    "backToList": "Back to Companies"
   },
   "workflows": {
     "title": "Campaigns",

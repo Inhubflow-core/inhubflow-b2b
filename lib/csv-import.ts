@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type DatabaseType from "better-sqlite3";
 import { randomUUID } from "crypto";
+import { resolveOrCreateCompany, linkTargetToCompany, extractDomain } from "@/lib/companies/service";
 
 type DB = DatabaseType.Database;
 
@@ -108,7 +109,7 @@ interface ParsedRow {
   fields: Record<EditableField, string | null>;
 }
 
-export function importCsv(db: DB, listId: string, csvText: string): CsvImportResult {
+export function importCsv(db: DB, listId: string, csvText: string, workspaceOwnerId?: string | null): CsvImportResult {
   const parsed = Papa.parse<Record<string, string>>(csvText, {
     header: true,
     skipEmptyLines: true,
@@ -205,6 +206,21 @@ export function importCsv(db: DB, listId: string, csvText: string): CsvImportRes
         if (isNew) imported++; else updated++;
       } else {
         skipped++; // already in this list, no changes
+      }
+
+      // Automatically resolve and link company
+      if (row.fields.company || row.email) {
+        const companyId = resolveOrCreateCompany(db, {
+          name: row.fields.company,
+          domain: extractDomain(row.email),
+          location: row.fields.location,
+          city: row.fields.city,
+          country: row.fields.country,
+          workspaceOwnerId,
+        });
+        if (companyId) {
+          linkTargetToCompany(db, targetId, companyId, row.fields.company);
+        }
       }
     }
   })();
