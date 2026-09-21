@@ -36,6 +36,11 @@ import {
   RiRefreshLine,
   RiErrorWarningLine,
   RiFlashlightLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiRocketLine,
+  RiGroupLine,
+  RiSparklingLine,
 } from "react-icons/ri";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1019,121 +1024,170 @@ function Wizard({
     summary: t("campaignWizard.nav.summary"),
   };
 
-  const PAGE_ICONS: Record<WizardPage, React.ReactNode> = {
-    prospects: <RiAddLine size={14} />,
-    prompt: <RiRobot2Line size={14} />,
-    "linkedin-steps": <RiLinkedinBoxLine size={14} />,
-    "email-steps": <RiMailLine size={14} />,
-    account: <RiUser3Line size={14} />,
-    summary: "✓",
+  const PAGE_ICONS: Record<WizardPage, React.ElementType> = {
+    prospects: RiGroupLine,
+    prompt: RiSparklingLine,
+    "linkedin-steps": RiLinkedinBoxLine,
+    "email-steps": RiMailLine,
+    account: RiUser3Line,
+    summary: RiRocketLine,
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-base-100 flex flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <div className="flex items-center gap-3">
-          {editingName ? (
-            <input
-              autoFocus
-              className="input input-xs input-bordered bg-base-300/50 font-semibold text-sm w-52"
-              value={nameValue}
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={saveWorkflowName}
-              onKeyDown={(e) => { if (e.key === "Enter") saveWorkflowName(); if (e.key === "Escape") { setEditingName(false); setNameValue(workflowName); } }}
-              disabled={nameSaving}
-            />
-          ) : (
-            <button
-              className="font-semibold text-sm hover:text-primary transition-colors cursor-pointer"
-              onClick={() => { setNameValue(workflowName); setEditingName(true); }}
-              title="Click to rename"
-            >
-              {workflowName}
-            </button>
-          )}
-          <span className="text-base-content/30">·</span>
-          <span className="text-sm text-base-content/50">{PAGE_LABELS[page]}</span>
-        </div>
-        <button
-          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-300/50 transition-colors"
-          onClick={onClose}
-          disabled={launching || saving}
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left nav */}
-        <div className="w-56 shrink-0 border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-1 overflow-y-auto">
-          {pages.map((p) => {
-            const active = page === p;
-            const canNav = canGoTo(p);
-            return (
-              <button
-                key={p}
-                onClick={() => canNav && setPage(p)}
-                className={`w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
-                  active
-                    ? "bg-primary/10 border border-primary/30"
-                    : canNav
-                    ? "hover:bg-base-200"
-                    : "opacity-30 cursor-not-allowed"
-                }`}
-              >
-                <span
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
-                    active ? "bg-primary text-primary-content" : "bg-base-300 text-base-content/50"
-                  }`}
-                >
-                  {PAGE_ICONS[p]}
-                </span>
-                <div className="min-w-0">
-                  <p className={`text-xs font-semibold ${active ? "text-primary" : "text-base-content"}`}>
-                    {PAGE_LABELS[p]}
-                  </p>
-                  {p === "prospects" && selectedList && (
-                    <p className="text-xs text-base-content/40 truncate">{selectedList.name}</p>
-                  )}
-                  {p === "linkedin-steps" && wizardSteps.filter(s => s.track === "linkedin").length > 0 && (
-                    <p className="text-xs text-base-content/40">{t("workflows.steps", { count: wizardSteps.filter(s => s.track === "linkedin").length })}</p>
-                  )}
-                  {p === "email-steps" && wizardSteps.filter(s => s.track === "email").length > 0 && (
-                    <p className="text-xs text-base-content/40">{t("workflows.steps", { count: wizardSteps.filter(s => s.track === "email").length })}</p>
-                  )}
-                  {p === "prompt" && campaignPrompt.trim() && (
-                    <p className="text-xs text-base-content/40 truncate">{campaignPrompt.trim().slice(0, 24)}{campaignPrompt.trim().length > 24 ? "…" : ""}</p>
-                  )}
-                  {p === "account" && selectedAccount && (
-                    <p className="text-xs text-base-content/40 truncate">{selectedAccount.name}</p>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs">
+      <div className="w-full max-w-5xl xl:max-w-6xl h-[88vh] flex flex-col bg-white dark:bg-gray-900 rounded-3xl border border-gray-300 dark:border-gray-700 shadow-2xl overflow-hidden">
+        {/* 1. Cabecera Principal del Modal */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 shrink-0">
+              <RiRocketLine size={22} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                {editingName ? (
+                  <input
+                    autoFocus
+                    className="rounded-lg px-2 py-0.5 border border-brand-500 bg-white dark:bg-gray-800 font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight focus:outline-none"
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onBlur={saveWorkflowName}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveWorkflowName();
+                      if (e.key === "Escape") {
+                        setEditingName(false);
+                        setNameValue(workflowName);
+                      }
+                    }}
+                    disabled={nameSaving}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="group flex items-center gap-1.5 font-black text-base sm:text-lg text-gray-900 dark:text-white leading-tight hover:text-brand-600 dark:hover:text-brand-400 transition-colors text-left truncate cursor-pointer"
+                    onClick={() => {
+                      setNameValue(workflowName);
+                      setEditingName(true);
+                    }}
+                    title="Click para renombrar"
+                  >
+                    <span className="truncate">
+                      {isEditMode
+                        ? `Editar Campaña: ${workflowName}`
+                        : isAddContacts
+                        ? `Añadir Contactos: ${workflowName}`
+                        : (workflowName || "Configurar Campaña")}
+                    </span>
+                    <RiEditLine size={15} className="text-gray-400 group-hover:text-brand-500 shrink-0 transition-colors" />
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {isEditMode
+                  ? "Modifica los pasos, mensajes, configuración y cuentas asociadas a la campaña"
+                  : isAddContacts
+                  ? "Selecciona los nuevos prospectos que deseas enrolar en esta campaña activa"
+                  : "Asistente guiado de InHubFlow para prospección multicanal y secuencias automatizadas"}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={launching || saving}
+            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0 cursor-pointer"
+            title="Cerrar"
+          >
+            <RiCloseLine size={22} />
+          </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto pt-10 px-10 pb-6">
-            <div className={`w-full mx-auto ${page === "prospects" ? "max-w-5xl" : "max-w-2xl"}`}>
-
-              {/* ── Page: Prospects ── */}
-              {page === "prospects" && (() => {
-                const filteredLists = lists.filter((l) =>
-                  listSearch.trim() === ""
-                    ? true
-                    : l.name.toLowerCase().includes(listSearch.toLowerCase())
-                );
+        {/* 2. Barra de Progreso del Wizard (Stepper) */}
+        {pages.length > 1 && (
+          <div className="px-6 py-3.5 border-b border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50 shrink-0">
+            <div className="flex items-center justify-between max-w-4xl mx-auto">
+              {pages.map((p, idx) => {
+                const isCurrent = page === p;
+                const isPast = pageIdx > idx;
+                const canNav = canGoTo(p);
+                const StepIcon = PAGE_ICONS[p];
                 return (
-                  <div className="flex flex-col" style={{ minHeight: "calc(100vh - 220px)" }}>
-                    <h2 className="text-xl font-semibold mb-1">{isAddContacts ? t("campaignWizard.prospects.addTitle") : t("campaignWizard.prospects.title")}</h2>
-                    <p className="text-base-content/50 text-sm mb-4">
-                      {isAddContacts
-                        ? t("campaignWizard.prospects.addSubtitle")
-                        : t("campaignWizard.prospects.subtitle")}
-                    </p>
+                  <div key={p} className="flex items-center flex-1 last:flex-none">
+                    <button
+                      type="button"
+                      disabled={!canNav}
+                      onClick={() => canNav && setPage(p)}
+                      className={`flex items-center gap-2 group text-left focus:outline-none ${!canNav ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <span
+                        className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all shrink-0 ${
+                          isCurrent
+                            ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500/30"
+                            : isPast
+                            ? "bg-emerald-500 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-gray-300"
+                        }`}
+                      >
+                        {isPast ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
+                      </span>
+                      <div className="hidden sm:block">
+                        <span
+                          className={`text-xs font-bold block leading-tight ${
+                            isCurrent
+                              ? "text-brand-600 dark:text-brand-400"
+                              : isPast
+                              ? "text-gray-900 dark:text-white"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          PASO {idx + 1}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                          {PAGE_LABELS[p]}
+                        </span>
+                      </div>
+                    </button>
+                    {idx < pages.length - 1 && (
+                      <div
+                        className={`flex-1 h-0.5 mx-2 sm:mx-3 transition-colors ${
+                          isPast ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 3. Contenido del Wizard según el paso activo */}
+        <div className={`flex-1 min-h-0 ${page === "prospects" ? "overflow-hidden" : "overflow-y-auto"} p-6 md:p-8 bg-white dark:bg-gray-900`}>
+          <div className={`w-full mx-auto ${page === "prospects" ? "max-w-5xl h-full min-h-0" : "max-w-3xl"}`}>
+
+            {/* ── Page: Prospects ── */}
+            {page === "prospects" && (() => {
+              const filteredLists = lists.filter((l) =>
+                listSearch.trim() === ""
+                  ? true
+                  : l.name.toLowerCase().includes(listSearch.toLowerCase())
+              );
+              return (
+                <div className="flex flex-col h-full min-h-0">
+                  <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 mb-3 shrink-0">
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <RiGroupLine className="text-brand-500" size={18} />
+                      {isAddContacts ? t("campaignWizard.prospects.addTitle") : t("campaignWizard.prospects.title")}
+                    </h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      Paso {pageIdx + 1} de {pages.length}
+                    </span>
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-3 shrink-0">
+                    {isAddContacts
+                      ? t("campaignWizard.prospects.addSubtitle")
+                      : t("campaignWizard.prospects.subtitle")}
+                  </p>
 
                     <div className="flex gap-6 flex-1 min-h-0">
                       {/* ── Left: Lists picker ── */}
@@ -1291,8 +1345,14 @@ function Wizard({
               {/* ── Page: Campaign Prompt ── */}
               {page === "prompt" && (
                 <div>
-                  <h2 className="text-xl font-semibold mb-1">{t("campaignWizard.prompt.title")}</h2>
-                  <p className="text-base-content/50 text-sm mb-6">
+                  <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 mb-3">
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <RiSparklingLine className="text-brand-500" size={18} />
+                      {t("campaignWizard.prompt.title")}
+                    </h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Paso {pageIdx + 1} de {pages.length}</span>
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-4">
                     {t("campaignWizard.prompt.desc")}
                   </p>
                   <textarea
@@ -1376,15 +1436,18 @@ function Wizard({
 
                 return (
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {track === "linkedin" ? (
-                        <RiLinkedinBoxLine size={20} className="text-primary" />
-                      ) : (
-                        <RiMailLine size={20} className="text-warning" />
-                      )}
-                      <h2 className="text-xl font-semibold">{track === "linkedin" ? t("campaignWizard.steps.linkedinTitle") : t("campaignWizard.steps.emailTitle")}</h2>
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 mb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        {track === "linkedin" ? (
+                          <RiLinkedinBoxLine size={18} className="text-brand-500" />
+                        ) : (
+                          <RiMailLine size={18} className="text-brand-500" />
+                        )}
+                        {track === "linkedin" ? t("campaignWizard.steps.linkedinTitle") : t("campaignWizard.steps.emailTitle")}
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso {pageIdx + 1} de {pages.length}</span>
                     </div>
-                    <p className="text-base-content/50 text-sm mb-6">
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mb-4">
                       {track === "linkedin"
                         ? t("campaignWizard.steps.linkedinDesc")
                         : t("campaignWizard.steps.emailDesc")}
@@ -1435,8 +1498,14 @@ function Wizard({
               {/* ── Page: Account ── */}
               {page === "account" && (
                 <div>
-                  <h2 className="text-xl font-semibold mb-1">{t("campaignWizard.account.title")}</h2>
-                  <p className="text-base-content/50 text-sm mb-6">
+                  <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 mb-3">
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                      <RiUser3Line className="text-brand-500" size={18} />
+                      {t("campaignWizard.account.title")}
+                    </h2>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Paso {pageIdx + 1} de {pages.length}</span>
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-4">
                     {t("campaignWizard.account.desc")}
                   </p>
 
@@ -1562,10 +1631,14 @@ function Wizard({
 
                 return (
                   <div className="space-y-5">
-                    <div>
-                      <h2 className="text-xl font-semibold mb-0.5">{t("campaignWizard.summary.title")}</h2>
-                      <p className="text-base-content/50 text-sm">{t("campaignWizard.summary.desc")}</p>
+                    <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
+                      <h2 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <RiRocketLine className="text-brand-500" size={18} />
+                        {t("campaignWizard.summary.title")}
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Paso {pageIdx + 1} de {pages.length}</span>
                     </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs -mt-2">{t("campaignWizard.summary.desc")}</p>
 
                     {/* Campaign overview card */}
                     <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs overflow-hidden">
@@ -1769,83 +1842,105 @@ function Wizard({
             </div>
           </div>
 
-          {/* Bottom nav */}
-          <div className="border-t border-gray-200 dark:border-gray-800 px-10 py-4 flex justify-between items-center shrink-0">
+          {/* 4. Footer de Navegación del Wizard */}
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-300 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-850/80 shrink-0">
             <div className="flex items-center gap-2">
-              <button
-                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/60 hover:text-base-content hover:bg-base-300/50 transition-colors disabled:opacity-40"
-                onClick={pageIdx === 0 ? onClose : () => setPage(pages[pageIdx - 1])}
-                disabled={launching || saving}
-              >
-                {pageIdx === 0 ? t("campaignWizard.nav.cancel") : t("campaignWizard.nav.back")}
-              </button>
+              {pageIdx === 0 ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={launching || saving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  {t("campaignWizard.nav.cancel")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPage(pages[pageIdx - 1])}
+                  disabled={launching || saving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  <RiArrowLeftLine size={15} /> {t("campaignWizard.nav.back")}
+                </button>
+              )}
               {!isStepsOnly && !isEditMode && (page === "linkedin-steps" || page === "email-steps") && wizardSteps.length > 0 && (
                 <button
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm text-base-content/40 hover:text-base-content/60 hover:bg-base-300/50 transition-colors disabled:opacity-40"
+                  type="button"
                   onClick={saveAndClose}
                   disabled={saving}
+                  className="inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold text-gray-500 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 cursor-pointer"
                 >
                   {saving ? <span className="loading loading-spinner loading-xs" /> : t("campaignWizard.nav.saveStepsOnly")}
                 </button>
               )}
             </div>
 
-            {isStepsOnly ? (
-              <button
-                className="inline-flex items-center px-6 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-40"
-                onClick={saveAndClose}
-                disabled={saving || wizardSteps.length === 0}
-              >
-                {saving ? <span className="loading loading-spinner loading-xs" /> : t("campaignWizard.nav.save")}
-              </button>
-            ) : isAddContacts ? (
-              <button
-                className="inline-flex items-center gap-1.5 px-6 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-40"
-                onClick={enrollContacts}
-                disabled={launching || !prospectsReady || selectedTargetIds.size === 0}
-              >
-                {launching
-                  ? <><span className="loading loading-spinner loading-xs" /> {t("campaignWizard.nav.enrolling")}</>
-                  : t("campaignWizard.nav.enrollContacts", { count: selectedTargetIds.size })}
-              </button>
-            ) : isEditMode && page === "account" ? (
-              <button
-                className="inline-flex items-center px-6 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-40"
-                onClick={saveAndClose}
-                disabled={saving || wizardSteps.length === 0}
-              >
-                {saving ? <span className="loading loading-spinner loading-xs" /> : t("campaignWizard.nav.saveChanges")}
-              </button>
-            ) : page !== "summary" ? (
-              <button
-                className="inline-flex items-center px-6 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-40"
-                disabled={
-                  (page === "prospects" && (!prospectsReady || conflictsLoading)) ||
-                  (page === "email-steps" && wizardSteps.length === 0) ||
-                  (page === "account" && !accountId)
-                }
-                onClick={() => setPage(pages[pageIdx + 1])}
-              >
-                {t("campaignWizard.nav.next")}
-              </button>
-            ) : (
-              <button
-                className="inline-flex items-center gap-1.5 px-8 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors disabled:opacity-40"
-                onClick={launch}
-                disabled={launching}
-              >
-                {launching
-                  ? <><span className="loading loading-spinner loading-xs" /> {t("campaignWizard.nav.launching")}</>
-                  : t("campaignWizard.nav.launchCampaign")}
-              </button>
-            )}
+            <div className="flex items-center gap-2.5">
+              {isStepsOnly ? (
+                <button
+                  type="button"
+                  onClick={saveAndClose}
+                  disabled={saving || wizardSteps.length === 0}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? <span className="loading loading-spinner loading-xs" /> : <RiCheckLine size={15} />}
+                  {t("campaignWizard.nav.save")}
+                </button>
+              ) : isAddContacts ? (
+                <button
+                  type="button"
+                  onClick={enrollContacts}
+                  disabled={launching || !prospectsReady || selectedTargetIds.size === 0}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {launching
+                    ? <><span className="loading loading-spinner loading-xs" /> {t("campaignWizard.nav.enrolling")}</>
+                    : <><RiUserFollowLine size={15} /> {t("campaignWizard.nav.enrollContacts", { count: selectedTargetIds.size })}</>}
+                </button>
+              ) : isEditMode && page === "account" ? (
+                <button
+                  type="button"
+                  onClick={saveAndClose}
+                  disabled={saving || wizardSteps.length === 0}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? <span className="loading loading-spinner loading-xs" /> : <RiCheckLine size={15} />}
+                  {t("campaignWizard.nav.saveChanges")}
+                </button>
+              ) : page !== "summary" ? (
+                <button
+                  type="button"
+                  disabled={
+                    (page === "prospects" && (!prospectsReady || conflictsLoading)) ||
+                    (page === "email-steps" && wizardSteps.length === 0) ||
+                    (page === "account" && !accountId)
+                  }
+                  onClick={() => setPage(pages[pageIdx + 1])}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {t("campaignWizard.nav.next")} <RiArrowRightLine size={15} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={launch}
+                  disabled={launching}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-lg hover:shadow-xl transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {launching
+                    ? <><span className="loading loading-spinner loading-xs" /> {t("campaignWizard.nav.launching")}</>
+                    : <><RiRocketLine size={15} /> {t("campaignWizard.nav.launchCampaign")}</>}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Step Config Modal ── */}
       {configIdx !== null && (() => {
-        const ws = wizardSteps[configIdx];
+        const ws = wizardSteps[configIdx]!;
         const idx = configIdx;
         const stepLabel = ws.type === "email" ? getEmailStepLabel(wizardSteps, idx, t) : ws.type === "message" ? getMessageStepLabel(wizardSteps, idx, t) : getStepLabel(ws.type, t);
         return (
@@ -2404,8 +2499,7 @@ function Wizard({
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }
 
