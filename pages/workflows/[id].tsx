@@ -1863,7 +1863,7 @@ function Wizard({
                   disabled={launching || saving}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-40 cursor-pointer"
                 >
-                  <RiArrowLeftLine size={15} /> {t("campaignWizard.nav.back")}
+                  <RiArrowLeftLine size={15} /> {t("campaignWizard.nav.back").replace(/^[←\s]+/, "")}
                 </button>
               )}
               {!isStepsOnly && !isEditMode && (page === "linkedin-steps" || page === "email-steps") && wizardSteps.length > 0 && (
@@ -1921,7 +1921,7 @@ function Wizard({
                   onClick={() => setPage(pages[pageIdx + 1])}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 shadow-md hover:shadow-lg transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  {t("campaignWizard.nav.next")} <RiArrowRightLine size={15} />
+                  {t("campaignWizard.nav.next").replace(/[→\s]+$/, "")} <RiArrowRightLine size={15} />
                 </button>
               ) : (
                 <button
