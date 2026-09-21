@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export interface ProspectAvatarProps {
   imageUrl?: string | null;
@@ -41,6 +41,10 @@ export default function ProspectAvatar({
 }: ProspectAvatarProps) {
   const [hasError, setHasError] = useState(false);
 
+  useEffect(() => {
+    setHasError(false);
+  }, [imageUrl]);
+
   const sizeClasses = {
     xs: "w-6 h-6 text-[10px]",
     sm: "w-7 h-7 text-xs",
@@ -58,6 +62,7 @@ export default function ProspectAvatar({
         <img
           src={imageUrl!}
           alt={name || "Prospecto"}
+          referrerPolicy="no-referrer"
           className={`${sizeClasses} rounded-full object-cover border border-gray-200 dark:border-gray-700 shadow-xs`}
           onError={() => setHasError(true)}
           loading="lazy"

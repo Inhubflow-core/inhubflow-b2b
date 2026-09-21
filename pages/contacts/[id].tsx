@@ -566,6 +566,25 @@ export default function ContactDetailPage({
   const positions: { title: string; companyName: string; startDate?: string; endDate?: string; current?: boolean; description?: string }[] =
     target.positions_json ? JSON.parse(target.positions_json) : [];
 
+  const [profileImageUrl, setProfileImageUrl] = useState(target.profile_image_url);
+
+  useEffect(() => {
+    if ((!profileImageUrl || profileImageUrl.trim() === "") && target.linkedin_url) {
+      fetch("/api/targets/sync-photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_id: target.id }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.updated && data.updated[target.id]) {
+            setProfileImageUrl(data.updated[target.id]);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [target.id, target.linkedin_url, profileImageUrl]);
+
   const [email, setEmail] = useState(target.email ?? "");
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState(target.email ?? "");
@@ -751,7 +770,7 @@ export default function ContactDetailPage({
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4 flex-1 min-w-0">
               <ProspectAvatar
-                imageUrl={target.profile_image_url}
+                imageUrl={profileImageUrl}
                 name={target.full_name}
                 size="xl"
                 badge={target.degree === 1 ? "linkedin" : null}

@@ -10,7 +10,7 @@ type DB = DatabaseType.Database;
 // importable. Mirrors the PATCH /api/targets/[id] editable set.
 const EDITABLE_FIELDS = [
   "first_name", "last_name", "title", "company", "location",
-  "city", "country", "phone", "headline", "summary", "notes",
+  "city", "country", "phone", "headline", "summary", "notes", "profile_image_url",
 ] as const;
 type EditableField = (typeof EDITABLE_FIELDS)[number];
 
@@ -32,6 +32,7 @@ const SAMPLE_VALUES: Record<EditableField, string> = {
   headline: "Head of Marketing @ Acme Inc",
   summary: "10+ years in B2B SaaS marketing.",
   notes: "Met at SaaStr 2026",
+  profile_image_url: "https://example.com/photo.jpg",
 };
 
 export function buildCsvTemplate(): string {
@@ -78,6 +79,18 @@ const FIELD_ALIASES: Record<string, string[]> = {
   headline: ["headline", "sub_headline", "header"],
   summary: ["summary", "about", "bio", "resumen", "resumo"],
   notes: ["notes", "note", "notas", "comentarios"],
+  profile_image_url: [
+    "profile_image_url",
+    "image_url",
+    "picture_url",
+    "photo_url",
+    "photo",
+    "picture",
+    "avatar",
+    "image",
+    "foto",
+    "imagen",
+  ],
 };
 
 function getField(row: Record<string, string>, field: string): string | null {

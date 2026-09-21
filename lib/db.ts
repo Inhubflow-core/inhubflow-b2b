@@ -37,6 +37,7 @@ export function getDb(): Database.Database {
     runMigrations(db);
     autoSeedInstance(db);
     scheduleUpdateCheck();
+    schedulePhotoSyncCheck(db);
   }
   return db;
 }
@@ -1477,3 +1478,59 @@ function initDb(db: Database.Database) {
     );
   `);
 }
+
+function schedulePhotoSyncCheck(database: Database.Database) {
+  setTimeout(async () => {
+    try {
+      const { unipile } = await import("@/lib/unipile/client");
+      if (!unipile.isConfigured()) return;
+
+      const account = database.prepare(
+        "SELECT id, unipile_account_id FROM accounts WHERE is_authenticated = 1 LIMIT 1"
+      ).get() as { id: string; unipile_account_id?: string | null } | undefined;
+      if (!account || !account.unipile_account_id) return;
+
+      // 1. Fast backfill from chat attendees
+      const targetsWithChat = database.prepare(
+        `SELECT id, unipile_chat_id FROM targets
+         WHERE (profile_image_url IS NULL OR profile_image_url = '')
+           AND unipile_chat_id IS NOT NULL
+         LIMIT 25`
+      ).all() as Array<{ id: string; unipile_chat_id: string }>;
+
+      for (const t of targetsWithChat) {
+        try {
+          const attendees = await unipile.listChatAttendees(t.unipile_chat_id);
+          const other = (attendees.items || []).find((a) => !a.is_self) || attendees.items?.[0];
+          if (other?.picture_url) {
+            database.prepare("UPDATE targets SET profile_image_url = ? WHERE id = ?").run(other.picture_url, t.id);
+          }
+        } catch {}
+      }
+
+      // 2. Backfill targets with linkedin_url
+      const targetsWithUrl = database.prepare(
+        `SELECT id, linkedin_url FROM targets
+         WHERE (profile_image_url IS NULL OR profile_image_url = '')
+           AND linkedin_url IS NOT NULL
+         ORDER BY last_replied_at DESC NULLS LAST, created_at DESC
+         LIMIT 15`
+      ).all() as Array<{ id: string; linkedin_url: string }>;
+
+      for (const t of targetsWithUrl) {
+        try {
+          await new Promise((r) => setTimeout(r, 350));
+          const profile = await unipile.resolveProfile(t.linkedin_url, account.unipile_account_id);
+          const photoUrl =
+            profile.profile_picture_url_large ||
+            profile.profile_picture_url ||
+            ((profile as unknown as { picture_url?: string }).picture_url ?? null);
+          if (photoUrl) {
+            database.prepare("UPDATE targets SET profile_image_url = ? WHERE id = ?").run(photoUrl, t.id);
+          }
+        } catch {}
+      }
+    } catch {}
+  }, 4000);
+}
+

@@ -994,6 +994,32 @@ export default function SignalsPage({
     fetchLeads();
   }, [fetchLeads]);
 
+  // Auto-sync photos for signal leads that have linkedin_url but missing profile_image_url
+  useEffect(() => {
+    const missing = leads
+      .filter((l) => (!l.profile_image_url || l.profile_image_url.trim() === "") && Boolean(l.linkedin_url))
+      .slice(0, 15);
+
+    if (missing.length === 0) return;
+
+    fetch("/api/targets/sync-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signal_lead_ids: missing.map((l) => l.id) }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.updated && Object.keys(data.updated).length > 0) {
+          setLeads((prev) =>
+            prev.map((l) =>
+              data.updated[l.id] ? { ...l, profile_image_url: data.updated[l.id] } : l
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, [leads]);
+
   useEffect(() => {
     if (!selectedAccountId) {
       setAccountCapabilities(null);

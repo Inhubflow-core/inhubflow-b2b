@@ -153,7 +153,12 @@ function searchPersonLead(monitorId: string, signalType: string, item: UnipileSe
     headline: item.headline || null,
     company: current?.company || null,
     location: item.location || current?.location || null,
-    profileImageUrl: item.profile_picture_url || null,
+    profileImageUrl:
+      item.profile_picture_url ||
+      (item as any).picture_url ||
+      (item as any).profile_picture_url_large ||
+      (item as any).image_url ||
+      null,
     signalType,
     evidence: {
       fingerprint: evidenceFingerprint({ monitorId, sourceType: "linkedin_people_search", sourceId: item.id, providerId: item.id, snippet }),
@@ -258,7 +263,13 @@ function parseCommentLead(
     name: authorName,
     headline: headlineVal,
     explicitProfileUrl: profileUrlVal,
-    profileImageUrl: authorObj.profile_picture_url || authorDetails.profile_picture_url || null,
+    profileImageUrl:
+      authorObj.picture_url ||
+      authorObj.profile_picture_url ||
+      authorObj.profile_picture_url_large ||
+      authorDetails.picture_url ||
+      authorDetails.profile_picture_url ||
+      null,
     metadata: { commentId: comment.id, postUrl },
   });
 }
@@ -294,7 +305,12 @@ function parseReactionLead(
     name: authorName,
     headline: headlineVal,
     explicitProfileUrl: profileUrlVal,
-    profileImageUrl: authorObj.profile_picture_url || null,
+    profileImageUrl:
+      authorObj.picture_url ||
+      authorObj.profile_picture_url ||
+      authorObj.profile_picture_url_large ||
+      authorObj.picture ||
+      null,
     metadata: { reactionType: reactionKind, postUrl },
   });
 }

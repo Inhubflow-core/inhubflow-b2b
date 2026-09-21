@@ -28,6 +28,7 @@ interface LocalTarget {
   messaging_urn: string | null;
   unipile_provider_id: string | null;
   unipile_chat_id: string | null;
+  profile_image_url?: string | null;
   run_id?: string | null;
   workflow_id?: string | null;
 }
@@ -73,7 +74,7 @@ function targetForMessage(
 ): LocalTarget | undefined {
   // 1. Direct match by chatId, providerId or exact URL
   const direct = db.prepare(`
-    SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url,
+    SELECT t.id, t.full_name, t.first_name, t.last_name, t.linkedin_url, t.profile_image_url,
            COALESCE(lta.unipile_provider_id, t.unipile_provider_id) AS unipile_provider_id,
            COALESCE(lta.unipile_chat_id, scoped_message.external_thread_id, t.unipile_chat_id) AS unipile_chat_id,
            COALESCE(t.messaging_urn, lta.unipile_provider_id) AS messaging_urn,
@@ -257,7 +258,13 @@ export async function ingestUnipileMessage(
       timestamp?: string;
       is_sender?: boolean | 0 | 1;
     };
-    profile?: { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null };
+    profile?: {
+      providerId: string | null;
+      name: string | null;
+      profileUrl: string | null;
+      memberUrn: string | null;
+      pictureUrl?: string | null;
+    };
     source?: string;
     policy?: IngestPolicy;
   },
@@ -267,7 +274,7 @@ export async function ingestUnipileMessage(
   const chatId = String(message.chat_id || "").trim();
   if (!messageId || !chatId) throw new Error("Evento de mensaje de LinkedIn incompleto");
   const direction = message.is_sender === true || message.is_sender === 1 ? "outbound" : "inbound";
-  const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null };
+  const profile = input.profile || { providerId: message.sender_id || null, name: null, profileUrl: null, memberUrn: null, pictureUrl: null };
   let target = targetForMessage(db, input.localAccountId, chatId, message.sender_id || null, profile.profileUrl, profile.providerId, profile.name);
 
   // Gate: only InHubFlow-related conversations belong in the inbox. A contact with no
@@ -293,11 +300,11 @@ export async function ingestUnipileMessage(
       INSERT INTO targets (
         id, full_name, first_name, last_name, linkedin_url,
         unipile_provider_id, unipile_chat_id, last_replied_account_id,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        profile_image_url, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(
       newTargetId, displayName, firstName, lastName, linkedinUrl,
-      effectiveId, chatId, input.localAccountId,
+      effectiveId, chatId, input.localAccountId, profile.pictureUrl || null,
     );
 
     ensureLinkedInTargetAccountState(db, input.localAccountId, {
@@ -315,17 +322,19 @@ export async function ingestUnipileMessage(
       messaging_urn: effectiveId,
       unipile_provider_id: effectiveId,
       unipile_chat_id: chatId,
+      profile_image_url: profile.pictureUrl || null,
     };
   }
 
-  // Ensure target and target-account have the unipile_chat_id and unipile_provider_id updated
+  // Ensure target and target-account have the unipile_chat_id, unipile_provider_id, and profile_image_url updated
   const effectiveProviderId = profile.providerId || message.sender_id || null;
   db.prepare(`
     UPDATE targets
     SET unipile_chat_id = COALESCE(unipile_chat_id, ?),
-        unipile_provider_id = COALESCE(unipile_provider_id, ?)
+        unipile_provider_id = COALESCE(unipile_provider_id, ?),
+        profile_image_url = COALESCE(profile_image_url, ?)
     WHERE id = ?
-  `).run(chatId, effectiveProviderId, target.id);
+  `).run(chatId, effectiveProviderId, profile.pictureUrl || null, target.id);
 
   markLinkedInTargetState(db, input.localAccountId, target.id, {
     unipile_chat_id: chatId,
@@ -434,7 +443,7 @@ export async function syncLinkedInInbox(
   }
 
   // Cache attendee profiles by chatId to prevent redundant network calls
-  const chatAttendeeCache = new Map<string, { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null }>();
+  const chatAttendeeCache = new Map<string, { providerId: string | null; name: string | null; profileUrl: string | null; memberUrn: string | null; pictureUrl?: string | null }>();
 
   for (const message of remoteMessages) {
     const chatId = message.chat_id;
@@ -447,14 +456,21 @@ export async function syncLinkedInInbox(
     ).get(localAccountId, chatId, messageId);
 
     if (!chatAttendeeCache.has(chatId)) {
-      let profile = { providerId: message.sender_id || null, name: null as string | null, profileUrl: null as string | null, memberUrn: null as string | null };
+      let profile = {
+        providerId: message.sender_id || null,
+        name: null as string | null,
+        profileUrl: null as string | null,
+        memberUrn: null as string | null,
+        pictureUrl: null as string | null,
+      };
       const existing = targetForMessage(db, localAccountId, chatId, message.sender_id || null, null, message.sender_id || null);
-      if (existing) {
+      if (existing && existing.profile_image_url) {
         profile = {
           providerId: existing.unipile_provider_id || message.sender_id || null,
           name: existing.full_name || null,
           profileUrl: existing.linkedin_url || null,
           memberUrn: existing.messaging_urn || null,
+          pictureUrl: existing.profile_image_url || null,
         };
       } else {
         try {
@@ -462,6 +478,9 @@ export async function syncLinkedInInbox(
           const other = (attRes.items || []).find((a) => !a.is_self) || attRes.items?.[0];
           if (other) {
             profile = attendeeProfile(other);
+            if (existing && profile.pictureUrl && !existing.profile_image_url) {
+              db.prepare("UPDATE targets SET profile_image_url = ? WHERE id = ?").run(profile.pictureUrl, existing.id);
+            }
           }
         } catch { /* ignore attendee error */ }
       }

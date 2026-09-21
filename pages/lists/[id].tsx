@@ -185,6 +185,32 @@ export default function ListDetailPage({
       .catch(() => {});
   }, []);
 
+  // Auto-sync photos for targets that have linkedin_url but missing profile_image_url
+  useEffect(() => {
+    const missingPhotoTargets = targets
+      .filter((t) => (!t.profile_image_url || t.profile_image_url.trim() === "") && Boolean(t.linkedin_url))
+      .slice(0, 20);
+
+    if (missingPhotoTargets.length === 0) return;
+
+    fetch("/api/targets/sync-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_ids: missingPhotoTargets.map((t) => t.id) }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.updated && Object.keys(data.updated).length > 0) {
+          setTargets((prev) =>
+            prev.map((t) =>
+              data.updated[t.id] ? { ...t, profile_image_url: data.updated[t.id] } : t
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, [initialList.id]);
+
   // Resume polling if there's already a running import (e.g. after page refresh)
   useEffect(() => {
     fetch(`/api/lists/${initialList.id}/import-status`)

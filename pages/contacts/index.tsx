@@ -131,6 +131,32 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     setSelected(new Set());
   }, [page, listId, debouncedSearch, filters, fetch_]);
 
+  // Auto-sync photos for contacts that have linkedin_url but missing profile_image_url
+  useEffect(() => {
+    const missing = contacts
+      .filter((c) => (!c.profile_image_url || c.profile_image_url.trim() === "") && Boolean(c.linkedin_url))
+      .slice(0, 15);
+
+    if (missing.length === 0) return;
+
+    fetch("/api/targets/sync-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_ids: missing.map((c) => c.id) }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.updated && Object.keys(data.updated).length > 0) {
+          setContacts((prev) =>
+            prev.map((c) =>
+              data.updated[c.id] ? { ...c, profile_image_url: data.updated[c.id] } : c
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, [contacts]);
+
   function changeList(lid: string) { setListId(lid); setPage(0); }
   function changeSearch(q: string) { setSearch(q); setPage(0); }
   function changeFilters(f: ActiveFilter[]) { setFilters(f); setPage(0); }
