@@ -417,7 +417,9 @@
       "aiWritesInMail": "AI writes subject + body",
       "noSubjectRequired": "No subject — required",
       "noSubject": "No subject",
-      "connectOnce": "Connection step can only be added once"
+      "connectOnce": "Connection step can only be added once",
+      "follow": "Follow Profile",
+      "followOnce": "Follow step can only be added once"
     },
     "prospects": {
       "title": "Choose your prospects",
@@ -491,6 +493,7 @@
       "waitBefore": "Wait before this step",
       "days": "days",
       "visitDesc": "Visits the profile. They'll see you in 'Who viewed my profile'. No further configuration needed.",
+      "followDesc": "Automatically follows the prospect's LinkedIn profile to generate a warm notification before or after connecting.",
       "includeNote": "Include a connection note",
       "notePlaceholder": "Hi {{first_name}}, I'd love to connect...",
       "inmailSubjectRequired": "Subject (required for InMail)",

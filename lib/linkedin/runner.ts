@@ -51,7 +51,7 @@ interface WorkflowStep {
   workflow_id: string;
   track: "linkedin" | "email";
   step_order: number;
-  step_type: "visit" | "connect" | "message" | "email" | "delay";
+  step_type: "visit" | "follow" | "connect" | "message" | "email" | "delay";
   template_id?: string | null;
   delay_seconds: number;
   connect_note?: string | null;
@@ -93,6 +93,7 @@ export interface RunnerUnipileClient {
   listAccounts(): Promise<{ items: UnipileAccount[] }>;
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
   sendInvitation(params: { account_id: string; provider_id: string; message?: string }): Promise<UnipileSendInvitationResponse>;
+  followUser?(params: { account_id: string; provider_id: string }): Promise<{ success?: boolean; [key: string]: unknown }>;
   startChat(params: { account_id: string; attendees_ids: string[]; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileStartChatResponse>;
   sendMessage(params: { chat_id: string; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileSendMessageResponse>;
 }
@@ -434,6 +435,30 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       log(db, runProfile.run_id, target.id, "error", `No se pudo sincronizar el perfil: ${message}`);
       if (message.includes("no tiene URL")) trFail(db, tr, message);
       else trDefer(db, tr, message, 1, now());
+    }
+    return;
+  }
+
+  if (step.step_type === "follow") {
+    try {
+      const profile = await resolveProfile();
+      enrichTarget(db, runProfile.account_id, target, profile);
+      if (typeof client.followUser === "function") {
+        await client.followUser({ account_id: accountId, provider_id: profile.provider_id });
+      }
+      log(db, runProfile.run_id, target.id, "info", `Perfil de ${name} seguido en LinkedIn con éxito!`);
+      trAdvance(db, tr, steps);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes("already") || message.toLowerCase().includes("conflict") || message.toLowerCase().includes("following")) {
+        log(db, runProfile.run_id, target.id, "info", `Ya sigues el perfil de ${name}; continuando secuencia`);
+        trAdvance(db, tr, steps);
+      } else if (message.includes("no tiene URL")) {
+        trFail(db, tr, message);
+      } else {
+        log(db, runProfile.run_id, target.id, "warn", `No se pudo seguir el perfil de ${name}: ${message}`);
+        trAdvance(db, tr, steps);
+      }
     }
     return;
   }

@@ -117,6 +117,17 @@ export interface UnipileSendInvitationResponse {
   status?: 'sent' | 'pending' | 'failed' | string;
 }
 
+export interface UnipileFollowUserParams {
+  account_id: string;
+  provider_id: string;
+}
+
+export interface UnipileFollowUserResponse {
+  object?: string;
+  success?: boolean;
+  [key: string]: unknown;
+}
+
 export interface UnipileSendMessageParams {
   chat_id: string;
   text: string;

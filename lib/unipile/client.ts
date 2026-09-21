@@ -19,6 +19,8 @@ import {
   UnipileCredentialsAuthResponse,
   UnipileLinkedInAuthParams,
   UnipileSolveCheckpointResponse,
+  UnipileFollowUserParams,
+  UnipileFollowUserResponse,
 } from './types';
 
 export class UnipileClient {
@@ -225,6 +227,19 @@ export class UnipileClient {
         account_id: params.account_id,
         provider_id: params.provider_id,
         ...(params.message ? { message: params.message } : {}),
+      }),
+    });
+  }
+
+  /**
+   * Sigue a un usuario en LinkedIn
+   */
+  async followUser(params: UnipileFollowUserParams): Promise<UnipileFollowUserResponse> {
+    return this.request<UnipileFollowUserResponse>('/api/v1/users/follow', {
+      method: 'POST',
+      body: JSON.stringify({
+        account_id: params.account_id,
+        provider_id: params.provider_id,
       }),
     });
   }

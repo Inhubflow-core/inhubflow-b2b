@@ -417,7 +417,9 @@
       "aiWritesInMail": "La IA redacta asunto + cuerpo",
       "noSubjectRequired": "Sin asunto — requerido",
       "noSubject": "Sin asunto",
-      "connectOnce": "El paso de conexión solo se puede agregar una vez"
+      "connectOnce": "El paso de conexión solo se puede agregar una vez",
+      "follow": "Seguir Perfil",
+      "followOnce": "El paso de seguir perfil solo se puede agregar una vez"
     },
     "prospects": {
       "title": "Elige tus prospectos",
@@ -491,6 +493,7 @@
       "waitBefore": "Esperar antes de este paso",
       "days": "días",
       "visitDesc": "Visita el perfil. Aparecerás en 'Quién ha visto tu perfil'. No requiere configuración adicional.",
+      "followDesc": "Sigue automáticamente el perfil de LinkedIn del prospecto para generar una notificación cálida en su cuenta antes o después de conectar.",
       "includeNote": "Incluir nota de conexión",
       "notePlaceholder": "Hola {{first_name}}, me gustaría conectar...",
       "inmailSubjectRequired": "Asunto (requerido para InMail)",

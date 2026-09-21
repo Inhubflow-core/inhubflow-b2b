@@ -31,6 +31,7 @@ import {
   RiSearchLine,
   RiLoader4Line,
   RiUser3Line,
+  RiUserFollowLine,
   RiArrowDownSLine,
   RiRefreshLine,
   RiErrorWarningLine,
@@ -39,7 +40,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type StepType = "visit" | "connect" | "message" | "sales_inmail" | "delay" | "email";
+type StepType = "visit" | "follow" | "connect" | "message" | "sales_inmail" | "delay" | "email";
 type Track = "linkedin" | "email";
 
 interface Step {
@@ -155,6 +156,7 @@ interface EmailAccount {
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
   visit: <RiEyeLine size={15} />,
+  follow: <RiUserFollowLine size={15} />,
   connect: <RiLinkedinBoxLine size={15} />,
   message: <RiMessage2Line size={15} />,
   sales_inmail: <RiSendPlaneLine size={15} />,
@@ -165,6 +167,7 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 // Static base labels fallback
 const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
+  follow: "Follow Profile",
   connect: "LinkedIn Connect",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
@@ -174,6 +177,7 @@ const STEP_LABELS: Record<string, string> = {
 function getStepLabel(type: string, t?: (key: string, params?: any) => string): string {
   if (t) {
     if (type === "visit") return t("campaignWizard.steps.visit");
+    if (type === "follow") return t("campaignWizard.steps.follow");
     if (type === "connect") return t("campaignWizard.steps.connect");
     if (type === "message") return t("campaignWizard.steps.message");
     if (type === "sales_inmail") return t("campaignWizard.steps.salesInmail");
@@ -206,6 +210,7 @@ const AI_LANGUAGES = [
 
 const STEP_COLORS: Record<string, string> = {
   visit: "bg-info/10 text-info border-info/20",
+  follow: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   connect: "bg-primary/10 text-primary border-primary/20",
   message: "bg-success/10 text-success border-success/20",
   sales_inmail: "bg-primary/10 text-primary border-primary/20",
@@ -337,7 +342,7 @@ type WizardPage = "prospects" | "prompt" | "linkedin-steps" | "email-steps" | "a
 
 interface WizardStep {
   track: Track;
-  type: "visit" | "connect" | "message" | "sales_inmail" | "email";
+  type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email";
   delayDaysBefore: number; // delay before this step (0 for first step within its track)
   connectNote: string;
   messageBody: string;
@@ -371,7 +376,7 @@ function buildWizardSteps(steps: Step[]): WizardStep[] {
       const raw = s as unknown as Record<string, unknown>;
       result.push({
         track,
-        type: s.step_type as "visit" | "connect" | "message" | "sales_inmail" | "email",
+        type: s.step_type as "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email",
         delayDaysBefore: pendingDelay[track] ?? 0,
         connectNote: s.connect_note ?? "",
         messageBody: s.message_body ?? "",
@@ -706,7 +711,7 @@ function Wizard({
   // In add-contacts mode every contact in the list is "active" already (this run) — dedup happens server-side.
   const allBlocked = !isAddContacts && conflicts !== null && conflicts.blocked > 0 && conflicts.blocked >= conflicts.total;
   const hasEmailStep = wizardSteps.some((s) => s.type === "email");
-  const hasLinkedInStep = wizardSteps.some((s) => s.type === "visit" || s.type === "connect" || s.type === "message" || s.type === "sales_inmail");
+  const hasLinkedInStep = wizardSteps.some((s) => s.type === "visit" || s.type === "follow" || s.type === "connect" || s.type === "message" || s.type === "sales_inmail");
 
   async function selectList(id: string) {
     setListId(id);
@@ -765,8 +770,9 @@ function Wizard({
   }
 
   const hasConnect = wizardSteps.some((s) => s.type === "connect");
+  const hasFollow = wizardSteps.some((s) => s.type === "follow");
 
-  async function addWizardStep(type: "visit" | "connect" | "message" | "sales_inmail" | "email") {
+  async function addWizardStep(type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email") {
     const track: Track = type === "email" ? "email" : "linkedin";
     setWizardSteps((prev) => {
       const trackSteps = prev.filter((s) => s.track === track);
@@ -1400,13 +1406,16 @@ function Wizard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-base-content/30 mr-1">{t("campaignWizard.steps.addStep")}</span>
                       {track === "linkedin"
-                        ? (["visit", "connect", "message", "sales_inmail"] as const)
+                        ? (["visit", "follow", "connect", "message", "sales_inmail"] as const)
                             // Sales Nav InMail is a premium feature — hide from the picker in the public build.
                             .filter((type) => type !== "sales_inmail" || hasPremium)
                             .map((type) => {
-                            const disabled = type === "connect" && hasConnect;
+                            const disabled = (type === "connect" && hasConnect) || (type === "follow" && hasFollow);
+                            const title = disabled
+                              ? (type === "connect" ? t("campaignWizard.steps.connectOnce") : (t("campaignWizard.steps.followOnce") || "El paso de seguir perfil solo se puede agregar una vez"))
+                              : undefined;
                             return (
-                              <button key={type} onClick={() => !disabled && addWizardStep(type)} title={disabled ? t("campaignWizard.steps.connectOnce") : undefined}
+                              <button key={type} onClick={() => !disabled && addWizardStep(type)} title={title}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs ${disabled ? "border-base-300/20 bg-base-200/40 text-base-content/20 cursor-not-allowed" : "border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary/70 hover:text-primary"}`}>
                                 <RiAddLine size={11} /> {getStepLabel(type, t)}
                               </button>
@@ -1884,6 +1893,12 @@ function Wizard({
                 {ws.type === "visit" && (
                   <p className="text-sm text-base-content/50">
                     {t("campaignWizard.config.visitDesc")}
+                  </p>
+                )}
+
+                {ws.type === "follow" && (
+                  <p className="text-sm text-base-content/50">
+                    {t("campaignWizard.config.followDesc") || "Sigue automáticamente el perfil de LinkedIn del prospecto para generar una notificación cálida en su cuenta antes o después de conectar."}
                   </p>
                 )}
 
@@ -2417,7 +2432,7 @@ const ANALYTICS_SERIES = [
 const DAY_OPTS = [7, 14, 30, 90];
 
 const STEP_TYPE_LABEL: Record<string, string> = {
-  visit: "Visit", connect: "Connect", message: "LI Message", sales_inmail: "InMail", email: "Email",
+  visit: "Visit", follow: "Follow", connect: "Connect", message: "LI Message", sales_inmail: "InMail", email: "Email",
 };
 
 function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string; days: number }) {

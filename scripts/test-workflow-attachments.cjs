@@ -203,7 +203,53 @@ async function runTests() {
     db.close();
   }
 
-  console.log("\n✅ TODAS LAS PRUEBAS DE ADJUNTOS Y NOTAS DE VOZ COMPLETADAS CON ÉXITO");
+  console.log("▶ Test 3: Runner procesa paso 'follow' (seguir perfil) a través de Unipile");
+  {
+    const db = makeTestDb();
+    db.prepare("INSERT INTO accounts (id, name, email, unipile_account_id, unipile_status) VALUES ('a1', 'Mi Cuenta', 'test@example.com', 'remote-acc-1', 'OK')").run();
+    db.prepare("INSERT INTO workflows (id, name) VALUES ('w1', 'Campaña Seguir Perfil')").run();
+    db.prepare("INSERT INTO runs (id, workflow_id, account_id) VALUES ('r1', 'w1', 'a1')").run();
+    db.prepare("INSERT INTO targets (id, full_name, first_name, linkedin_url, unipile_provider_id) VALUES ('t1', 'Carlos Sanchez', 'Carlos', 'https://www.linkedin.com/in/carlos-s', 'prov-carlos')").run();
+    db.prepare("INSERT INTO run_profiles (id, run_id, target_id) VALUES ('rp1', 'r1', 't1')").run();
+    db.prepare("INSERT INTO run_profile_tracks (id, run_profile_id, track, state, current_step) VALUES ('tr1', 'rp1', 'linkedin', 'pending', 0)").run();
+
+    db.prepare(`
+      INSERT INTO workflow_steps (
+        id, workflow_id, track, step_order, step_type
+      ) VALUES (?, ?, ?, ?, ?)
+    `).run("s1", "w1", "linkedin", 1, "follow");
+
+    let followPayload = null;
+    const mockClient = {
+      isConfigured: () => true,
+      getAccount: async () => ({ id: "remote-acc-1", type: "LINKEDIN", sources: [{ status: "OK" }] }),
+      listAccounts: async () => ({ items: [{ id: "remote-acc-1", type: "LINKEDIN", sources: [{ status: "OK" }] }] }),
+      resolveProfile: async () => ({ provider_id: "prov-carlos" }),
+      followUser: async (params) => {
+        followPayload = params;
+        return { success: true };
+      },
+    };
+
+    const tr = db.prepare("SELECT * FROM run_profile_tracks WHERE id = 'tr1'").get();
+    await processSingleTrack(db, tr, { client: mockClient });
+
+    assert.ok(followPayload !== null, "followUser debió ser llamado");
+    assert.equal(followPayload.account_id, "remote-acc-1");
+    assert.equal(followPayload.provider_id, "prov-carlos");
+
+    const updatedTr = db.prepare("SELECT * FROM run_profile_tracks WHERE id = 'tr1'").get();
+    assert.equal(updatedTr.state, "completed", "Track debió completarse al terminar el único paso");
+
+    const logs = db.prepare("SELECT * FROM logs WHERE run_id = 'r1'").all();
+    const followLog = logs.find(l => l.message.includes("seguido en LinkedIn"));
+    assert.ok(followLog, "Debe registrar log de confirmación de seguimiento");
+
+    console.log("  ✓ Paso 'follow' ejecutado, perfil seguido con éxito y registrado en logs");
+    db.close();
+  }
+
+  console.log("\n✅ TODAS LAS PRUEBAS DE SECUENCIAS (ADJUNTOS, AUDIOS Y SEGUIR PERFIL) COMPLETADAS CON ÉXITO");
 }
 
 runTests().catch(err => {
