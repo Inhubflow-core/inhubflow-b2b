@@ -1102,68 +1102,69 @@ function Wizard({
           </button>
         </div>
 
-        {/* 2. Barra de Progreso del Wizard (Stepper) */}
-        {pages.length > 1 && (
-          <div className="px-6 sm:px-10 py-4 border-b border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50 shrink-0 overflow-x-auto">
-            <div className="flex items-center justify-between w-full min-w-[720px] max-w-6xl mx-auto">
-              {pages.map((p, idx) => {
-                const isCurrent = page === p;
-                const isPast = pageIdx > idx;
-                const canNav = canGoTo(p);
-                const StepIcon = PAGE_ICONS[p];
-                return (
-                  <div key={p} className="flex items-center flex-1 last:flex-none">
-                    <button
-                      type="button"
-                      disabled={!canNav}
-                      onClick={() => canNav && setPage(p)}
-                      className={`flex items-center gap-2.5 group text-left focus:outline-none shrink-0 ${!canNav ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <span
-                        className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all shrink-0 ${
-                          isCurrent
-                            ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500/30"
-                            : isPast
-                            ? "bg-emerald-500 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-gray-300"
-                        }`}
-                      >
-                        {isPast ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
-                      </span>
-                      <div className="hidden sm:block">
-                        <span
-                          className={`text-xs font-bold block leading-tight ${
-                            isCurrent
-                              ? "text-brand-600 dark:text-brand-400"
-                              : isPast
-                              ? "text-gray-900 dark:text-white"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          PASO {idx + 1}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
-                          {PAGE_LABELS[p]}
-                        </span>
-                      </div>
-                    </button>
-                    {idx < pages.length - 1 && (
-                      <div
-                        className={`flex-1 min-w-[20px] sm:min-w-[36px] h-0.5 mx-3 sm:mx-5 transition-colors ${
-                          isPast ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"
-                        }`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+        {/* 2. Cuerpo del Wizard (Pasos en vertical a la izquierda + Contenido a la derecha) */}
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* Barra lateral vertical de pasos */}
+          <div className="w-56 sm:w-64 shrink-0 border-r border-gray-200 dark:border-gray-800 p-3 sm:p-4 flex flex-col gap-1.5 overflow-y-auto bg-gray-50/70 dark:bg-gray-850/50">
+            <div className="mb-1.5 px-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Pasos de la campaña
+              </span>
             </div>
+            {pages.map((p, idx) => {
+              const isCurrent = page === p;
+              const isPast = pageIdx > idx;
+              const canNav = canGoTo(p);
+              const StepIcon = PAGE_ICONS[p];
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={!canNav}
+                  onClick={() => canNav && setPage(p)}
+                  className={`w-full text-left flex items-center gap-3 p-2.5 rounded-2xl transition-all ${
+                    isCurrent
+                      ? "bg-brand-500/10 border border-brand-500/30 text-brand-600 dark:text-brand-400 font-bold shadow-2xs"
+                      : isPast
+                      ? "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-800 dark:text-gray-200 cursor-pointer"
+                      : "opacity-40 cursor-not-allowed text-gray-400 dark:text-gray-500"
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all shrink-0 ${
+                      isCurrent
+                        ? "bg-brand-500 text-white shadow-md shadow-brand-500/25 ring-2 ring-brand-500/30"
+                        : isPast
+                        ? "bg-emerald-500 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    {isPast ? <RiCheckLine size={15} /> : <StepIcon size={14} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider block leading-tight ${
+                        isCurrent
+                          ? "text-brand-600 dark:text-brand-400"
+                          : isPast
+                          ? "text-gray-500 dark:text-gray-400"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      PASO {idx + 1}
+                    </span>
+                    <p className="text-xs font-semibold truncate leading-tight mt-0.5">
+                      {PAGE_LABELS[p]}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        )}
 
-        {/* 3. Contenido del Wizard según el paso activo */}
-        <div className={`flex-1 min-h-0 ${page === "prospects" ? "overflow-hidden" : "overflow-y-auto"} p-6 md:p-8 bg-white dark:bg-gray-900`}>
-          <div className={`w-full mx-auto ${page === "prospects" ? "max-w-5xl h-full min-h-0" : "max-w-3xl"}`}>
+          {/* Contenido del Wizard según el paso activo */}
+          <div className={`flex-1 min-h-0 ${page === "prospects" ? "overflow-hidden" : "overflow-y-auto"} p-6 md:p-8 bg-white dark:bg-gray-900`}>
+            <div className={`w-full mx-auto ${page === "prospects" ? "max-w-5xl h-full min-h-0" : "max-w-3xl"}`}>
 
             {/* ── Page: Prospects ── */}
             {page === "prospects" && (() => {
@@ -1841,8 +1842,9 @@ function Wizard({
               })()}
             </div>
           </div>
+        </div>
 
-          {/* 4. Footer de Navegación del Wizard */}
+        {/* 3. Footer de Navegación del Wizard */}
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-300 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-850/80 shrink-0">
             <div className="flex items-center gap-2">
               {pageIdx === 0 ? (
