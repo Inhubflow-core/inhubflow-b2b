@@ -1164,7 +1164,7 @@ function Wizard({
 
           {/* Contenido del Wizard según el paso activo */}
           <div className={`flex-1 min-h-0 ${page === "prospects" ? "overflow-hidden" : "overflow-y-auto"} p-6 md:p-8 bg-white dark:bg-gray-900`}>
-            <div className={`w-full mx-auto ${page === "prospects" ? "max-w-5xl h-full min-h-0" : "max-w-3xl"}`}>
+            <div className={`w-full mx-auto max-w-5xl ${page === "prospects" ? "h-full min-h-0" : ""}`}>
 
             {/* ── Page: Prospects ── */}
             {page === "prospects" && (() => {
