@@ -32,14 +32,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const resolved = await resolveUnipileAccount(db, account.id, unipile);
     const profile = await unipile.resolveProfile(target.linkedin_url, resolved.unipileAccountId);
 
+    const profilePictureUrl =
+      profile.profile_picture_url_large ||
+      profile.profile_picture_url ||
+      ((profile as unknown as { picture_url?: string }).picture_url ?? null);
+
     db.prepare(`
-      UPDATE targets SET headline = COALESCE(?, headline) WHERE id = ?
-    `).run(profile.headline, id);
+      UPDATE targets SET
+        headline = COALESCE(?, headline),
+        profile_image_url = COALESCE(?, profile_image_url)
+      WHERE id = ?
+    `).run(profile.headline, profilePictureUrl, id);
     markLinkedInTargetState(db, account.id, id, {
       unipile_provider_id: profile.provider_id,
     });
 
-    return res.json({ contact_id: id, account_id: account.id, profile });
+    return res.json({ contact_id: id, account_id: account.id, profile, profile_image_url: profilePictureUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return res.status(500).json({ error: message });

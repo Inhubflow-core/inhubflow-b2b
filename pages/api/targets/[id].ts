@@ -27,7 +27,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // Editable contact fields (CRM hygiene). Anything else is owned by enrichment/automation.
     const EDITABLE = [
       "first_name", "last_name", "full_name", "title", "company", "location",
-      "email", "phone", "headline", "summary", "notes", "stage_id",
+      "email", "phone", "headline", "summary", "notes", "stage_id", "profile_image_url",
     ] as const;
 
     const body = req.body as Record<string, unknown>;

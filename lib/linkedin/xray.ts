@@ -1,4 +1,4 @@
-import { WebSearchClient, WebSearchProviderError } from "@/lib/serper/client";
+import { WebSearchClient, WebSearchProviderError } from "../serper/client";
 import { SearchLead, SearchProgressCallback } from "./search";
 
 export type XRayErrorCode =
@@ -394,7 +394,7 @@ export async function searchLinkedInWithSerper(
         title: parsed.title || options.title || null,
         company: parsed.company || company || null,
         location: effectiveLocation,
-        profileImageUrl: null,
+        profileImageUrl: (item as unknown as { imageUrl?: string }).imageUrl || null,
         degree: null,
         email: parsed.email,
         phone: parsed.phone,

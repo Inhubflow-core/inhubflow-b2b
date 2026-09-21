@@ -8,6 +8,7 @@ import { GetServerSideProps } from "next";
 import { getDb } from "@/lib/db";
 import { previewSignalMessage } from "@/lib/signals/message-template";
 import { toast } from "sonner";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 import {
   COUNTRIES_LIST,
   SAMPLE_TITLES,
@@ -87,6 +88,7 @@ interface SignalLead {
   headline: string | null;
   company: string | null;
   location: string | null;
+  profile_image_url?: string | null;
   signal_type: string;
   signal_snippet: string | null;
   icebreaker_preview: string | null;
@@ -1667,13 +1669,20 @@ export default function SignalsPage({
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="font-bold text-sm text-gray-900 dark:text-white">
-                            {resLead.full_name}
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
-                            {resLead.headline}
-                          </p>
+                        <div className="flex items-center gap-2.5">
+                          <ProspectAvatar
+                            imageUrl={resLead.profile_image_url}
+                            name={resLead.full_name}
+                            size="sm"
+                          />
+                          <div>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                              {resLead.full_name}
+                            </h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
+                              {resLead.headline}
+                            </p>
+                          </div>
                         </div>
                         <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 shrink-0">
                           {resLead.score}% Match
@@ -1875,6 +1884,11 @@ export default function SignalsPage({
                             }
                           }}
                           className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                        />
+                        <ProspectAvatar
+                          imageUrl={lead.profile_image_url}
+                          name={lead.full_name}
+                          size="sm"
                         />
                         <h4 className="font-bold text-sm text-gray-900 dark:text-white">
                           {lead.full_name}

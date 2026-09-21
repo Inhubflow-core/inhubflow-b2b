@@ -12,6 +12,7 @@ import {
   RiCheckboxBlankCircleLine, RiDeleteBinLine, RiCalendarLine,
   RiAddLine, RiCloseCircleLine, RiPhoneLine,
 } from "react-icons/ri";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 interface Company {
   id: string;
@@ -78,6 +79,7 @@ interface Target {
   apollo_functions: string | null;
   apollo_id: string | null;
   apollo_enriched_at: string | null;
+  profile_image_url?: string | null;
   company_description: string | null;
   company_size: number | null;
   company_industry: string | null;
@@ -747,13 +749,20 @@ export default function ContactDetailPage({
         {/* Header — full width */}
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{target.full_name ?? "—"}</h1>
-              {target.title && <p className="text-gray-600 dark:text-gray-300 text-sm mt-0.5">{target.title}</p>}
-              {target.headline && target.headline !== target.title && (
-                <p className="text-gray-400 text-xs mt-1 italic">{target.headline}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-2 mt-3">
+            <div className="flex items-start gap-4 flex-1 min-w-0">
+              <ProspectAvatar
+                imageUrl={target.profile_image_url}
+                name={target.full_name}
+                size="xl"
+                badge={target.degree === 1 ? "linkedin" : null}
+              />
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{target.full_name ?? "—"}</h1>
+                {target.title && <p className="text-gray-600 dark:text-gray-300 text-sm mt-0.5">{target.title}</p>}
+                {target.headline && target.headline !== target.title && (
+                  <p className="text-gray-400 text-xs mt-1 italic">{target.headline}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 mt-3">
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold ${connectionStatus.color}`}>
                   {target.degree === 1 ? <RiUserFollowLine size={12} /> : target.connection_requested_at ? <RiUserAddLine size={12} /> : null}
                   {connectionStatus.label}
@@ -778,7 +787,8 @@ export default function ContactDetailPage({
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
               {target.linkedin_url && (
                 <a href={target.linkedin_url} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#0A66C2] text-white hover:bg-[#004182] transition-colors shadow-xs">

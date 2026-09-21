@@ -14,6 +14,7 @@ import {
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, applyFiltersClient } from "@/components/ui/FilterBar";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 const PAGE_SIZE = 25;
 
@@ -32,6 +33,7 @@ interface Target {
   email: string | null;
   email_status: string | null;
   apollo_enriched_at: string | null;
+  profile_image_url?: string | null;
 }
 
 interface ListDetail {
@@ -671,7 +673,16 @@ export default function ListDetailPage({
                         onChange={() => toggleOne(t.id)}
                       />
                     </td>
-                    <td className="font-semibold text-gray-900 dark:text-white">{t.full_name ?? "—"}</td>
+                    <td className="font-semibold text-gray-900 dark:text-white">
+                      <div className="flex items-center gap-2.5">
+                        <ProspectAvatar
+                          imageUrl={t.profile_image_url}
+                          name={t.full_name}
+                          size="sm"
+                        />
+                        <span className="truncate">{t.full_name ?? "—"}</span>
+                      </div>
+                    </td>
                     <td className="text-gray-600 dark:text-gray-300 max-w-50 truncate">{t.title ?? "—"}</td>
                     <td className="text-gray-600 dark:text-gray-300">{t.company ?? "—"}</td>
                     <td className="text-gray-400 text-xs">{t.location ?? "—"}</td>

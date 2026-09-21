@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
 import { timeLabelInZone } from "@/lib/calendar/time";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 export type CalendarEventStatus = "confirmed" | "completed" | "cancelled" | "no_show";
 
@@ -229,9 +230,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-brand-500 text-white font-bold text-xs flex items-center justify-center">
-                    {event.target_name[0].toUpperCase()}
-                  </div>
+                  <ProspectAvatar
+                    imageUrl={event.target_image_url}
+                    name={event.target_name}
+                    size="sm"
+                  />
                   <div>
                     <h4 className="font-semibold text-xs text-gray-900 dark:text-white">
                       {event.target_name}

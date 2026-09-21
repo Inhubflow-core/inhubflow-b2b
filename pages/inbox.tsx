@@ -31,6 +31,7 @@ import {
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { Locale, TranslationParams } from "@/lib/i18n/types";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 import type { InboxReply } from "./api/inbox/index";
 import type { EmailMessage } from "./api/inbox/thread";
 
@@ -833,16 +834,12 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
       {/* ── Chat Header (z-30 ensures floating popovers stay on top of message timeline) ── */}
       <div className="relative z-30 px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-base-100/95 backdrop-blur-md flex items-center justify-between gap-4 shrink-0 shadow-xs">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative shrink-0">
-            <div
-              className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm border shadow-sm ${getAvatarColor(
-                reply.full_name
-              )}`}
-            >
-              {getInitials(reply.full_name ?? reply.email)}
-            </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-success ring-2 ring-base-100" />
-          </div>
+          <ProspectAvatar
+            imageUrl={reply.profile_image_url}
+            name={reply.full_name ?? reply.email}
+            size="lg"
+            badge="online"
+          />
 
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1052,13 +1049,11 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
                     className={`flex items-end gap-2.5 ${isOutbound ? "justify-end" : "justify-start"}`}
                   >
                     {!isOutbound && (
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 border ${getAvatarColor(
-                          reply.full_name
-                        )}`}
-                      >
-                        {getInitials(reply.full_name)}
-                      </div>
+                      <ProspectAvatar
+                        imageUrl={reply.profile_image_url}
+                        name={reply.full_name}
+                        size="xs"
+                      />
                     )}
 
                     <div
@@ -1954,14 +1949,12 @@ export default function InboxPage() {
                   >
                     {/* Avatar with status indicator */}
                     <div className="relative shrink-0 mt-0.5">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs border shadow-sm ${getAvatarColor(
-                          reply.full_name
-                        )}`}
-                      >
-                        {getInitials(reply.full_name ?? reply.email)}
-                      </div>
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-success ring-2 ring-base-100" />
+                      <ProspectAvatar
+                        imageUrl={reply.profile_image_url}
+                        name={reply.full_name ?? reply.email}
+                        size="md"
+                        badge="online"
+                      />
                     </div>
 
                     {/* Content Body */}
@@ -2061,9 +2054,11 @@ export default function InboxPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-5 animate-scaleUp">
             <div className="flex items-start gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
-                <RiPriceTag3Line size={24} />
-              </div>
+              <ProspectAvatar
+                imageUrl={selectedReply.profile_image_url}
+                name={selectedReply.full_name}
+                size="lg"
+              />
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-base text-base-content">
                   Etiqueta al prospecto antes de salir

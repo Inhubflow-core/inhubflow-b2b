@@ -95,6 +95,7 @@ export interface SignalLead {
   headline: string | null;
   company: string | null;
   location: string | null;
+  profile_image_url?: string | null;
   signal_type: string;
   signal_snippet: string | null;
   icebreaker_preview: string | null;
@@ -210,6 +211,7 @@ function rebuildSignalLeads(db: Database.Database): void {
     ["id", "lower(hex(randomblob(16)))"], ["workspace_owner_id", "NULL"], ["monitor_id", "''"],
     ["linkedin_url", "''"], ["identity_key", "lower(linkedin_url)"], ["provider_id", "NULL"],
     ["full_name", "'Contacto'"], ["headline", "NULL"], ["company", "NULL"], ["location", "NULL"],
+    ["profile_image_url", "NULL"],
     ["signal_type", "'signal_detected'"], ["signal_snippet", "NULL"], ["icebreaker_preview", "NULL"],
     ["status", "'pending'"], ["score", "0"], ["signal_count", "1"],
     ["first_detected_at", "created_at"], ["last_detected_at", "updated_at"],
@@ -250,6 +252,7 @@ function rebuildSignalLeads(db: Database.Database): void {
           promotion_state TEXT NOT NULL DEFAULT 'pending' CHECK(promotion_state IN ('pending', 'promoting', 'imported', 'enrolled', 'blocked', 'failed')),
           promotion_error TEXT,
           imported_target_id TEXT REFERENCES targets(id) ON DELETE SET NULL,
+          profile_image_url TEXT,
           metadata_json TEXT,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -344,6 +347,7 @@ export function applySignalSchema(db: Database.Database): void {
       promotion_state TEXT NOT NULL DEFAULT 'pending',
       promotion_error TEXT,
       imported_target_id TEXT REFERENCES targets(id) ON DELETE SET NULL,
+      profile_image_url TEXT,
       metadata_json TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -415,6 +419,8 @@ export function applySignalSchema(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  ensureColumn(db, "signal_leads", "profile_image_url", "TEXT");
 
   db.exec(`
     UPDATE signal_monitors

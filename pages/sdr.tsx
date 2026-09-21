@@ -27,6 +27,7 @@ import {
 } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import type { SdrSimulationResult } from "@/lib/sdr-agent/simulation";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 type Tab = "overview" | "approvals" | "gates" | "prompts" | "knowledge" | "simulator" | "history";
 
@@ -48,6 +49,7 @@ interface PendingAction {
   target_company: string | null;
   target_linkedin: string | null;
   target_email: string | null;
+  target_image_url?: string | null;
   channel: string;
   ai_turn_count: number;
   intent: string | null;
@@ -125,6 +127,7 @@ interface SdrConfigData {
     created_at: string;
     target_name?: string;
     target_company?: string;
+    target_image_url?: string | null;
   }>;
 }
 
@@ -1081,6 +1084,11 @@ export default function SdrPage() {
                       {/* Lead & Context Header */}
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 pb-3">
                         <div className="flex items-center gap-2.5 flex-wrap">
+                          <ProspectAvatar
+                            imageUrl={act.target_image_url}
+                            name={act.target_name}
+                            size="sm"
+                          />
                           <span className="font-semibold text-sm text-base-content">
                             {act.target_name || "Lead / Prospecto"}
                           </span>
@@ -1591,8 +1599,17 @@ export default function SdrPage() {
                           {new Date(d.created_at).toLocaleString()}
                         </td>
                         <td className="py-3 px-4 font-medium text-base-content">
-                          {d.target_name || t("sdr.colProspect")}
-                          {d.target_company && <span className="block text-xs text-base-content/40">{d.target_company}</span>}
+                          <div className="flex items-center gap-2.5">
+                            <ProspectAvatar
+                              imageUrl={d.target_image_url}
+                              name={d.target_name}
+                              size="sm"
+                            />
+                            <div>
+                              <span>{d.target_name || t("sdr.colProspect")}</span>
+                              {d.target_company && <span className="block text-xs text-base-content/40">{d.target_company}</span>}
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-400">

@@ -1100,7 +1100,7 @@
   },
   "signalRadar": {
     "header": {
-      "title": "SIGNAL RADAR",
+      "title": "Signal Radar",
       "subtitle": "Detecta prospectos calientes y decisores activos en LinkedIn con señales de intención en tiempo real.",
       "badge": "Live Radar",
       "newMonitor": "Nuevo Monitor",

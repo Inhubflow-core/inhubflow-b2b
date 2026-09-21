@@ -508,6 +508,7 @@ export class SignalRadarService {
         headline,
         company,
         location: profile.location || candidate.location || current?.location || null,
+        profileImageUrl: profile.profile_picture_url_large || profile.profile_picture_url || ((profile as unknown as { picture_url?: string }).picture_url ?? null) || candidate.profileImageUrl || null,
       };
     } catch {
       return { ...candidate, linkedinUrl: canonical };
@@ -532,14 +533,14 @@ export class SignalRadarService {
         db.prepare(`
           INSERT INTO signal_leads (
             id, workspace_owner_id, monitor_id, linkedin_url, identity_key, provider_id,
-            full_name, headline, company, location, signal_type, signal_snippet,
+            full_name, headline, company, location, profile_image_url, signal_type, signal_snippet,
             status, score, signal_count, first_detected_at, last_detected_at,
             message_generation_state, promotion_state, metadata_json, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1, ?, ?, 'pending', 'pending', ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1, ?, ?, 'pending', 'pending', ?, ?, ?)
         `).run(
           id, monitor.workspace_owner_id, monitor.id, canonicalLinkedInProfileUrl(discovered.linkedinUrl) || discovered.linkedinUrl,
           identity, discovered.providerId || null, discovered.fullName, discovered.headline || null,
-          discovered.company || null, discovered.location || null, discovered.signalType,
+          discovered.company || null, discovered.location || null, discovered.profileImageUrl || null, discovered.signalType,
           discovered.evidence.snippet || null, score.total,
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
@@ -563,11 +564,12 @@ export class SignalRadarService {
           UPDATE signal_leads SET provider_id = COALESCE(provider_id, ?),
             full_name = COALESCE(NULLIF(full_name, ''), ?), headline = COALESCE(?, headline),
             company = COALESCE(?, company), location = COALESCE(?, location),
+            profile_image_url = COALESCE(profile_image_url, ?),
             signal_type = ?, signal_snippet = ?, score = MAX(score, ?),
             signal_count = signal_count + 1, last_detected_at = ?, metadata_json = ?, updated_at = datetime('now')
           WHERE id = ?
         `).run(discovered.providerId || null, discovered.fullName, discovered.headline || null,
-          discovered.company || null, discovered.location || null, discovered.signalType,
+          discovered.company || null, discovered.location || null, discovered.profileImageUrl || null, discovered.signalType,
           discovered.evidence.snippet || null, score.total,
           discovered.evidence.occurredAt || new Date(this.now()).toISOString(),
           JSON.stringify({

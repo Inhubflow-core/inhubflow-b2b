@@ -10,6 +10,7 @@ export interface InboxReply {
   email: string | null;
   headline: string | null;
   company: string | null;
+  profile_image_url: string | null;
   channel: "email" | "linkedin" | "both";
   replied_at: string;
   email_replied_at: string | null;
@@ -183,6 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       t.email,
       t.headline,
       t.company,
+      t.profile_image_url,
       t.email_replied_at,
       t.last_replied_at,
       CASE

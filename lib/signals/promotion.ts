@@ -105,6 +105,7 @@ export function promoteSignalLead(
         company: lead.company,
         location: lead.location,
         providerId: lead.provider_id,
+        profileImageUrl: lead.profile_image_url || null,
       });
       attachTargetToList(db, listId, id);
       if (input.trigger === "autopilot") {

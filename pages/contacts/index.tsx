@@ -13,6 +13,7 @@ import {
   RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine, RiKanbanView,
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, filtersToParams } from "@/components/ui/FilterBar";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 const PAGE_SIZE = 50;
 
@@ -33,6 +34,7 @@ interface Contact {
   last_replied_at: string | null;
   apollo_enriched_at: string | null;
   seniority: string | null;
+  profile_image_url?: string | null;
   created_at: string;
 }
 
@@ -371,10 +373,12 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                         />
                       </td>
                       <td>
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-semibold shrink-0 border border-brand-500/20">
-                            {(c.full_name ?? "?").charAt(0).toUpperCase()}
-                          </div>
+                        <div className="flex items-center gap-2.5">
+                          <ProspectAvatar
+                            imageUrl={c.profile_image_url}
+                            name={c.full_name}
+                            size="sm"
+                          />
                           <span className="font-semibold text-gray-900 dark:text-white truncate max-w-36">{c.full_name ?? "—"}</span>
                         </div>
                       </td>

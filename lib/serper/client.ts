@@ -5,6 +5,7 @@ export interface WebSearchResult {
   date: string | null;
   source: string | null;
   position: number | null;
+  imageUrl?: string | null;
 }
 
 export interface WebSearchResponse {
@@ -112,6 +113,7 @@ export class WebSearchClient {
             date: typeof row.date === "string" ? row.date : null,
             source: typeof row.source === "string" ? row.source : null,
             position: typeof row.position === "number" ? row.position : null,
+            imageUrl: typeof row.imageUrl === "string" ? row.imageUrl : typeof row.thumbnail === "string" ? row.thumbnail : null,
           };
         }).filter((item): item is WebSearchResult => Boolean(item));
         return {

@@ -88,7 +88,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!providerId && target.linkedin_url) {
         const profile = await unipile.resolveProfile(target.linkedin_url, resolved.unipileAccountId);
         providerId = profile.provider_id;
+        const photoUrl = profile.profile_picture_url_large || profile.profile_picture_url || ((profile as unknown as { picture_url?: string }).picture_url ?? null);
         if (providerId) markLinkedInTargetState(db, accountId, target.id, { unipile_provider_id: providerId });
+        if (photoUrl) {
+          db.prepare("UPDATE targets SET profile_image_url = COALESCE(profile_image_url, ?) WHERE id = ?").run(photoUrl, target.id);
+        }
       }
       if (!providerId) throw new Error("No se pudo identificar el contacto de LinkedIn");
       const newChat = await unipile.startChat({ account_id: resolved.unipileAccountId, attendees_ids: [providerId], text: finalBody });

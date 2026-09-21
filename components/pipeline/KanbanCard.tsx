@@ -10,6 +10,7 @@ import {
   RiListCheck,
 } from "react-icons/ri";
 import type { PipelineCard } from "@/lib/pipeline/pipeline-service";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 
 interface KanbanCardProps {
   card: PipelineCard;
@@ -111,20 +112,11 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
 
       {/* Profile: Avatar + Name + Title */}
       <div className="flex items-start gap-2.5 mb-2.5">
-        {card.profile_image_url ? (
-          <img
-            src={card.profile_image_url}
-            alt={card.full_name || "Lead"}
-            className="w-9 h-9 rounded-full object-cover shrink-0 border border-base-300"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 text-primary font-bold text-xs flex items-center justify-center shrink-0 border border-primary/20">
-            {getInitials(card.full_name)}
-          </div>
-        )}
+        <ProspectAvatar
+          imageUrl={card.profile_image_url}
+          name={card.full_name}
+          size="md"
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">

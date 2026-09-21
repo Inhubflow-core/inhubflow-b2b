@@ -20,6 +20,7 @@ export interface DiscoveredSignalLead {
   company?: string | null;
   location?: string | null;
   companySize?: string | number | null;
+  profileImageUrl?: string | null;
   signalType: SignalType | string;
   evidence: SignalEvidence;
 }

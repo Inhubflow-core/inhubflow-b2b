@@ -73,7 +73,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       SELECT d.id, d.intent, d.confidence, d.risk_level, d.language,
         d.recommended_action, d.requires_human, d.reason_code, d.reply_draft,
         d.model, d.provider, d.latency_ms, d.policy_outcome, d.knowledge_status,
-        d.created_at, t.full_name AS target_name, t.company AS target_company
+        d.created_at, t.full_name AS target_name, t.company AS target_company,
+        t.profile_image_url AS target_image_url
       FROM sdr_decisions d
       JOIN sdr_threads th ON th.id = d.thread_id
       LEFT JOIN targets t ON t.id = th.target_id

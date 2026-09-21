@@ -27,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         a.delivery_status, a.created_at, a.updated_at,
         t.id AS target_id, t.full_name AS target_name, t.company AS target_company,
         t.linkedin_url AS target_linkedin, t.email AS target_email,
+        t.profile_image_url AS target_image_url,
         th.channel, th.ai_turn_count,
         d.intent, d.confidence, d.risk_level, d.requires_human, d.reason_code
       FROM sdr_actions a
@@ -53,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       target_company: string | null;
       target_linkedin: string | null;
       target_email: string | null;
+      target_image_url: string | null;
       channel: string;
       ai_turn_count: number;
       intent: string | null;

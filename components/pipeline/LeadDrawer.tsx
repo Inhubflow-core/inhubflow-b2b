@@ -23,6 +23,7 @@ import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { ScheduleModal } from "@/components/calendar/ScheduleModal";
 import { useWorkspaceTimezone } from "@/lib/calendar/use-workspace-timezone";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 import { TagPicker, type AppliedTag, type TagOption } from "@/components/pipeline/TagPicker";
 
 interface LeadDrawerProps {
@@ -218,17 +219,11 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
         {/* Header */}
         <div className="p-5 border-b border-base-200 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            {card.profile_image_url ? (
-              <img
-                src={card.profile_image_url}
-                alt={card.full_name || "Lead"}
-                className="w-12 h-12 rounded-full object-cover border border-base-300 shrink-0"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-primary/20 text-primary font-bold text-sm flex items-center justify-center shrink-0">
-                {card.full_name?.slice(0, 2).toUpperCase() || "?"}
-              </div>
-            )}
+            <ProspectAvatar
+              imageUrl={card.profile_image_url}
+              name={card.full_name}
+              size="lg"
+            />
             <div className="min-w-0">
               <h3 className="font-bold text-base text-base-content truncate">
                 {card.full_name}

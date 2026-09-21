@@ -1,6 +1,7 @@
 import React from "react";
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
 import { dayKeyInZone, timeLabelInZone } from "@/lib/calendar/time";
+import ProspectAvatar from "@/components/ui/ProspectAvatar";
 import {
   RiVideoLine,
   RiTimeLine,
@@ -171,8 +172,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 
                     {evt.target_name && (
                       <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 flex-wrap">
-                        <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1">
-                          <RiUserLine size={13} className="text-brand-500" />
+                        <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                          <ProspectAvatar
+                            imageUrl={evt.target_image_url}
+                            name={evt.target_name}
+                            size="xs"
+                          />
                           {evt.target_name}
                         </span>
                         {evt.target_company && (

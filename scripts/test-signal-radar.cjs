@@ -49,7 +49,7 @@ function baseDb() {
     CREATE TABLE targets (
       id TEXT PRIMARY KEY, linkedin_url TEXT UNIQUE, first_name TEXT, last_name TEXT,
       full_name TEXT, headline TEXT, title TEXT, company TEXT, location TEXT,
-      unipile_provider_id TEXT, sdr_autopilot INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+      unipile_provider_id TEXT, profile_image_url TEXT, sdr_autopilot INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE list_targets (list_id TEXT, target_id TEXT, PRIMARY KEY(list_id,target_id));
     CREATE TABLE runs (
@@ -359,6 +359,7 @@ async function run() {
       listLinkedInSearchParameters: async () => ({ items: [] }),
       getPostComments: async () => ({ items: [] }),
       getPostReactions: async () => ({ items: [] }),
+      listAccounts: async () => ({ items: [{ id: "remote-1", name: "test", provider: "LINKEDIN" }] }),
       resolveProfile: async () => ({ object: "UserProfile", provider_id: "x" }),
     };
     const service = new SignalRadarService({ getDatabase: () => db, client: failingClient });
