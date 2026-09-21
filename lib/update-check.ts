@@ -1,6 +1,6 @@
 /**
  * InHubFlow standalone version state.
- * Upstream Linki polling has been removed for full independence.
+ * External polling has been removed for full independence.
  */
 
 export interface UpdateState {

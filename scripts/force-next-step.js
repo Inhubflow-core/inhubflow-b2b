@@ -32,12 +32,7 @@ const Database = require("better-sqlite3");
 
 const DB_PATH =
   process.env.INHUBFLOW_DB_PATH ||
-  process.env.LINKI_DB_PATH ||
-  (fs.existsSync(path.join(process.cwd(), "inhubflow.db"))
-    ? path.join(process.cwd(), "inhubflow.db")
-    : fs.existsSync(path.join(process.cwd(), "linki.db"))
-    ? path.join(process.cwd(), "linki.db")
-    : path.join(process.cwd(), "inhubflow.db"));
+  path.join(process.cwd(), "inhubflow.db");
 
 function parseArgs(argv) {
   const args = { apply: false, list: false, allTargets: false, skipSchedule: false, run: null, target: null };

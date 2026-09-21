@@ -35,7 +35,6 @@ export function decryptSecret(value: string | null): string | null {
   const authTag = Buffer.from(authTagB64, "base64");
   const ciphertext = Buffer.from(dataB64, "base64");
 
-  // Try InHubFlow primary key first
   try {
     const key = deriveKey("inhubflow-secret-encryption");
     const decipher = createDecipheriv(ALGORITHM, key, iv);
@@ -43,16 +42,7 @@ export function decryptSecret(value: string | null): string | null {
     const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     return plaintext.toString("utf8");
   } catch {
-    // Fallback for legacy secrets encrypted with the Linki key
-    try {
-      const legacyKey = deriveKey("linki-secret-encryption");
-      const decipher = createDecipheriv(ALGORITHM, legacyKey, iv);
-      decipher.setAuthTag(authTag);
-      const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-      return plaintext.toString("utf8");
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 

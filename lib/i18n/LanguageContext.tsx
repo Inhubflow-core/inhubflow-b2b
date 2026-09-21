@@ -25,14 +25,13 @@ const LanguageContext = createContext<LanguageContextType>({
 });
 
 const STORAGE_KEY = "inhubflow_locale";
-const LEGACY_STORAGE_KEY = "linki_locale";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("es");
 
   useEffect(() => {
     try {
-      const saved = (localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)) as Locale | null;
+      const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
       if (saved && ["es", "pt-BR", "en"].includes(saved)) {
         setLocaleState(saved);
         return;

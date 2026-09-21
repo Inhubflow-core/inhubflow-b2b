@@ -1,7 +1,7 @@
 # Auditoría Técnica — Asistente SDR IA
 
 **Fecha:** 2026-09-18
-**Repositorio:** `linki-main` @ rama `main`
+**Repositorio:** `inhubflow` @ rama `main`
 **Commit revisado:** `c0aaaf3`
 **Estado del working tree:** `M pages/signals/index.tsx` (cambio previo, no incluido en el análisis)
 **Alcance:** `lib/sdr-agent/**`, `pages/sdr.tsx`, `pages/api/sdr/**`, y su integración con Inbox, email (IMAP), LinkedIn (Unipile), campañas (`lib/campaigns`, `lib/linkedin/runner`), Signal Radar (`lib/signals/**`, paso 3 del wizard) y calendario nativo.
@@ -30,7 +30,7 @@ npx tsc --noEmit --incremental false   PASS (sin errores)
 npm run build                    PASS (exit code 0)
 ```
 
-### Estado real en `linki.db`
+### Estado real en `inhubflow.db`
 
 ```text
 sdr_agents              1 agente · mode="off" · runtime_enabled=0 · provider_enabled=0 · outbound_enabled=0

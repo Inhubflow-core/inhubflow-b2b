@@ -30,7 +30,7 @@ Module._extensions[".ts"] = (module, filename) => {
   );
 };
 
-const db = new Database(path.join(process.cwd(), "linki.db"));
+const db = new Database(path.join(process.cwd(), "inhubflow.db"));
 db.pragma("foreign_keys = ON");
 
 const { applyCalendarSchema } = require("../lib/calendar/schema.ts");

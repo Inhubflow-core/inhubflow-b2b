@@ -1,7 +1,7 @@
 # 🔍 Revisión Exhaustiva — Signal Radar
 
 **Fecha:** 18-09-2026
-**Repositorio:** `inhubflow-linki` v1.7.4 · **Commit HEAD:** `2f81808`
+**Repositorio:** `inhubflow` v1.7.4 · **Commit HEAD:** `2f81808`
 **Alcance:** módulo `lib/signals/` + integración `lib/unipile/`
 **Estado:** Solo revisión. **Sin modificaciones realizadas.**
 

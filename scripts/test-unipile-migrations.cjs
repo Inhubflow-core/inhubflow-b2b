@@ -30,7 +30,7 @@ Module._extensions[".ts"] = (module, filename) => {
 
 async function run() {
   const tempPath = path.join(os.tmpdir(), `inhubflow-unipile-migration-${process.pid}-${Date.now()}.db`);
-  const sourcePath = path.join(root, "linki.db");
+  const sourcePath = path.join(root, "inhubflow.db");
   if (fs.existsSync(sourcePath)) {
     const source = new Database(sourcePath, { readonly: true, fileMustExist: true });
     await source.backup(tempPath);

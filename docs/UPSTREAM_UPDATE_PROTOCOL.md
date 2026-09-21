@@ -1,7 +1,7 @@
 # Estado de Independencia de InHubFlow (Histórico de Desvinculación)
 
 > **ESTADO: INDEPENDIENTE / BIFURCACIÓN PERMANENTE**
-> A partir de septiembre de 2026, **InHubFlow** se ha desvinculado de forma permanente y definitiva del repositorio upstream (`moaljumaa/linki`).
+> A partir de septiembre de 2026, **InHubFlow** se ha desvinculado de forma permanente y definitiva de cualquier repositorio externo.
 
 ---
 

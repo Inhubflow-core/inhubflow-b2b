@@ -320,8 +320,7 @@ html.dark .btn-outline {
 }
 
 /* Product tour (driver.js) — styled to match InHubFlow */
-.inhubflow-tour-popover.driver-popover,
-.linki-tour-popover.driver-popover {
+.inhubflow-tour-popover.driver-popover {
   background: #101828;
   border: 1px solid #1d2939;
   border-radius: 16px;
@@ -329,25 +328,21 @@ html.dark .btn-outline {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
-.inhubflow-tour-popover .driver-popover-title,
-.linki-tour-popover .driver-popover-title {
+.inhubflow-tour-popover .driver-popover-title {
   color: #fcfcfd;
   font-size: 15px;
   font-weight: 600;
 }
-.inhubflow-tour-popover .driver-popover-description,
-.linki-tour-popover .driver-popover-description {
+.inhubflow-tour-popover .driver-popover-description {
   color: #98a2b3;
   font-size: 13px;
   line-height: 1.5;
 }
-.inhubflow-tour-popover .driver-popover-progress-text,
-.linki-tour-popover .driver-popover-progress-text {
+.inhubflow-tour-popover .driver-popover-progress-text {
   color: #667085;
   font-size: 11px;
 }
-.inhubflow-tour-popover .driver-popover-footer button,
-.linki-tour-popover .driver-popover-footer button {
+.inhubflow-tour-popover .driver-popover-footer button {
   background: #1d2939;
   color: #fcfcfd;
   text-shadow: none;
@@ -357,8 +352,7 @@ html.dark .btn-outline {
   font-weight: 500;
   padding: 5px 12px;
 }
-.inhubflow-tour-popover .driver-popover-footer .driver-popover-next-btn,
-.linki-tour-popover .driver-popover-footer .driver-popover-next-btn {
+.inhubflow-tour-popover .driver-popover-footer .driver-popover-next-btn {
   background: #465fff;
   border-color: #465fff;
   color: #ffffff;

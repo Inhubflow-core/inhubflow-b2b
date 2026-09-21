@@ -15,13 +15,7 @@ import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-at
 
 function resolveDbPath(): string {
   if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
-  if (process.env.LINKI_DB_PATH) return process.env.LINKI_DB_PATH;
-  const inhubflowDb = path.join(process.cwd(), "inhubflow.db");
-  const linkiDb = path.join(process.cwd(), "linki.db");
-  if (fs.existsSync(inhubflowDb) && fs.statSync(inhubflowDb).size > 4096) return inhubflowDb;
-  if (fs.existsSync(linkiDb)) return linkiDb;
-  if (fs.existsSync(inhubflowDb)) return inhubflowDb;
-  return inhubflowDb;
+  return path.join(process.cwd(), "inhubflow.db");
 }
 
 const DB_PATH = resolveDbPath();

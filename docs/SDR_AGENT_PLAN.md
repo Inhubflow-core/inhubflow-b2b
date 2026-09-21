@@ -1,7 +1,7 @@
 # Context
 
-> 📌 **Referencia Histórica de Origen:**
-> Este proyecto utilizó originalmente como base tecnológica el software open-source [Linki](https://github.com/moaljumaa/linki) creado por Mo Aljumaa. A partir de la independencia total de InHubFlow (septiembre 2026), **se eliminan formalmente todas las restricciones de "no tocar core" o "no hacer cambios intrusivos"** que existían para mantener compatibilidad con upstream. InHubFlow ahora evoluciona como plataforma propietaria e independiente, con libertad total para modificar, refactorizar o potenciar su núcleo directamente.
+> 📌 **Evolución Propietaria e Independiente:**
+> A partir de la independencia total de InHubFlow (septiembre 2026), **se eliminan formalmente todas las restricciones de "no tocar core" o "no hacer cambios intrusivos"** que existían anteriormente. InHubFlow evoluciona como plataforma propietaria e independiente, con libertad total para modificar, refactorizar o potenciar su núcleo directamente.
 
 InHubFlow cuenta con un módulo SDR propio basado en Gemini que procesa conversaciones de LinkedIn por cada slot, clasifica la intención, responde preguntas fundamentadas, maneja objeciones permitidas, propone servicios aprobados y entrega la conversación a una persona cuando no pueda actuar con seguridad. Después de completar el SDR no-calendar, coordinará reuniones mediante el calendario empresarial nativo de InHubFlow.
 

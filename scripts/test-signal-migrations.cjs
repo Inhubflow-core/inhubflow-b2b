@@ -23,7 +23,7 @@ Module._extensions[".ts"] = (module, filename) => {
 };
 
 async function run() {
-  const sourcePath = path.join(root, "linki.db");
+  const sourcePath = path.join(root, "inhubflow.db");
   const tempPath = path.join(os.tmpdir(), `inhubflow-signal-migration-${process.pid}-${Date.now()}.db`);
   const source = new Database(sourcePath, { readonly: true, fileMustExist: true });
   await source.backup(tempPath);

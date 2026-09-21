@@ -2,7 +2,7 @@ const Database = require("better-sqlite3");
 const crypto = require("node:crypto");
 const path = require("node:path");
 
-const dbPath = path.resolve(process.cwd(), "linki.db");
+const dbPath = path.resolve(process.cwd(), "inhubflow.db");
 const db = new Database(dbPath);
 
 console.log("=======================================================");
@@ -11,7 +11,7 @@ console.log("=======================================================");
 
 const agent = db.prepare("SELECT id, workspace_owner_id, name FROM sdr_agents LIMIT 1").get();
 if (!agent) {
-  console.error("❌ No se encontró ningún agente SDR configurado en linki.db.");
+  console.error("❌ No se encontró ningún agente SDR configurado en inhubflow.db.");
   process.exit(1);
 }
 
