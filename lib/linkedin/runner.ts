@@ -59,6 +59,10 @@ interface WorkflowStep {
   email_subject?: string | null;
   email_body?: string | null;
   enabled: number;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
 }
 
 interface Target {
@@ -89,8 +93,8 @@ export interface RunnerUnipileClient {
   listAccounts(): Promise<{ items: UnipileAccount[] }>;
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
   sendInvitation(params: { account_id: string; provider_id: string; message?: string }): Promise<UnipileSendInvitationResponse>;
-  startChat(params: { account_id: string; attendees_ids: string[]; text: string }): Promise<UnipileStartChatResponse>;
-  sendMessage(params: { chat_id: string; text: string }): Promise<UnipileSendMessageResponse>;
+  startChat(params: { account_id: string; attendees_ids: string[]; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileStartChatResponse>;
+  sendMessage(params: { chat_id: string; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileSendMessageResponse>;
 }
 
 export interface RunnerDependencies {
@@ -277,7 +281,7 @@ function providerErrorBody(error: unknown): string {
   return error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
 }
 
-function recordOutboundMessage(db: ReturnType<typeof getDb>, runId: string, workflowId: string, target: Target, chatId: string, messageId: string, text: string) {
+function recordOutboundMessage(db: ReturnType<typeof getDb>, runId: string, workflowId: string, target: Target, chatId: string, messageId: string, text: string, attachmentInfo?: { url?: string | null; name?: string | null; type?: string | null } | null) {
   db.prepare(`
     INSERT INTO linkedin_inbox_messages (
       id, account_id, target_id, run_id, workflow_id, external_thread_id,
@@ -287,7 +291,20 @@ function recordOutboundMessage(db: ReturnType<typeof getDb>, runId: string, work
     SELECT ?, r.account_id, ?, ?, ?, ?, ?, 'outbound', '', 'Me', ?, datetime('now'), 'profile_url', ?
     FROM runs r WHERE r.id = ?
     ON CONFLICT(account_id, external_thread_id, external_message_id) DO NOTHING
-  `).run(randomUUID(), target.id, runId, workflowId, chatId, messageId, text, JSON.stringify({ source: "campaign-runner-linkedin" }), runId);
+  `).run(
+    randomUUID(),
+    target.id,
+    runId,
+    workflowId,
+    chatId,
+    messageId,
+    text,
+    JSON.stringify({
+      source: "campaign-runner-linkedin",
+      attachment: attachmentInfo?.url ? attachmentInfo : undefined,
+    }),
+    runId
+  );
 }
 
 async function resolveRemoteAccount(db: ReturnType<typeof getDb>, localAccountId: string, client: RunnerUnipileClient, deps: RunnerDependencies) {
@@ -659,7 +676,31 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
     let deliveryId = "";
     try {
       if (!target.unipile_chat_id && !providerId) providerId = (await resolveProfile()).provider_id;
-      const text = stepText(db, step, target, "message", runProfile.id) || "Hola!";
+      const rawText = stepText(db, step, target, "message", runProfile.id);
+      const text = rawText || (step.attachment_url ? "" : "Hola!");
+
+      let attachments: Array<{ file: Buffer; filename: string; mime_type?: string }> | undefined = undefined;
+      if (step.attachment_url) {
+        try {
+          const fs = await import("node:fs");
+          const path = await import("node:path");
+          let localPath = step.attachment_url;
+          if (localPath.startsWith("/")) {
+            localPath = path.join(process.cwd(), "public", localPath.replace(/^\//, ""));
+          }
+          if (fs.existsSync(localPath)) {
+            const buf = fs.readFileSync(localPath);
+            attachments = [{
+              file: buf,
+              filename: step.attachment_name || path.basename(localPath),
+              mime_type: step.attachment_type || undefined,
+            }];
+          }
+        } catch (attErr) {
+          console.error("Error reading step attachment file:", attErr);
+        }
+      }
+
       const reservation = prepareLinkedInStepDelivery(db, {
         trackId: tr.id,
         stepId: step.id,
@@ -667,7 +708,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         targetId: target.id,
         accountId: runProfile.account_id,
         actionType: "message",
-        payload: JSON.stringify({ chatId: target.unipile_chat_id, providerId, text }),
+        payload: JSON.stringify({ chatId: target.unipile_chat_id, providerId, text, hasAttachment: !!attachments }),
       });
       if (!reservation.acquired) throw new Error(`La entrega ya está reservada (${reservation.delivery.state})`);
       deliveryId = reservation.delivery.id;
@@ -676,7 +717,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       let messageId: string | null = null;
       if (chatId) {
         try {
-          const sent = await client.sendMessage({ chat_id: chatId, text });
+          const sent = await client.sendMessage({ chat_id: chatId, text, ...(attachments ? { attachments } : {}) });
           messageId = sent?.message_id || null;
         } catch (error) {
           const body = providerErrorBody(error);
@@ -686,12 +727,12 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
           if (!staleChat) throw error;
           if (!providerId) providerId = (await resolveProfile()).provider_id;
           markLinkedInTargetState(db, runProfile.account_id, target.id, { unipile_chat_id: null });
-          const started = await client.startChat({ account_id: accountId, attendees_ids: [providerId], text });
+          const started = await client.startChat({ account_id: accountId, attendees_ids: [providerId], text, ...(attachments ? { attachments } : {}) });
           chatId = started?.chat_id || null;
           messageId = started?.message_id || null;
         }
       } else if (providerId) {
-        const started = await client.startChat({ account_id: accountId, attendees_ids: [providerId], text });
+        const started = await client.startChat({ account_id: accountId, attendees_ids: [providerId], text, ...(attachments ? { attachments } : {}) });
         chatId = started?.chat_id || null;
         messageId = started?.message_id || null;
       }
@@ -707,10 +748,11 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
           message_sent_at: nowIso(now()),
           ...(providerId ? { unipile_provider_id: providerId } : {}),
         });
-        recordOutboundMessage(db, runProfile.run_id, runProfile.workflow_id, target, chatId, messageId, text);
+        recordOutboundMessage(db, runProfile.run_id, runProfile.workflow_id, target, chatId, messageId, text, step.attachment_url ? { url: step.attachment_url, name: step.attachment_name, type: step.attachment_type } : null);
         trAdvance(db, tr, steps);
       })();
-      log(db, runProfile.run_id, target.id, "info", `Mensaje enviado a ${name} con éxito!`);
+      const attLog = step.attachment_name ? ` (con adjunto: ${step.attachment_name})` : "";
+      log(db, runProfile.run_id, target.id, "info", `Mensaje${attLog} enviado a ${name} con éxito!`);
       tagContacted(db, target.id, runProfile.run_id);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

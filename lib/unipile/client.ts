@@ -236,6 +236,16 @@ export class UnipileClient {
       body.append('attendees_ids[]', attendeeId);
     }
     if (params.text) body.append('text', params.text);
+    for (const attachment of params.attachments || []) {
+      if (typeof attachment.file === 'string') {
+        body.append('attachments', attachment.file);
+      } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(attachment.file)) {
+        const blob = new Blob([new Uint8Array(attachment.file)], { type: attachment.mime_type || 'application/octet-stream' });
+        body.append('attachments', blob, attachment.filename);
+      } else {
+        body.append('attachments', attachment.file as Blob, attachment.filename);
+      }
+    }
 
     return this.request<UnipileStartChatResponse>('/api/v1/chats', {
       method: 'POST',
@@ -252,6 +262,9 @@ export class UnipileClient {
     for (const attachment of params.attachments || []) {
       if (typeof attachment.file === 'string') {
         body.append('attachments', attachment.file);
+      } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(attachment.file)) {
+        const blob = new Blob([new Uint8Array(attachment.file)], { type: attachment.mime_type || 'application/octet-stream' });
+        body.append('attachments', blob, attachment.filename);
       } else {
         body.append('attachments', attachment.file as Blob, attachment.filename);
       }

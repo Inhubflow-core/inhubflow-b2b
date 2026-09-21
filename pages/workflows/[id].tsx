@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { toast } from "sonner";
 import { OrModel } from "@/components/ui/ModelPicker";
 import FilterBar, { ActiveFilter, filtersToParams, FILTER_FIELDS } from "@/components/ui/FilterBar";
+import { StepAttachmentPicker } from "@/components/ui/StepAttachmentPicker";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiArrowLeftLine,
@@ -55,6 +56,10 @@ interface Step {
   message_body: string | null;
   email_subject: string | null;
   email_body: string | null;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
 }
 
 interface WorkflowData {
@@ -348,6 +353,10 @@ interface WizardStep {
   aiMaxWordsEnabled: boolean;
   aiMaxWords: number;
   aiLanguage: string;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentType?: string | null;
+  attachmentSize?: number | null;
 }
 
 function buildWizardSteps(steps: Step[]): WizardStep[] {
@@ -377,6 +386,10 @@ function buildWizardSteps(steps: Step[]): WizardStep[] {
         aiMaxWordsEnabled: !!(raw.ai_max_words),
         aiMaxWords: (raw.ai_max_words as number) ?? 100,
         aiLanguage: (raw.ai_language as string) ?? "English",
+        attachmentUrl: (raw.attachment_url as string) || null,
+        attachmentName: (raw.attachment_name as string) || null,
+        attachmentType: (raw.attachment_type as string) || null,
+        attachmentSize: (raw.attachment_size as number) || null,
       });
       pendingDelay[track] = 0;
     }
@@ -848,6 +861,10 @@ function Wizard({
           ai_prompt: hasAI ? (ws.aiPrompt || null) : null,
           ai_max_words: hasAI && ws.aiEnabled && ws.aiMaxWordsEnabled ? ws.aiMaxWords : null,
           ai_language: hasAI ? (ws.aiLanguage || "English") : null,
+          attachment_url: isMessage ? (ws.attachmentUrl || null) : null,
+          attachment_name: isMessage ? (ws.attachmentName || null) : null,
+          attachment_type: isMessage ? (ws.attachmentType || null) : null,
+          attachment_size: isMessage ? (ws.attachmentSize || null) : null,
         }),
       });
       if (isEmail) emailPosition++;
@@ -1994,6 +2011,22 @@ function Wizard({
                         </div>
                       </div>
                     )}
+
+                    {/* LinkedIn Voice Note & Attachment Picker */}
+                    <StepAttachmentPicker
+                      attachmentUrl={ws.attachmentUrl}
+                      attachmentName={ws.attachmentName}
+                      attachmentType={ws.attachmentType}
+                      attachmentSize={ws.attachmentSize}
+                      onChange={(att) => {
+                        updateStep(idx, {
+                          attachmentUrl: att.url,
+                          attachmentName: att.name,
+                          attachmentType: att.type,
+                          attachmentSize: att.size,
+                        });
+                      }}
+                    />
                   </div>
                 )}
 
@@ -3254,9 +3287,16 @@ export default function WorkflowDetailPage({
                         <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs border ${sel ? "bg-primary/20 border-primary/40 text-primary" : `${STEP_COLORS[s.step_type]}`}`}>
                           {STEP_ICONS[s.step_type]}
                         </span>
-                        <p className={`text-xs font-medium leading-tight ${sel ? "text-primary" : "text-base-content"}`}>
-                          {getStepLabel(s.step_type, t)}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-medium leading-tight truncate ${sel ? "text-primary" : "text-base-content"}`}>
+                            {getStepLabel(s.step_type, t)}
+                          </p>
+                          {s.attachment_name && (
+                            <p className="text-[10px] text-purple-400 font-normal truncate mt-0.5">
+                              📎 {s.attachment_name}
+                            </p>
+                          )}
+                        </div>
                       </button>
                     </div>
                   );

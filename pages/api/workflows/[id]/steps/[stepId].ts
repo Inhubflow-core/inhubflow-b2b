@@ -6,7 +6,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const stepId = req.query.stepId as string;
 
   if (req.method === "PUT") {
-    const { step_type, template_id, delay_seconds, step_order, connect_note, message_body, email_subject, email_body } = req.body;
+    const { step_type, template_id, delay_seconds, step_order, connect_note, message_body, email_subject, email_body, attachment_url, attachment_name, attachment_type, attachment_size } = req.body;
     db.prepare(
       `UPDATE workflow_steps SET
         step_type = COALESCE(?, step_type),
@@ -16,9 +16,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         connect_note = ?,
         message_body = ?,
         email_subject = ?,
-        email_body = ?
+        email_body = ?,
+        attachment_url = ?,
+        attachment_name = ?,
+        attachment_type = ?,
+        attachment_size = ?
        WHERE id = ?`
-    ).run(step_type ?? null, template_id ?? null, delay_seconds ?? null, step_order ?? null, connect_note ?? null, message_body ?? null, email_subject ?? null, email_body ?? null, stepId);
+    ).run(step_type ?? null, template_id ?? null, delay_seconds ?? null, step_order ?? null, connect_note ?? null, message_body ?? null, email_subject ?? null, email_body ?? null, attachment_url ?? null, attachment_name ?? null, attachment_type ?? null, attachment_size ?? null, stepId);
     return res.json({ ok: true });
   }
 

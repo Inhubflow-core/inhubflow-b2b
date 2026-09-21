@@ -113,6 +113,7 @@ function makeDb() {
       attempted_at TEXT DEFAULT (datetime('now')), confirmed_at TEXT,
       updated_at TEXT DEFAULT (datetime('now')), UNIQUE(track_id, step_id)
     );
+    CREATE TABLE list_targets (list_id TEXT, target_id TEXT, PRIMARY KEY(list_id, target_id));
     CREATE TABLE runtime_leases (lease_key TEXT PRIMARY KEY, owner_id TEXT, expires_at_ms INTEGER, updated_at TEXT);
     CREATE TABLE run_profile_step_messages (run_profile_id TEXT NOT NULL, step_id TEXT NOT NULL, body TEXT NOT NULL, source TEXT DEFAULT 'signal_radar', metadata_json TEXT DEFAULT '{}', created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (run_profile_id, step_id));
   `);

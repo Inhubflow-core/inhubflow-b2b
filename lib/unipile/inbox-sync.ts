@@ -415,8 +415,9 @@ export async function syncLinkedInInbox(
   const maxMessages = options.maxMessages ?? 500;
   const maxChats = options.maxChats ?? 100;
   // The paginated account feed already covers every chat (264 of 264 in production),
-  // so the slower chat-by-chat sweep is opt-in rather than part of every tick.
-  const fullBackfill = options.fullBackfill ?? false;
+  // so the slower chat-by-chat sweep is opt-in rather than part of every tick,
+  // unless listAccountMessages is not available on the client (fallback mode).
+  const fullBackfill = options.fullBackfill ?? (typeof client.listAccountMessages !== "function");
 
   let captured = 0;
   let duplicates = 0;
@@ -425,21 +426,23 @@ export async function syncLinkedInInbox(
 
   // 1. Walk the account-wide message feed with cursor pagination
   let remoteMessages: UnipileMessage[] = [];
-  try {
-    let cursor: string | null | undefined = undefined;
-    let guard = 0;
-    while (guard++ < 20) {
-      const res = await client.listAccountMessages(resolved.unipileAccountId, Math.min(250, maxMessages), cursor ?? undefined);
-      const batch = res.items || [];
-      remoteMessages.push(...batch);
-      if (batch.length === 0) break;
-      if (remoteMessages.length >= maxMessages) break;
-      const next = res.cursor;
-      if (!next || next === cursor) break;
-      cursor = next;
+  if (typeof client.listAccountMessages === "function") {
+    try {
+      let cursor: string | null | undefined = undefined;
+      let guard = 0;
+      while (guard++ < 20) {
+        const res = await client.listAccountMessages(resolved.unipileAccountId, Math.min(250, maxMessages), cursor ?? undefined);
+        const batch = res.items || [];
+        remoteMessages.push(...batch);
+        if (batch.length === 0) break;
+        if (remoteMessages.length >= maxMessages) break;
+        const next = res.cursor;
+        if (!next || next === cursor) break;
+        cursor = next;
+      }
+    } catch (err) {
+      console.warn("[syncLinkedInInbox] Error fetching account messages, fallback to chats:", err);
     }
-  } catch (err) {
-    console.warn("[syncLinkedInInbox] Error fetching account messages, fallback to chats:", err);
   }
 
   // Cache attendee profiles by chatId to prevent redundant network calls
@@ -504,8 +507,19 @@ export async function syncLinkedInInbox(
   //    that had been read elsewhere never got its history imported.
   let totalChatsCount = chatsSeen.size;
   try {
-    const chatsResponse = await client.listChats(resolved.unipileAccountId, Math.min(250, maxChats));
-    const chats = chatsResponse.items || [];
+    const chats: UnipileChat[] = [];
+    let chatCursor: string | null | undefined = undefined;
+    let chatGuard = 0;
+    while (chatGuard++ < 20) {
+      const chatsResponse = await client.listChats(resolved.unipileAccountId, Math.min(250, maxChats), chatCursor ?? undefined);
+      const batch = chatsResponse.items || [];
+      chats.push(...batch);
+      if (batch.length === 0) break;
+      if (chats.length >= maxChats) break;
+      const next = chatsResponse.cursor;
+      if (!next || next === chatCursor) break;
+      chatCursor = next;
+    }
     totalChatsCount = Math.max(totalChatsCount, chats.length);
 
     for (const chat of chats) {
@@ -517,8 +531,20 @@ export async function syncLinkedInInbox(
         const profile = attendeeProfile(other);
         chatAttendeeCache.set(chat.id, profile);
 
-        const messagesResponse = await client.listMessages(chat.id, 100);
-        for (const message of messagesResponse.items || []) {
+        const messages: UnipileMessage[] = [];
+        let msgCursor: string | null | undefined = undefined;
+        let msgGuard = 0;
+        while (msgGuard++ < 10) {
+          const messagesResponse = await client.listMessages(chat.id, 100, msgCursor ?? undefined);
+          const batch = messagesResponse.items || [];
+          messages.push(...batch);
+          if (batch.length === 0) break;
+          const next = messagesResponse.cursor;
+          if (!next || next === msgCursor) break;
+          msgCursor = next;
+        }
+
+        for (const message of messages) {
           const before = db.prepare(
             "SELECT 1 FROM linkedin_inbox_messages WHERE account_id = ? AND external_thread_id = ? AND external_message_id = ?"
           ).get(localAccountId, chat.id, message.id || message.message_id);

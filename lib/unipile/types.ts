@@ -136,6 +136,11 @@ export interface UnipileStartChatParams {
   account_id: string;
   attendees_ids: string[];
   text: string;
+  attachments?: Array<{
+    file: Buffer | Blob | string;
+    filename: string;
+    mime_type?: string;
+  }>;
 }
 
 export interface UnipileStartChatResponse {

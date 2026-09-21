@@ -45,7 +45,14 @@ export async function resolveUnipileAccount(
   if (!client.isConfigured()) throw new Error("El motor de LinkedIn no está configurado");
 
   // Fetch available remote accounts from Unipile
-  const remoteAccounts = await client.listAccounts();
+  let remoteAccounts: { items?: UnipileAccount[] } = { items: [] };
+  if (typeof client.listAccounts === "function") {
+    try {
+      remoteAccounts = await client.listAccounts();
+    } catch {
+      // List accounts failure should not block direct getAccount by ID
+    }
+  }
   const usable = (remoteAccounts.items || []).filter(isUsableLinkedInAccount);
 
   // If local has a name, check if there is an exact name match in Unipile

@@ -759,6 +759,11 @@ function runMigrations(db: Database.Database) {
       UNIQUE(track_id, step_id)
     )`,
     "CREATE INDEX IF NOT EXISTS idx_linkedin_step_deliveries_account_time ON linkedin_step_deliveries(account_id, attempted_at)",
+    // Workflow step attachments (audio / voice note, PDF, image, video)
+    "ALTER TABLE workflow_steps ADD COLUMN attachment_url TEXT",
+    "ALTER TABLE workflow_steps ADD COLUMN attachment_name TEXT",
+    "ALTER TABLE workflow_steps ADD COLUMN attachment_type TEXT",
+    "ALTER TABLE workflow_steps ADD COLUMN attachment_size INTEGER",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists */ }
