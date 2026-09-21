@@ -1104,8 +1104,8 @@ function Wizard({
 
         {/* 2. Barra de Progreso del Wizard (Stepper) */}
         {pages.length > 1 && (
-          <div className="px-6 py-3.5 border-b border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50 shrink-0">
-            <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div className="px-6 sm:px-10 py-4 border-b border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50 shrink-0 overflow-x-auto">
+            <div className="flex items-center justify-between w-full min-w-[720px] max-w-6xl mx-auto">
               {pages.map((p, idx) => {
                 const isCurrent = page === p;
                 const isPast = pageIdx > idx;
@@ -1117,7 +1117,7 @@ function Wizard({
                       type="button"
                       disabled={!canNav}
                       onClick={() => canNav && setPage(p)}
-                      className={`flex items-center gap-2 group text-left focus:outline-none ${!canNav ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+                      className={`flex items-center gap-2.5 group text-left focus:outline-none shrink-0 ${!canNav ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <span
                         className={`flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold transition-all shrink-0 ${
@@ -1142,14 +1142,14 @@ function Wizard({
                         >
                           PASO {idx + 1}
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap">
                           {PAGE_LABELS[p]}
                         </span>
                       </div>
                     </button>
                     {idx < pages.length - 1 && (
                       <div
-                        className={`flex-1 h-0.5 mx-2 sm:mx-3 transition-colors ${
+                        className={`flex-1 min-w-[20px] sm:min-w-[36px] h-0.5 mx-3 sm:mx-5 transition-colors ${
                           isPast ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"
                         }`}
                       />
