@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
-import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers, FiRefreshCw } from "react-icons/fi";
+import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers } from "react-icons/fi";
 import { RiMailSendLine, RiReplyLine, RiRobot2Line, RiLinkedinBoxLine, RiFilterLine } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { UpcomingMeetingsWidget } from "@/components/calendar/UpcomingMeetingsWidget";
@@ -33,15 +33,6 @@ interface DashboardStats {
 
 interface AgentStats {
   daily: { day: string; cost_usd: number; input_tokens: number; output_tokens: number }[];
-}
-
-interface AccountRow {
-  id: string;
-  is_authenticated: number;
-  li_connections: number | null;
-  li_pending: number | null;
-  li_profile_views: number | null;
-  li_stats_synced_at: string | null;
 }
 
 // ── Animated counter ──────────────────────────────────────────────────────────
@@ -285,89 +276,6 @@ function ActivityChart({
   );
 }
 
-// ── LinkedIn stats card ───────────────────────────────────────────────────────
-
-interface LiStats { connections: number; pending: number; profile_views: number }
-
-function LinkedInCard({
-  accountId, cachedStats, cachedSyncedAt,
-}: {
-  accountId?: string;
-  cachedStats?: LiStats | null;
-  cachedSyncedAt?: string | null;
-}) {
-  const { t } = useTranslation();
-  const [syncing, setSyncing] = useState(false);
-  const [liStats, setLiStats] = useState<LiStats | null>(cachedStats ?? null);
-  const [syncedAt, setSyncedAt] = useState<string | null>(cachedSyncedAt ?? null);
-  const [syncError, setSyncError] = useState<string | null>(null);
-
-  async function handleSync() {
-    if (!accountId) return;
-    setSyncing(true); setSyncError(null);
-    try {
-      const res = await fetch(`/api/accounts/${accountId}/li-stats`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Sync failed");
-      setLiStats(data);
-      setSyncedAt(new Date().toISOString());
-    } catch (e) {
-      setSyncError(e instanceof Error ? e.message : "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  const items = [
-    { label: t("dashboard.connections"), value: liStats?.connections ?? null, color: "#32d583" },
-    { label: t("dashboard.pendingSent"), value: liStats?.pending ?? null, color: "#f4b740" },
-    { label: t("dashboard.profileViews"), value: liStats?.profile_views ?? null, color: "#5aa2ff" },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <RiLinkedinBoxLine size={16} className="text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.channelLinkedin")}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {syncedAt && (
-            <span className="text-[10px] text-gray-400">
-              {new Date(syncedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-          {accountId && (
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-950/40 transition-colors disabled:opacity-40"
-            >
-              <FiRefreshCw size={11} className={syncing ? "animate-spin" : ""} />
-              {syncing ? t("dashboard.syncing") : t("dashboard.sync")}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {items.map(s => (
-          <div key={s.label} className="flex flex-col gap-1 bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3">
-            {s.value !== null
-              ? <span className="text-xl font-bold tabular-nums" style={{ color: s.color }}><Counter value={s.value} /></span>
-              : <span className="text-xl font-bold text-gray-300 dark:text-gray-700">—</span>
-            }
-            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{s.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {syncError && <p className="text-xs text-red-500 mt-2">{syncError}</p>}
-      {!accountId && <p className="text-xs text-gray-400 mt-2">{t("dashboard.noAccountAuth")}</p>}
-    </div>
-  );
-}
-
 // ── AI usage panel ────────────────────────────────────────────────────────────
 
 function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number }) {
@@ -379,44 +287,68 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
   const labelEvery = days <= 7 ? 1 : days <= 14 ? 2 : days <= 30 ? 5 : 15;
 
   return (
-    <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col justify-between h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800 mb-4">
         <div className="flex items-center gap-2">
-          <RiRobot2Line size={16} className="text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.aiUsage")}</span>
+          <RiRobot2Line size={16} className="text-purple-500" />
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+            {t("dashboard.aiUsage")}
+          </span>
         </div>
-        {hasData && (
+        {hasData ? (
           <div className="flex items-center gap-3 text-xs font-medium">
-            <span className="text-gray-500 dark:text-gray-400 tabular-nums">{totalTokens.toLocaleString()} {t("dashboard.tokens")}</span>
-            <span className="font-bold tabular-nums" style={{ color: "#a78bfa" }}>${totalCost.toFixed(4)}</span>
+            <span className="text-gray-500 dark:text-gray-400 tabular-nums">
+              {totalTokens.toLocaleString()} {t("dashboard.tokens")}
+            </span>
+            <span className="font-bold tabular-nums text-purple-600 dark:text-purple-400">
+              ${totalCost.toFixed(4)}
+            </span>
           </div>
+        ) : (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+            SDR & Asistente IA
+          </span>
         )}
       </div>
 
+      {/* Content */}
       {!hasData ? (
-        <p className="text-xs text-gray-400 py-2">{t("dashboard.noAiUsage")}</p>
+        <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-2.5">
+            <RiRobot2Line size={20} />
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+            {t("dashboard.noAiUsage")}
+          </p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 max-w-xs">
+            El consumo de tokens y costos se registrará automáticamente cuando el agente SDR califique leads o redacte respuestas.
+          </p>
+        </div>
       ) : (
-        <div className="flex items-end gap-0.5" style={{ height: 52 }}>
-          {data.map((d, i) => {
-            const showLabel = i % labelEvery === 0;
-            const height = Math.max(2, ((d.cost_usd ?? 0) / maxCost) * 44);
-            return (
-              <div key={d.day} className="flex flex-col items-center flex-1 group relative justify-end" style={{ height: "100%" }}>
-                <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-2.5 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-xl">
-                  <div className="text-gray-400 mb-1">{d.day}</div>
-                  <div style={{ color: "#a78bfa" }}>${(d.cost_usd ?? 0).toFixed(5)}</div>
-                  <div className="text-gray-400">{((d.input_tokens ?? 0) + (d.output_tokens ?? 0)).toLocaleString()} {t("dashboard.tokens")}</div>
+        <div className="flex-1 flex flex-col justify-end pt-2">
+          <div className="flex items-end gap-1" style={{ height: 120 }}>
+            {data.map((d, i) => {
+              const showLabel = i % labelEvery === 0;
+              const height = Math.max(3, ((d.cost_usd ?? 0) / maxCost) * 100);
+              return (
+                <div key={d.day} className="flex flex-col items-center flex-1 group relative justify-end" style={{ height: "100%" }}>
+                  <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-2.5 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-xl">
+                    <div className="text-gray-400 mb-1">{d.day}</div>
+                    <div className="text-purple-400 font-bold">${(d.cost_usd ?? 0).toFixed(5)}</div>
+                    <div className="text-gray-300">{((d.input_tokens ?? 0) + (d.output_tokens ?? 0)).toLocaleString()} {t("dashboard.tokens")}</div>
+                  </div>
+                  <div
+                    className="w-full rounded-t-sm"
+                    style={{ height, background: "#a78bfa", opacity: (d.cost_usd ?? 0) === 0 ? 0.12 : 0.85 }}
+                  />
+                  {showLabel && (
+                    <span className="text-[10px] text-gray-400 mt-1.5 leading-none shrink-0">{d.day.slice(5)}</span>
+                  )}
                 </div>
-                <div
-                  className="w-full rounded-t-sm"
-                  style={{ height, background: "#a78bfa", opacity: (d.cost_usd ?? 0) === 0 ? 0.08 : 0.75 }}
-                />
-                {showLabel && (
-                  <span className="text-[10px] text-gray-400 mt-1 leading-none">{d.day.slice(5)}</span>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -487,20 +419,8 @@ export default function Dashboard() {
   const [hasPremium, setHasPremium] = useState(true);
   const [error, setError] = useState(false);
   const [days, setDays] = useState(7);
-  const [account, setAccount] = useState<AccountRow | null>(null);
   const [listId, setListId] = useState("");
   const [workflowId, setWorkflowId] = useState("");
-
-  useEffect(() => {
-    fetch("/api/accounts")
-      .then(r => r.json())
-      .then((accounts: AccountRow[]) => {
-        const auth = accounts.find(a => a.is_authenticated === 1);
-        if (auth) setAccount(auth);
-        else if (accounts.length > 0) setAccount(accounts[0]);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     fetch("/api/premium-status").then((r) => r.ok ? r.json() : null)
@@ -723,45 +643,46 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Second row: funnel left, chart right ── */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: "270px 1fr" }}>
-
-        {/* Left: funnel + LinkedIn + AI */}
-        <div className="space-y-4">
-          {/* Funnel */}
-          <div className="rounded-2xl border border-gray-300 bg-white shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden" data-tour="dashboard-funnel">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t("dashboard.funnel")}</span>
+      {/* ── Fila 1: Embudo de Conversión & Uso de la IA (Dos columnas en una misma línea) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+        {/* Embudo de Conversión */}
+        <div className="rounded-2xl border border-gray-300 bg-white shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden flex flex-col justify-between h-full" data-tour="dashboard-funnel">
+          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RiFilterLine size={16} className="text-brand-500" />
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{t("dashboard.funnel")}</span>
             </div>
-            <div className="divide-y divide-gray-200 dark:divide-gray-800 py-1">
-              <FunnelRow icon={<FiUsers size={12} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
-              <FunnelRow icon={<FiUserPlus size={12} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
-              <FunnelRow icon={<FiRepeat size={12} />}       color="#c084fc" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />
-              <FunnelRow icon={<RiMailSendLine size={12} />} color="#fb923c" label={t("dashboard.emailsSent")}    value={totals.emails_sent}         max={maxFunnelValue} />
-              <FunnelRow icon={<RiReplyLine size={12} />}    color="#32d583" label={t("dashboard.emailsReplied")}  value={totals.email_replies}       max={maxFunnelValue} />
-            </div>
+            <span className="text-[11px] font-medium text-gray-400">
+              {totals.total_targets} {t("contacts.title").toLowerCase()}
+            </span>
           </div>
-
-          {/* LinkedIn account card */}
-          <LinkedInCard
-            accountId={account?.id}
-            cachedStats={account?.li_connections != null ? {
-              connections: account.li_connections!,
-              pending: account.li_pending!,
-              profile_views: account.li_profile_views!,
-            } : null}
-            cachedSyncedAt={account?.li_stats_synced_at}
-          />
-
-          {/* AI usage mini */}
-          {hasPremium && agentStats && <AiUsagePanel data={agentStats.daily} days={days} />}
+          <div className="divide-y divide-gray-100 dark:divide-gray-800/80 py-1 flex-1 flex flex-col justify-around">
+            <FunnelRow icon={<FiUsers size={13} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
+            <FunnelRow icon={<FiUserPlus size={13} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
+            <FunnelRow icon={<FiRepeat size={13} />}       color="#c084fc" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />
+            <FunnelRow icon={<RiMailSendLine size={13} />} color="#fb923c" label={t("dashboard.emailsSent")}    value={totals.emails_sent}         max={maxFunnelValue} />
+            <FunnelRow icon={<RiReplyLine size={13} />}    color="#32d583" label={t("dashboard.emailsReplied")}  value={totals.email_replies}       max={maxFunnelValue} />
+          </div>
         </div>
 
-        {/* Right: activity chart & upcoming commercial meetings widget */}
-        <div className="space-y-4">
-          <ActivityChart data={stats.activity} days={days} onDaysChange={setDays} />
-          <UpcomingMeetingsWidget />
-        </div>
+        {/* Uso de la IA */}
+        {hasPremium && agentStats ? (
+          <AiUsagePanel data={agentStats.daily} days={days} />
+        ) : (
+          <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex items-center justify-center h-full">
+            <p className="text-xs text-gray-400">{t("dashboard.noAiUsage")}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fila 2: Actividad (Tamaño completo) ── */}
+      <div className="w-full">
+        <ActivityChart data={stats.activity} days={days} onDaysChange={setDays} />
+      </div>
+
+      {/* ── Fila 3: Próximas Reuniones Comerciales (Tamaño completo) ── */}
+      <div className="w-full">
+        <UpcomingMeetingsWidget />
       </div>
     </div>
     </>
