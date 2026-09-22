@@ -131,30 +131,30 @@ function KpiCard({
 }) {
   return (
     <div
-      className="relative rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden group hover:border-brand-500/50 dark:hover:border-brand-500/50 transition-all"
+      className="relative rounded-2xl border border-gray-300 bg-white p-4.5 sm:p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden group hover:border-brand-500/50 dark:hover:border-brand-500/50 hover:shadow-sm transition-all"
     >
       <div
-        className="absolute top-0 right-0 w-16 h-16 rounded-bl-3xl opacity-[0.06] transition-opacity group-hover:opacity-15"
+        className="absolute top-0 right-0 w-20 h-20 rounded-bl-3xl opacity-[0.06] transition-opacity group-hover:opacity-15"
         style={{ background: color }}
       />
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-3.5">
         <span
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 transition-transform group-hover:scale-105"
           style={{ background: `${color}18`, color }}
         >
           {icon}
         </span>
         {pulse && (
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+            <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: color }} />
           </span>
         )}
       </div>
-      <div className="tabular-nums font-bold text-2xl text-gray-900 dark:text-white leading-none mb-1.5">
+      <div className="tabular-nums font-extrabold text-3xl sm:text-3xl lg:text-4xl text-gray-900 dark:text-white leading-tight mb-2 tracking-tight">
         <Counter value={value} />
       </div>
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
-      {sub && <div className="text-xs font-medium mt-1" style={{ color }}>{sub}</div>}
+      <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 leading-snug">{label}</div>
+      {sub && <div className="text-xs font-bold mt-1.5" style={{ color }}>{sub}</div>}
     </div>
   );
 }
