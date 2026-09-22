@@ -104,57 +104,54 @@ function Counter({ value, duration = 800 }: { value: number; duration?: number }
   return <>{display.toLocaleString()}</>;
 }
 
-// ── Channel section header ─────────────────────────────────────────────────────
+// ── Executive Metric Tile (Modern InHubFlow Style) ─────────────────────────────
 
-function ChannelHeader({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color }}>
-        {icon} {label}
-      </span>
-      <div className="flex-1 h-px bg-gray-300 dark:bg-gray-700" />
-    </div>
-  );
-}
-
-// ── KPI card (TailAdmin Style) ────────────────────────────────────────────────
-
-function KpiCard({
-  label, value, sub, color, icon, pulse,
+function MetricTile({
+  icon,
+  label,
+  value,
+  sub,
+  color,
+  pulse,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: number;
   sub?: string;
   color: string;
-  icon: React.ReactNode;
   pulse?: boolean;
 }) {
   return (
-    <div
-      className="relative rounded-2xl border border-gray-300 bg-white p-4.5 sm:p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden group hover:border-brand-500/50 dark:hover:border-brand-500/50 hover:shadow-sm transition-all"
-    >
-      <div
-        className="absolute top-0 right-0 w-20 h-20 rounded-bl-3xl opacity-[0.06] transition-opacity group-hover:opacity-15"
-        style={{ background: color }}
-      />
-      <div className="flex items-start justify-between mb-3.5">
+    <div className="p-4 rounded-xl bg-gray-50/70 dark:bg-gray-800/50 border border-gray-200/80 dark:border-gray-800 hover:border-brand-500/30 dark:hover:border-brand-500/30 hover:bg-white dark:hover:bg-gray-850 hover:shadow-xs transition-all group flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2.5">
         <span
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 transition-transform group-hover:scale-105"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 transition-transform group-hover:scale-105"
           style={{ background: `${color}18`, color }}
         >
           {icon}
         </span>
         {pulse && (
           <span className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: color }} />
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
           </span>
         )}
       </div>
-      <div className="tabular-nums font-extrabold text-3xl sm:text-3xl lg:text-4xl text-gray-900 dark:text-white leading-tight mb-2 tracking-tight">
-        <Counter value={value} />
+      <div>
+        <div className="tabular-nums font-extrabold text-2xl sm:text-3xl text-gray-900 dark:text-white leading-tight tracking-tight">
+          <Counter value={value} />
+        </div>
+        <div className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 truncate">
+          {label}
+        </div>
+        {sub && (
+          <div
+            className="text-[10px] font-bold mt-1.5 inline-block px-2 py-0.5 rounded-md"
+            style={{ background: `${color}15`, color }}
+          >
+            {sub}
+          </div>
+        )}
       </div>
-      <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 leading-snug">{label}</div>
-      {sub && <div className="text-xs font-bold mt-1.5" style={{ color }}>{sub}</div>}
     </div>
   );
 }
@@ -751,91 +748,156 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* ── KPI rows — LinkedIn then Email ── */}
-      <div className="space-y-4">
-        {/* LinkedIn Channel */}
-        <div>
-          <ChannelHeader
-            icon={<RiLinkedinBoxLine size={13} />}
-            label={t("dashboard.channelLinkedin")}
-            color="#5aa2ff"
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-            <KpiCard
-              label={t("dashboard.profilesVisited")}
-              value={totals.connections_requested}
-              color="#5aa2ff"
-              icon={<FiEye size={14} />}
-            />
-            <KpiCard
-              label={t("dashboard.profilesFollowed")}
-              value={totals.follows || 0}
-              color="#a855f7"
-              icon={<RiUserFollowLine size={14} />}
-            />
-            <KpiCard
-              label={t("dashboard.connectionRequests")}
-              value={totals.connections_requested}
-              sub={acceptanceRate > 0 ? `${acceptanceRate}% ${t("dashboard.accepted")}` : undefined}
-              color="#32d583"
-              icon={<FiUserPlus size={14} />}
-              pulse={totals.active_runs > 0}
-            />
-            <KpiCard
-              label={t("dashboard.messagesSent")}
-              value={totals.messages_sent}
-              sub={replyRate > 0 ? `${replyRate}% ${t("dashboard.replied")}` : undefined}
-              color="#f4b740"
-              icon={<FiMessageSquare size={14} />}
-            />
-            <KpiCard
-              label={t("dashboard.inmailsSent")}
-              value={totals.inmails_sent}
-              color="#e879f9"
-              icon={<RiLinkedinBoxLine size={14} />}
-            />
-            <KpiCard
-              label={t("inbox.title")}
-              value={totals.replies_received}
-              color="#06b6d4"
-              icon={<FiRepeat size={14} />}
-            />
+      {/* ── Executive Multichannel Performance Deck ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        {/* LinkedIn Outreach Engine Panel */}
+        <div className="lg:col-span-7 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg bg-[#0077b5]/10 text-[#0077b5] dark:bg-[#0077b5]/20 dark:text-[#38bdf8] flex items-center justify-center text-base shrink-0">
+                  <RiLinkedinBoxLine size={18} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight">
+                      {t("dashboard.channelLinkedin")} &mdash; Outreach Engine
+                    </h3>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Multicanal
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    Automatización de visitas, seguimientos, conexiones e InMails
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/workflows"
+                className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+              >
+                <span>Ver Campañas</span>
+                <RiArrowRightLine size={12} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <MetricTile
+                label={t("dashboard.profilesVisited")}
+                value={totals.connections_requested}
+                color="#0284c7"
+                icon={<FiEye size={15} />}
+              />
+              <MetricTile
+                label={t("dashboard.profilesFollowed")}
+                value={totals.follows || 0}
+                color="#8b5cf6"
+                icon={<RiUserFollowLine size={15} />}
+              />
+              <MetricTile
+                label={t("dashboard.connectionRequests")}
+                value={totals.connections_requested}
+                sub={acceptanceRate > 0 ? `${acceptanceRate}% ${t("dashboard.accepted")}` : undefined}
+                color="#10b981"
+                icon={<FiUserPlus size={15} />}
+                pulse={totals.active_runs > 0}
+              />
+              <MetricTile
+                label={t("dashboard.messagesSent")}
+                value={totals.messages_sent}
+                sub={replyRate > 0 ? `${replyRate}% ${t("dashboard.replied")}` : undefined}
+                color="#f59e0b"
+                icon={<FiMessageSquare size={15} />}
+              />
+              <MetricTile
+                label={t("dashboard.inmailsSent")}
+                value={totals.inmails_sent}
+                color="#ec4899"
+                icon={<RiLinkedinBoxLine size={15} />}
+              />
+              <MetricTile
+                label={t("inbox.title")}
+                value={totals.replies_received}
+                color="#06b6d4"
+                icon={<FiRepeat size={15} />}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Email Channel */}
-        <div>
-          <ChannelHeader
-            icon={<RiMailSendLine size={13} />}
-            label={t("dashboard.channelEmail")}
-            color="#fb923c"
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-            <KpiCard
-              label={t("dashboard.emailsSent")}
-              value={totals.emails_sent}
-              sub={emailReplyRate > 0 ? `${emailReplyRate}% ${t("dashboard.replied")}` : undefined}
-              color="#fb923c"
-              icon={<RiMailSendLine size={14} />}
-            />
-            <KpiCard
-              label={t("dashboard.emailsReplied")}
-              value={totals.email_replies}
-              color="#32d583"
-              icon={<RiReplyLine size={14} />}
-            />
-            <KpiCard
-              label={t("contacts.title")}
-              value={totals.total_targets}
-              color="#808080"
-              icon={<FiUsers size={14} />}
-            />
-            <KpiCard
-              label={t("dashboard.connected")}
-              value={totals.connected}
-              color="#32d583"
-              icon={<FiUserPlus size={14} />}
-            />
+        {/* Cold Email & Deliverability Panel */}
+        <div className="lg:col-span-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 dark:bg-orange-500/20 dark:text-orange-400 flex items-center justify-center text-base shrink-0">
+                  <RiMailSendLine size={18} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight">
+                      {t("dashboard.channelEmail")} &mdash; Secuencias
+                    </h3>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <RiShieldCheckLine size={11} />
+                      Warmup OK
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                    Cadencias de correo frío y control de reputación SPF/DKIM
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/email-health"
+                className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+              >
+                <span>Salud</span>
+                <RiArrowRightLine size={12} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <MetricTile
+                label={t("dashboard.emailsSent")}
+                value={totals.emails_sent}
+                sub={emailReplyRate > 0 ? `${emailReplyRate}% ${t("dashboard.replied")}` : undefined}
+                color="#f97316"
+                icon={<RiMailSendLine size={15} />}
+              />
+              <MetricTile
+                label={t("dashboard.emailsReplied")}
+                value={totals.email_replies}
+                color="#10b981"
+                icon={<RiReplyLine size={15} />}
+              />
+              <MetricTile
+                label={t("contacts.title")}
+                value={totals.total_targets}
+                color="#64748b"
+                icon={<FiUsers size={15} />}
+              />
+              <MetricTile
+                label={t("dashboard.connected")}
+                value={totals.connected}
+                color="#3b82f6"
+                icon={<FiUserPlus size={15} />}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+              <RiPulseLine size={14} className="text-emerald-500" />
+              <span className="text-[11px]">Entregabilidad estimada: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">98.6%</strong></span>
+            </div>
+            <Link
+              href="/email-accounts"
+              className="text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:underline"
+            >
+              Configurar buzones &rarr;
+            </Link>
           </div>
         </div>
       </div>
