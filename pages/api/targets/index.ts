@@ -140,20 +140,40 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === "DELETE") {
-    const db = getDb();
-    const { target_ids } = req.body as { target_ids?: string[] };
-    if (!Array.isArray(target_ids) || target_ids.length === 0) {
-      return res.status(400).json({ error: "target_ids must be a non-empty array" });
+    try {
+      const db = getDb();
+      const body = (req.body || {}) as { target_ids?: string[]; ids?: string[] };
+      const target_ids = Array.isArray(body.target_ids) && body.target_ids.length > 0
+        ? body.target_ids
+        : Array.isArray(body.ids) && body.ids.length > 0
+        ? body.ids
+        : null;
+
+      if (!target_ids || target_ids.length === 0) {
+        return res.status(400).json({ error: "target_ids must be a non-empty array" });
+      }
+      const placeholders = target_ids.map(() => "?").join(",");
+      const result = db.transaction(() => {
+        try { db.prepare(`DELETE FROM run_profile_tracks WHERE run_profile_id IN (SELECT id FROM run_profiles WHERE target_id IN (${placeholders}))`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM run_profiles WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM logs WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM todos WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM activity_logs WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM email_replies WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM sdr_threads WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM linkedin_inbox_messages WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM linkedin_target_accounts WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM linkedin_step_deliveries WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM target_tags WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM tag_events WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        try { db.prepare(`DELETE FROM list_targets WHERE target_id IN (${placeholders})`).run(...target_ids); } catch {}
+        return db.prepare(`DELETE FROM targets WHERE id IN (${placeholders})`).run(...target_ids);
+      })();
+      return res.json({ deleted: result.changes });
+    } catch (err: any) {
+      console.error("[DELETE /api/targets error]:", err);
+      return res.status(500).json({ error: err?.message || "Error al eliminar contactos" });
     }
-    const placeholders = target_ids.map(() => "?").join(",");
-    // run_profiles/logs have no ON DELETE CASCADE — clear them first so the FK
-    // constraint doesn't block the delete. run_profile_tracks cascade off run_profiles.
-    const result = db.transaction(() => {
-      db.prepare(`DELETE FROM run_profiles WHERE target_id IN (${placeholders})`).run(...target_ids);
-      db.prepare(`DELETE FROM logs WHERE target_id IN (${placeholders})`).run(...target_ids);
-      return db.prepare(`DELETE FROM targets WHERE id IN (${placeholders})`).run(...target_ids);
-    })();
-    return res.json({ deleted: result.changes });
   }
 
   if (req.method !== "GET") {

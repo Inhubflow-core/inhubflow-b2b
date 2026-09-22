@@ -199,7 +199,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     const res = await fetch("/api/targets", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: Array.from(selected) }),
+      body: JSON.stringify({ ids: Array.from(selected), target_ids: Array.from(selected) }),
     });
     setDeleteLoading(false);
     if (res.ok) {
