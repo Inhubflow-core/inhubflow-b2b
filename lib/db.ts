@@ -894,11 +894,11 @@ function runMigrations(db: Database.Database) {
     }
   } catch { /* migration already done */ }
 
-  // Allow the 'follow' step_type (Follow Profile). Rebuilds the table preserving
-  // every existing column and updates CHECK constraint to include 'follow'.
+  // Allow the 'follow' and 'like_comment' step_types. Rebuilds the table preserving
+  // every existing column and updates CHECK constraint to include 'like_comment'.
   try {
     const ti = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='workflow_steps'").get() as { sql: string } | undefined;
-    if (ti && !ti.sql.includes("'follow'")) {
+    if (ti && !ti.sql.includes("'like_comment'")) {
       const cols = (db.prepare("PRAGMA table_info(workflow_steps)").all() as Array<{ name: string }>).map((c) => c.name);
       const colList = cols.join(", ");
       db.exec(`
@@ -907,7 +907,7 @@ function runMigrations(db: Database.Database) {
           id TEXT PRIMARY KEY,
           workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
           step_order INTEGER NOT NULL,
-          step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email')),
+          step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email', 'like_comment')),
           template_id TEXT REFERENCES templates(id),
           delay_seconds INTEGER DEFAULT 0,
           connect_note TEXT,
@@ -936,7 +936,7 @@ function runMigrations(db: Database.Database) {
       `);
     }
   } catch (err) {
-    console.error("[db migration] Error migrating workflow_steps for 'follow':", err);
+    console.error("[db migration] Error migrating workflow_steps for 'like_comment':", err);
   }
 
   // CSV import: allow email-only targets (no LinkedIn URL). targets.linkedin_url was
@@ -1352,7 +1352,7 @@ function initDb(db: Database.Database) {
       id TEXT PRIMARY KEY,
       workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
       step_order INTEGER NOT NULL,
-      step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email')),
+      step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email', 'like_comment')),
       template_id TEXT REFERENCES templates(id),
       delay_seconds INTEGER DEFAULT 0,
       connect_note TEXT,

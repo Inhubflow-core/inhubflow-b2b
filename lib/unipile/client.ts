@@ -21,6 +21,10 @@ import {
   UnipileSolveCheckpointResponse,
   UnipileFollowUserParams,
   UnipileFollowUserResponse,
+  UnipilePostItem,
+  UnipileUserPostsResponse,
+  UnipileReactPostParams,
+  UnipileCommentPostParams,
 } from './types';
 
 export class UnipileClient {
@@ -252,6 +256,52 @@ export class UnipileClient {
       }
       throw err;
     }
+  }
+
+  /**
+   * Obtiene las publicaciones recientes de un perfil de LinkedIn
+   */
+  async getUserPosts(params: { account_id: string; identifier: string; limit?: number }): Promise<UnipilePostItem[]> {
+    const limit = params.limit ?? 5;
+    const url = `/api/v1/users/${encodeURIComponent(params.identifier)}/posts?account_id=${encodeURIComponent(params.account_id)}&limit=${limit}`;
+    try {
+      const res = await this.request<UnipileUserPostsResponse | UnipilePostItem[]>(url, { method: 'GET' });
+      if (Array.isArray(res)) return res;
+      if (res && typeof res === 'object' && Array.isArray((res as UnipileUserPostsResponse).items)) {
+        return (res as UnipileUserPostsResponse).items || [];
+      }
+      return [];
+    } catch (err: unknown) {
+      console.warn(`[Unipile] Error al obtener posts para ${params.identifier}:`, err);
+      return [];
+    }
+  }
+
+  /**
+   * Envía una reacción (Like, Celebrate, etc.) a una publicación en LinkedIn
+   */
+  async reactToPost(params: UnipileReactPostParams): Promise<{ success: boolean; [key: string]: unknown }> {
+    return this.request('/api/v1/posts/reaction', {
+      method: 'POST',
+      body: JSON.stringify({
+        account_id: params.account_id,
+        post_id: params.post_id,
+        reaction_type: params.reaction_type || 'like',
+      }),
+    });
+  }
+
+  /**
+   * Publica un comentario en una publicación de LinkedIn
+   */
+  async commentOnPost(params: UnipileCommentPostParams): Promise<{ id?: string; comment_id?: string; [key: string]: unknown }> {
+    const body = new FormData();
+    body.append('account_id', params.account_id);
+    body.append('text', params.text);
+    return this.request(`/api/v1/posts/${encodeURIComponent(params.post_id)}/comments`, {
+      method: 'POST',
+      body,
+    });
   }
 
   async startChat(params: UnipileStartChatParams): Promise<UnipileStartChatResponse> {

@@ -399,3 +399,33 @@ export interface UnipileWebhookPayload {
   AccountStatus?: { account_id?: string; account_type?: string; message?: string; [key: string]: unknown };
   [key: string]: unknown;
 }
+
+export interface UnipilePostItem {
+  id: string;
+  social_id?: string;
+  provider_id?: string;
+  text?: string;
+  content?: string;
+  date?: string;
+  created_at?: string;
+  parsed_datetime?: string;
+  [key: string]: unknown;
+}
+
+export interface UnipileUserPostsResponse {
+  items?: UnipilePostItem[];
+  cursor?: string;
+  [key: string]: unknown;
+}
+
+export interface UnipileReactPostParams {
+  account_id: string;
+  post_id: string;
+  reaction_type?: 'like' | 'celebrate' | 'support' | 'love' | 'insightful' | 'funny';
+}
+
+export interface UnipileCommentPostParams {
+  account_id: string;
+  post_id: string;
+  text: string;
+}

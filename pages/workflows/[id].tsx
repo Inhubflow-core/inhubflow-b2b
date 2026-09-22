@@ -44,11 +44,12 @@ import {
   RiDraggable,
   RiArrowUpSLine,
   RiAttachment2,
+  RiThumbUpLine,
 } from "react-icons/ri";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type StepType = "visit" | "follow" | "connect" | "message" | "sales_inmail" | "delay" | "email";
+type StepType = "visit" | "follow" | "connect" | "message" | "sales_inmail" | "delay" | "email" | "like_comment";
 type Track = "linkedin" | "email";
 
 interface Step {
@@ -165,6 +166,7 @@ interface EmailAccount {
 const STEP_ICONS: Record<string, React.ReactNode> = {
   visit: <RiEyeLine size={15} />,
   follow: <RiUserFollowLine size={15} />,
+  like_comment: <RiThumbUpLine size={15} />,
   connect: <RiLinkedinBoxLine size={15} />,
   message: <RiMessage2Line size={15} />,
   sales_inmail: <RiSendPlaneLine size={15} />,
@@ -176,6 +178,7 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
   follow: "Follow Profile",
+  like_comment: "Like + Comment",
   connect: "Connect & Follow",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
@@ -186,6 +189,7 @@ function getStepLabel(type: string, t?: (key: string, params?: any) => string): 
   if (t) {
     if (type === "visit") return t("campaignWizard.steps.visit");
     if (type === "follow") return t("campaignWizard.steps.follow");
+    if (type === "like_comment") return t("campaignWizard.steps.likeComment");
     if (type === "connect") return t("campaignWizard.steps.connect");
     if (type === "message") return t("campaignWizard.steps.message");
     if (type === "sales_inmail") return t("campaignWizard.steps.salesInmail");
@@ -219,6 +223,7 @@ const AI_LANGUAGES = [
 const STEP_COLORS: Record<string, string> = {
   visit: "bg-info/10 text-info border-info/20",
   follow: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  like_comment: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   connect: "bg-primary/10 text-primary border-primary/20",
   message: "bg-success/10 text-success border-success/20",
   sales_inmail: "bg-primary/10 text-primary border-primary/20",
@@ -350,7 +355,7 @@ type WizardPage = "prospects" | "prompt" | "linkedin-steps" | "email-steps" | "a
 
 interface WizardStep {
   track: Track;
-  type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email";
+  type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email" | "like_comment";
   delayDaysBefore: number; // delay before this step (0 for first step within its track)
   connectNote: string;
   messageBody: string;
@@ -384,7 +389,7 @@ function buildWizardSteps(steps: Step[]): WizardStep[] {
       const raw = s as unknown as Record<string, unknown>;
       result.push({
         track,
-        type: s.step_type as "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email",
+        type: s.step_type as "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email" | "like_comment",
         delayDaysBefore: pendingDelay[track] ?? 0,
         connectNote: s.connect_note ?? "",
         messageBody: s.message_body ?? "",
@@ -781,13 +786,24 @@ function Wizard({
 
   const hasConnect = wizardSteps.some((s) => s.type === "connect");
   const hasFollow = wizardSteps.some((s) => s.type === "follow");
+  const hasLikeComment = wizardSteps.some((s) => s.type === "like_comment");
 
-  async function addWizardStep(type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email") {
+  async function addWizardStep(type: "visit" | "follow" | "connect" | "message" | "sales_inmail" | "email" | "like_comment") {
     const track: Track = type === "email" ? "email" : "linkedin";
     setWizardSteps((prev) => {
       const trackSteps = prev.filter((s) => s.track === track);
       const isFirstInTrack = trackSteps.length === 0;
-      const newStep: WizardStep = { track, type, delayDaysBefore: isFirstInTrack ? 0 : 1, connectNote: "", messageBody: "", templateId: null, templateIds: [], emailSubject: "", emailBody: "", emailSignature: null, aiEnabled: false, aiModel: "", aiPrompt: "", aiMaxWordsEnabled: false, aiMaxWords: 100, aiLanguage: "English" };
+      const newStep: WizardStep = { track, type, delayDaysBefore: isFirstInTrack ? 0 : 1, connectNote: "", messageBody: "", templateId: null, templateIds: [], emailSubject: "", emailBody: "", emailSignature: null, aiEnabled: type === "like_comment", aiModel: "", aiPrompt: "", aiMaxWordsEnabled: false, aiMaxWords: 100, aiLanguage: "Spanish" };
+
+      if (type === "like_comment") {
+        // Insert after visit or before connect
+        const connectIdx = prev.findIndex((s) => s.type === "connect");
+        if (connectIdx !== -1) {
+          const inserted = [...prev];
+          inserted.splice(connectIdx, 0, newStep);
+          return inserted;
+        }
+      }
 
       if (type === "connect") {
         // Insert before the first linkedin message step
@@ -1587,12 +1603,14 @@ function Wizard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-base-content/30 mr-1">{t("campaignWizard.steps.addStep")}</span>
                       {track === "linkedin"
-                        ? (["visit", "connect", "message", "sales_inmail"] as const)
+                        ? (["visit", "like_comment", "connect", "message", "sales_inmail"] as const)
                             // Sales Nav InMail is a premium feature — hide from the picker in the public build.
                             .filter((type) => type !== "sales_inmail" || hasPremium)
                             .map((type) => {
-                            const disabled = type === "connect" && hasConnect;
-                            const title = disabled ? t("campaignWizard.steps.connectOnce") : undefined;
+                            const disabled = (type === "connect" && hasConnect) || (type === "like_comment" && hasLikeComment);
+                            const title = disabled
+                              ? (type === "connect" ? t("campaignWizard.steps.connectOnce") : (t("campaignWizard.steps.likeCommentOnce") || "Solo se puede agregar un paso de Like + Comentario por campaña"))
+                              : undefined;
                             return (
                               <button key={type} onClick={() => !disabled && addWizardStep(type)} title={title}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs ${disabled ? "border-base-300/20 bg-base-200/40 text-base-content/20 cursor-not-allowed" : "border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary/70 hover:text-primary"}`}>
@@ -2117,6 +2135,40 @@ function Wizard({
                   <p className="text-sm text-base-content/50">
                     {t("campaignWizard.config.followDesc") || "Sigue automáticamente el perfil de LinkedIn del prospecto para generar una notificación cálida en su cuenta antes o después de conectar."}
                   </p>
+                )}
+
+                {ws.type === "like_comment" && (
+                  <div className="space-y-4">
+                    <div className="p-3.5 rounded-xl bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-primary/10 border border-rose-500/20 text-xs text-base-content/90 space-y-2">
+                      <div className="flex items-center gap-2 font-medium text-rose-400">
+                        <RiThumbUpLine size={14} />
+                        <span>{t("campaignWizard.config.likeCommentTitle") || "Interacción 2-en-1 con Inteligencia Artificial"}</span>
+                      </div>
+                      <p className="text-xs text-base-content/70 leading-relaxed">
+                        {t("campaignWizard.config.likeCommentFormula") || "El bot busca el último post del prospecto (últimos 90 días), le da Like y redacta un comentario estratégico con la fórmula: Conexión con el post + Insight de industria + Anclaje sutil a la propuesta de valor."}
+                      </p>
+                      <div className="pt-1 border-t border-base-300/40 text-[11px] text-base-content/50 flex items-center gap-1.5">
+                        <span>🛡️</span>
+                        <span>{t("campaignWizard.config.likeCommentFallbackNotice") || "Si el prospecto no ha publicado en los últimos 90 días, avanza automáticamente a Conectar y Seguir."}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-base-content/60 mb-1.5 block font-medium">
+                        {t("campaignWizard.config.customCommentPromptLabel") || "Instrucción adicional o enfoque para la IA (opcional)"}
+                      </label>
+                      <textarea
+                        className="textarea textarea-bordered w-full bg-base-300/50 text-sm h-24 resize-none placeholder:text-base-content/30 focus:border-primary/40"
+                        placeholder={t("campaignWizard.config.customCommentPromptPlaceholder") || "ej. Tono profesional y reflexivo. Menciona la importancia de la eficiencia en ventas y la tecnología."}
+                        value={ws.aiPrompt}
+                        onChange={(e) => updateStep(idx, { aiPrompt: e.target.value })}
+                        maxLength={400}
+                      />
+                      <p className="text-[11px] text-base-content/40 mt-1">
+                        {t("campaignWizard.config.customCommentPromptTip") || "La IA usará el Contexto de tu Campaña y el contenido real del post para generar comentarios únicos y humanos."}
+                      </p>
+                    </div>
+                  </div>
                 )}
 
                 {ws.type === "connect" && (

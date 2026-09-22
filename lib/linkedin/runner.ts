@@ -51,7 +51,7 @@ interface WorkflowStep {
   workflow_id: string;
   track: "linkedin" | "email";
   step_order: number;
-  step_type: "visit" | "follow" | "connect" | "message" | "email" | "delay";
+  step_type: "visit" | "follow" | "connect" | "message" | "email" | "delay" | "like_comment";
   template_id?: string | null;
   delay_seconds: number;
   connect_note?: string | null;
@@ -59,6 +59,7 @@ interface WorkflowStep {
   email_subject?: string | null;
   email_body?: string | null;
   enabled: number;
+  ai_prompt?: string | null;
   attachment_url?: string | null;
   attachment_name?: string | null;
   attachment_type?: string | null;
@@ -94,6 +95,9 @@ export interface RunnerUnipileClient {
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
   sendInvitation(params: { account_id: string; provider_id: string; message?: string }): Promise<UnipileSendInvitationResponse>;
   followUser?(params: { account_id: string; provider_id: string }): Promise<{ success?: boolean; [key: string]: unknown }>;
+  getUserPosts?(params: { account_id: string; identifier: string; limit?: number }): Promise<Array<{ id: string; social_id?: string; text?: string; content?: string; [key: string]: unknown }>>;
+  reactToPost?(params: { account_id: string; post_id: string; reaction_type?: string }): Promise<{ success: boolean; [key: string]: unknown }>;
+  commentOnPost?(params: { account_id: string; post_id: string; text: string }): Promise<{ id?: string; comment_id?: string; [key: string]: unknown }>;
   startChat(params: { account_id: string; attendees_ids: string[]; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileStartChatResponse>;
   sendMessage(params: { chat_id: string; text: string; attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }> }): Promise<UnipileSendMessageResponse>;
 }
@@ -282,6 +286,55 @@ function providerErrorBody(error: unknown): string {
   return error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
 }
 
+async function generatePostComment(postText: string, campaignContext?: string, customInstruction?: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || !postText.trim()) {
+    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+  }
+
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey });
+    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+
+    const prompt = `Actúa como un profesional de negocios y líder de opinión en LinkedIn.
+Tu objetivo es redactar un comentario estratégico en la publicación de un prospecto siguiendo esta FÓRMULA EXACTA:
+1. [CONEXIÓN AUTÉNTICA]: Valida y conecta con una idea clave o aprendizaje específico del post del autor. Cero frases genéricas como "Buen post".
+2. [TRANSICIÓN CON INSIGHT]: Aporta un punto de vista reflexivo, profesional o dato de la industria que complemente su idea.
+3. [ANCLAJE DE VALOR SUTIL]: Relaciona sutilmente con la propuesta de valor de nuestra empresa (${campaignContext || "soluciones tecnológicas B2B y automatización estratégica"}) sin sonar comercial ni poner enlaces. Despierta curiosidad profesional para que quien lea tu comentario quiera visitar tu perfil.
+
+REGLAS ESTRICTAS:
+- Longitud: Corto y conciso, entre 25 y 40 palabras (máximo 3 oraciones).
+- Tono: Humano, positivo, profesional y constructivo.
+- Idioma: Mismo idioma del post del prospecto (si el post es en español, responde en español; si es en portugués, en portugués; si es en inglés, en inglés).
+- Prohibido hashtags, prohibido links, prohibido pedir reuniones o vender directamente.
+${customInstruction ? `Instrucción adicional del usuario: ${customInstruction}` : ""}
+
+PUBLICACIÓN DEL PROSPECTO:
+"""
+${postText.slice(0, 1500)}
+"""
+
+Escribe ÚNICAMENTE el texto final del comentario, sin comillas ni encabezados.`;
+
+    const res = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 150,
+      },
+    });
+
+    const text = res.text?.trim()?.replace(/^["']|["']$/g, "");
+    if (text && text.length > 10) return text;
+    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+  } catch (err) {
+    console.error("[runner:generatePostComment] Error generating AI comment:", err);
+    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+  }
+}
+
 function recordOutboundMessage(db: ReturnType<typeof getDb>, runId: string, workflowId: string, target: Target, chatId: string, messageId: string, text: string, attachmentInfo?: { url?: string | null; name?: string | null; type?: string | null } | null) {
   db.prepare(`
     INSERT INTO linkedin_inbox_messages (
@@ -465,6 +518,84 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         log(db, runProfile.run_id, target.id, "warn", `No se pudo seguir el perfil de ${name}: ${message}`);
         trAdvance(db, tr, steps);
       }
+    }
+    return;
+  }
+
+  if (step.step_type === "like_comment") {
+    try {
+      const profile = await resolveProfile();
+      enrichTarget(db, runProfile.account_id, target, profile);
+
+      const posts = typeof client.getUserPosts === "function"
+        ? await client.getUserPosts({ account_id: accountId, identifier: profile.provider_id, limit: 3 })
+        : [];
+
+      if (!posts || posts.length === 0) {
+        log(db, runProfile.run_id, target.id, "info", `${name} no tiene publicaciones recientes en LinkedIn; continuando secuencia`);
+        trAdvance(db, tr, steps);
+        return;
+      }
+
+      const latestPost = posts.find(p => (p.text || p.content || "").trim().length > 0) || posts[0];
+      const postId = (latestPost.social_id || latestPost.id || "").toString();
+
+      if (!postId) {
+        log(db, runProfile.run_id, target.id, "info", `Publicación sin ID identificable para ${name}; continuando con Conectar y Seguir`);
+        trAdvance(db, tr, steps);
+        return;
+      }
+
+      // Validar ventana de 90 días (3 meses de actividad)
+      const postDateStr = (latestPost.date || latestPost.created_at || latestPost.parsed_datetime || "") as string;
+      if (postDateStr) {
+        const postTime = new Date(postDateStr).getTime();
+        if (!isNaN(postTime)) {
+          const ageDays = (Date.now() - postTime) / (1000 * 60 * 60 * 24);
+          if (ageDays > 90) {
+            log(db, runProfile.run_id, target.id, "info", `${name} no tiene publicaciones en los últimos 90 días (${Math.round(ageDays)}d); continuando con Conectar y Seguir`);
+            trAdvance(db, tr, steps);
+            return;
+          }
+        }
+      }
+
+      // 1. Reaccionar (Like)
+      try {
+        if (typeof client.reactToPost === "function") {
+          await client.reactToPost({
+            account_id: accountId,
+            post_id: postId,
+            reaction_type: "like",
+          });
+        }
+      } catch (reactErr) {
+        console.warn(`[runner] Warning enviando reacción al post ${postId}:`, reactErr);
+      }
+
+      // 2. Generar comentario con IA con la fórmula Conexión + Insight + Valor
+      const postText = (latestPost.text || latestPost.content || "").trim();
+      const workflow = db.prepare("SELECT prompt FROM workflows WHERE id = ?").get(runProfile.workflow_id) as { prompt?: string } | undefined;
+      const campaignContext = workflow?.prompt || "";
+      const customInstruction = step.ai_prompt || "";
+
+      const commentText = await generatePostComment(postText, campaignContext, customInstruction);
+
+      // 3. Publicar comentario en LinkedIn
+      if (typeof client.commentOnPost === "function") {
+        await client.commentOnPost({
+          account_id: accountId,
+          post_id: postId,
+          text: commentText,
+        });
+      }
+
+      log(db, runProfile.run_id, target.id, "info", `Like + Comentario publicados en el post de ${name}: "${commentText.slice(0, 50)}..."`);
+      trAdvance(db, tr, steps);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(db, runProfile.run_id, target.id, "warn", `No se pudo interactuar con la publicación de ${name}: ${message}`);
+      trAdvance(db, tr, steps);
     }
     return;
   }
