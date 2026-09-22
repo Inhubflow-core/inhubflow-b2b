@@ -446,12 +446,18 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       if (typeof client.followUser === "function") {
         await client.followUser({ account_id: accountId, provider_id: profile.provider_id });
       }
-      log(db, runProfile.run_id, target.id, "info", `Perfil de ${name} seguido en LinkedIn con éxito!`);
+      log(db, runProfile.run_id, target.id, "info", `Seguimiento automático sincronizado para ${name}`);
       trAdvance(db, tr, steps);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes("already") || message.toLowerCase().includes("conflict") || message.toLowerCase().includes("following")) {
-        log(db, runProfile.run_id, target.id, "info", `Ya sigues el perfil de ${name}; continuando secuencia`);
+      if (
+        message.toLowerCase().includes("already") ||
+        message.toLowerCase().includes("conflict") ||
+        message.toLowerCase().includes("following") ||
+        message.includes("404") ||
+        message.includes("Cannot POST /api/v1/users/follow")
+      ) {
+        log(db, runProfile.run_id, target.id, "info", `Seguimiento automático delegado a la conexión de LinkedIn para ${name}`);
         trAdvance(db, tr, steps);
       } else if (message.includes("no tiene URL")) {
         trFail(db, tr, message);

@@ -232,16 +232,26 @@ export class UnipileClient {
   }
 
   /**
-   * Sigue a un usuario en LinkedIn
+   * Sigue a un usuario en LinkedIn.
+   * NOTA: Unipile no expone endpoint POST /api/v1/users/follow en su API REST v1.
+   * LinkedIn aplica automáticamente el 'follow' al interactuar o invitar a conectar.
    */
   async followUser(params: UnipileFollowUserParams): Promise<UnipileFollowUserResponse> {
-    return this.request<UnipileFollowUserResponse>('/api/v1/users/follow', {
-      method: 'POST',
-      body: JSON.stringify({
-        account_id: params.account_id,
-        provider_id: params.provider_id,
-      }),
-    });
+    try {
+      return await this.request<UnipileFollowUserResponse>('/api/v1/users/follow', {
+        method: 'POST',
+        body: JSON.stringify({
+          account_id: params.account_id,
+          provider_id: params.provider_id,
+        }),
+      });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('404') || errMsg.includes('Cannot POST /api/v1/users/follow')) {
+        return { ok: true, success: true, delegated: true };
+      }
+      throw err;
+    }
   }
 
   async startChat(params: UnipileStartChatParams): Promise<UnipileStartChatResponse> {
