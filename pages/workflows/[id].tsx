@@ -176,7 +176,7 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
   follow: "Follow Profile",
-  connect: "LinkedIn Connect",
+  connect: "Connect & Follow",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
   email: "Cold Email",
@@ -1587,14 +1587,12 @@ function Wizard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-base-content/30 mr-1">{t("campaignWizard.steps.addStep")}</span>
                       {track === "linkedin"
-                        ? (["visit", "follow", "connect", "message", "sales_inmail"] as const)
+                        ? (["visit", "connect", "message", "sales_inmail"] as const)
                             // Sales Nav InMail is a premium feature — hide from the picker in the public build.
                             .filter((type) => type !== "sales_inmail" || hasPremium)
                             .map((type) => {
-                            const disabled = (type === "connect" && hasConnect) || (type === "follow" && hasFollow);
-                            const title = disabled
-                              ? (type === "connect" ? t("campaignWizard.steps.connectOnce") : (t("campaignWizard.steps.followOnce") || "El paso de seguir perfil solo se puede agregar una vez"))
-                              : undefined;
+                            const disabled = type === "connect" && hasConnect;
+                            const title = disabled ? t("campaignWizard.steps.connectOnce") : undefined;
                             return (
                               <button key={type} onClick={() => !disabled && addWizardStep(type)} title={title}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs ${disabled ? "border-base-300/20 bg-base-200/40 text-base-content/20 cursor-not-allowed" : "border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary/70 hover:text-primary"}`}>
@@ -2123,6 +2121,10 @@ function Wizard({
 
                 {ws.type === "connect" && (
                   <div className="space-y-4">
+                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary/90 flex items-start gap-2">
+                      <span className="text-base shrink-0 leading-none">💡</span>
+                      <span>{t("campaignWizard.config.connectAutoFollowTip") || "Al solicitar la conexión, LinkedIn activa automáticamente el seguimiento mutuo del perfil para nutrir el feed y la relevancia del contacto."}</span>
+                    </div>
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
