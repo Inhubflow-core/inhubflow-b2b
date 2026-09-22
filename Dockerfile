@@ -25,8 +25,9 @@ ENV NODE_ENV=production
 # Build Next.js application
 RUN npm run build
 
-# Data directory — mount a volume here to persist the SQLite DB
-RUN mkdir -p /data && chown node:node /data
+# Data directory and uploads — mount a volume at /data to persist DB and persistent files
+RUN mkdir -p /data/uploads/workflow-attachments /app/public/uploads/workflow-attachments && \
+    chown -R node:node /data /app/public
 ENV INHUBFLOW_DB_PATH=/data/inhubflow.db
 
 USER node

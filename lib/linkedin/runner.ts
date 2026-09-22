@@ -713,6 +713,12 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
           if (localPath.startsWith("/")) {
             localPath = path.join(process.cwd(), "public", localPath.replace(/^\//, ""));
           }
+          if (!fs.existsSync(localPath)) {
+            const dataPath = path.join("/data", "uploads", "workflow-attachments", path.basename(localPath));
+            if (fs.existsSync(dataPath)) {
+              localPath = dataPath;
+            }
+          }
           if (fs.existsSync(localPath)) {
             const buf = fs.readFileSync(localPath);
             attachments = [{

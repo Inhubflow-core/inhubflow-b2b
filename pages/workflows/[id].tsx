@@ -41,6 +41,9 @@ import {
   RiRocketLine,
   RiGroupLine,
   RiSparklingLine,
+  RiDraggable,
+  RiArrowUpSLine,
+  RiAttachment2,
 } from "react-icons/ri";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -600,6 +603,8 @@ function Wizard({
   const [conflictsLoading, setConflictsLoading] = useState(false);
   const [wizardSteps, setWizardSteps] = useState<WizardStep[]>(() => buildWizardSteps(initialSteps));
   const [configIdx, setConfigIdx] = useState<number | null>(null); // which step is being configured
+  const [draggedStepPos, setDraggedStepPos] = useState<number | null>(null);
+  const [dragOverStepPos, setDragOverStepPos] = useState<number | null>(null);
   const [launching, setLaunching] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -801,6 +806,43 @@ function Wizard({
   function removeWizardStep(idx: number) {
     setWizardSteps((prev) => prev.filter((_, i) => i !== idx));
     if (configIdx === idx) setConfigIdx(null);
+  }
+
+  function moveTrackStep(track: Track, fromPos: number, toPos: number) {
+    if (fromPos === toPos) return;
+    setWizardSteps((prev) => {
+      const trackIndices: number[] = [];
+      const trackItems: WizardStep[] = [];
+      prev.forEach((step, idx) => {
+        if (step.track === track) {
+          trackIndices.push(idx);
+          trackItems.push(step);
+        }
+      });
+
+      if (fromPos < 0 || fromPos >= trackItems.length || toPos < 0 || toPos >= trackItems.length) {
+        return prev;
+      }
+
+      const [moved] = trackItems.splice(fromPos, 1);
+      trackItems.splice(toPos, 0, moved);
+
+      // Normalizar delays: el primer paso del track no requiere espera previa
+      if (trackItems[0].delayDaysBefore > 0) {
+        trackItems[0] = { ...trackItems[0], delayDaysBefore: 0 };
+      }
+      // Los pasos subsiguientes mantienen al menos 1 día si tenían 0
+      if (trackItems.length > 1 && trackItems[1].delayDaysBefore === 0) {
+        trackItems[1] = { ...trackItems[1], delayDaysBefore: 1 };
+      }
+
+      const next = [...prev];
+      trackIndices.forEach((origIdx, pos) => {
+        next[origIdx] = trackItems[pos];
+      });
+      return next;
+    });
+    setConfigIdx(null);
   }
 
   function updateStep(idx: number, patch: Partial<WizardStep>) {
@@ -1372,9 +1414,31 @@ function Wizard({
                 const track: Track = page === "linkedin-steps" ? "linkedin" : "email";
                 const trackSteps = wizardSteps.map((ws, idx) => ({ ws, idx })).filter(({ ws }) => ws.track === track);
 
-                function StepCard({ ws, idx, isFirst }: { ws: WizardStep; idx: number; isFirst: boolean }) {
+                function StepCard({ ws, idx, pos, totalInTrack }: { ws: WizardStep; idx: number; pos: number; totalInTrack: number }) {
+                  const isFirst = pos === 0;
+                  const isLast = pos === totalInTrack - 1;
+                  const isBeingDragged = draggedStepPos === pos;
+                  const isDropTarget = dragOverStepPos === pos;
+
                   return (
-                    <div>
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverStepPos !== pos) setDragOverStepPos(pos);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverStepPos === pos) setDragOverStepPos(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedStepPos !== null && draggedStepPos !== pos) {
+                          moveTrackStep(track, draggedStepPos, pos);
+                        }
+                        setDraggedStepPos(null);
+                        setDragOverStepPos(null);
+                      }}
+                      className={`transition-all duration-150 ${isDropTarget ? "scale-[1.01]" : ""}`}
+                    >
                       {!isFirst && (
                         <div className="flex items-center gap-2 py-1 pl-3">
                           <div className="flex flex-col items-center gap-0.5">
@@ -1388,9 +1452,30 @@ function Wizard({
                         </div>
                       )}
                       <div
-                        className="flex items-center gap-2 border rounded-xl px-3 py-2.5 cursor-pointer transition-colors bg-base-200 border-base-300/50 hover:border-primary/30 hover:bg-base-200/80 group"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedStepPos(pos);
+                          e.dataTransfer.setData("text/plain", String(pos));
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDraggedStepPos(null);
+                          setDragOverStepPos(null);
+                        }}
+                        className={`flex items-center gap-2 border rounded-xl px-3 py-2.5 transition-all bg-base-200 group select-none cursor-pointer ${
+                          isBeingDragged ? "opacity-40 border-dashed border-primary" : "border-base-300/50 hover:border-primary/40 hover:bg-base-200/80"
+                        } ${isDropTarget ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100" : ""}`}
                         onClick={() => setConfigIdx(idx)}
                       >
+                        {/* Drag Handle */}
+                        <div
+                          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 -ml-1 rounded transition-colors shrink-0"
+                          title="Arrastrar para cambiar orden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <RiDraggable size={15} />
+                        </div>
+
                         <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${STEP_COLORS[ws.type]}`}>
                           {STEP_ICONS[ws.type]}
                         </span>
@@ -1419,9 +1504,39 @@ function Wizard({
                           {ws.aiEnabled && (
                             <p className="text-[10px] text-primary/50 flex items-center gap-0.5 mt-0.5"><RiRobot2Line size={9} /> AI</p>
                           )}
+                          {(ws.attachmentUrl || ws.attachmentName) && (
+                            <p className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-1 font-medium truncate mt-0.5">
+                              <RiAttachment2 size={11} className="shrink-0" />
+                              <span className="truncate">{ws.attachmentName || "Archivo adjunto"}</span>
+                            </p>
+                          )}
                         </div>
+
+                        {/* Order buttons: Up / Down arrows */}
+                        <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            disabled={isFirst}
+                            onClick={() => moveTrackStep(track, pos, pos - 1)}
+                            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors"
+                            title="Subir paso"
+                          >
+                            <RiArrowUpSLine size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLast}
+                            onClick={() => moveTrackStep(track, pos, pos + 1)}
+                            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 disabled:hover:text-gray-400 transition-colors"
+                            title="Bajar paso"
+                          >
+                            <RiArrowDownSLine size={15} />
+                          </button>
+                        </div>
+
                         <RiEditLine size={12} className="text-base-content/20 group-hover:text-base-content/40 transition-colors shrink-0 mr-0.5" />
                         <button
+                          type="button"
                           className="inline-flex items-center p-1 rounded-md bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors shrink-0"
                           onClick={(e) => { e.stopPropagation(); removeWizardStep(idx); }}
                         >
@@ -1463,7 +1578,9 @@ function Wizard({
                           {track === "linkedin" ? t("campaignWizard.steps.noLinkedinSteps") : t("campaignWizard.steps.noEmailSteps")}
                         </div>
                       ) : (
-                        trackSteps.map(({ ws, idx }, pos) => <StepCard key={idx} ws={ws} idx={idx} isFirst={pos === 0} />)
+                        trackSteps.map(({ ws, idx }, pos) => (
+                          <StepCard key={idx} ws={ws} idx={idx} pos={pos} totalInTrack={trackSteps.length} />
+                        ))
                       )}
                     </div>
 
@@ -1719,6 +1836,11 @@ function Wizard({
                                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs border font-medium ${colorClass}`}>
                                         {STEP_ICONS[ws.type]} {label}
                                       </span>
+                                      {(ws.attachmentUrl || ws.attachmentName) && (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                                          <RiAttachment2 size={11} /> {ws.attachmentName || "Adjunto"}
+                                        </span>
+                                      )}
                                       <div className="flex-1" />
                                       {ws.aiEnabled && (
                                         <span className="inline-flex items-center gap-1.5 text-xs">

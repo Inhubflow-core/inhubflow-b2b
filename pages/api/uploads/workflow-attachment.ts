@@ -69,9 +69,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "El archivo supera el límite de 25 MB" });
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "workflow-attachments");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    let uploadDir = path.join(process.cwd(), "public", "uploads", "workflow-attachments");
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+    } catch (mkdirErr: any) {
+      console.warn("[upload-workflow-attachment] Could not create in public/uploads:", mkdirErr?.message);
+      // Fallback: check if /data is available and writable
+      const fallbackDataDir = path.join("/data", "uploads", "workflow-attachments");
+      try {
+        if (!fs.existsSync(fallbackDataDir)) {
+          fs.mkdirSync(fallbackDataDir, { recursive: true });
+        }
+        uploadDir = fallbackDataDir;
+      } catch (fallbackErr: any) {
+        console.error("[upload-workflow-attachment] Fallback to /data also failed:", fallbackErr?.message);
+        throw mkdirErr;
+      }
     }
 
     const sanitizedBase = path.basename(filename, ext).replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 50);
@@ -80,6 +95,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const targetFilePath = path.join(uploadDir, safeFilename);
 
     fs.writeFileSync(targetFilePath, buffer);
+
+    // Also mirror to /data if /data exists and we wrote to public, so attachments survive redeployments
+    if (uploadDir !== path.join("/data", "uploads", "workflow-attachments")) {
+      try {
+        const dataDir = path.join("/data", "uploads", "workflow-attachments");
+        if (fs.existsSync("/data")) {
+          if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+          fs.writeFileSync(path.join(dataDir, safeFilename), buffer);
+        }
+      } catch {
+        // Non-fatal backup
+      }
+    }
 
     const publicUrl = `/uploads/workflow-attachments/${safeFilename}`;
 

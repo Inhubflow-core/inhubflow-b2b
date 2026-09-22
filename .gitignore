@@ -66,6 +66,11 @@ scratch/
 # Docker volume mount — contains the SQLite DB when running via docker-compose
 /data
 
+# Uploaded workflow attachments (ignore uploaded binary files, preserve directory)
+/public/uploads/*
+!/public/uploads/workflow-attachments/
+!/public/uploads/workflow-attachments/.gitkeep
+
 # open-core: premium pages are mirrored from ee/pages/ into pages/ by
 # scripts/mirror-ee.js at predev/prebuild. The script writes a generated pages/.gitignore
 # (read natively by git) that ignores the mirrored copies + manifest, so they are never
