@@ -10,7 +10,7 @@ import {
   RiArrowLeftSLine, RiArrowRightSLine, RiRefreshLine, RiReplyLine,
   RiUserAddLine, RiUserFollowLine, RiUserLine, RiSparklingLine,
   RiMessage2Line, RiMailCheckLine, RiMailLine, RiAtLine,
-  RiArrowRightLine, RiSearchLine, RiPlayLine, RiHistoryLine,
+  RiArrowRightLine, RiSearchLine, RiPlayLine, RiHistoryLine, RiRestartLine,
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, applyFiltersClient } from "@/components/ui/FilterBar";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -298,6 +298,45 @@ export default function ListDetailPage({
     setSelected(new Set());
     setAllFilteredSelected(false);
     setPage(0);
+  }
+
+  const [resetting, setResetting] = useState(false);
+
+  async function resetSelectedStatus() {
+    if (effectiveSelectedCount === 0) return;
+    if (!confirm(`¿Restablecer el estado de ${effectiveSelectedCount} contacto(s) a 'no contactado' para pruebas? Podrás volver a enrolarlos en cualquier campaña.`)) return;
+    setResetting(true);
+    try {
+      const res = await fetch("/api/targets/reset-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_ids: effectiveSelectedIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to reset status");
+      toast.success(data.message ?? "Contactos restablecidos a estado nuevo");
+      const resetSet = new Set(effectiveSelectedIds);
+      setTargets((prev) =>
+        prev.map((t) =>
+          resetSet.has(t.id)
+            ? {
+                ...t,
+                connection_requested_at: null,
+                connected_at: null,
+                message_sent_at: null,
+                last_replied_at: null,
+                degree: null,
+              }
+            : t
+        )
+      );
+      setSelected(new Set());
+      setAllFilteredSelected(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Error al resetear contactos");
+    } finally {
+      setResetting(false);
+    }
   }
 
   async function moveToList() {
@@ -624,6 +663,15 @@ export default function ListDetailPage({
                       <RiArrowRightLine size={12} /> Move to list
                     </button>
                   )}
+                  <button
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                    onClick={resetSelectedStatus}
+                    disabled={resetting}
+                    title="Restablece el estado de los prospectos a no contactado para poder probar campañas de nuevo"
+                  >
+                    <RiRestartLine size={12} className={resetting ? "animate-spin" : ""} />
+                    <span>{resetting ? "Restableciendo..." : "Reset para pruebas"}</span>
+                  </button>
                   <button
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
                     onClick={removeFromList}

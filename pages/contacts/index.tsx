@@ -10,7 +10,7 @@ import {
   RiExternalLinkLine, RiArrowLeftSLine, RiArrowRightSLine,
   RiUserFollowLine, RiUserAddLine, RiUserLine, RiUserSearchLine,
   RiMessage2Line, RiReplyLine, RiMailCheckLine, RiAtLine, RiMailLine,
-  RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine, RiKanbanView,
+  RiSearchLine, RiAddLine, RiListCheck2, RiDeleteBinLine, RiKanbanView, RiRestartLine,
 } from "react-icons/ri";
 import FilterBar, { ActiveFilter, filtersToParams } from "@/components/ui/FilterBar";
 import ProspectAvatar from "@/components/ui/ProspectAvatar";
@@ -213,6 +213,30 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
     }
   }
 
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function resetSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`¿Restablecer el estado de ${selected.size} contacto(s) a 'no contactado' para pruebas? Podrás volver a enrolarlos en cualquier campaña.`)) return;
+    setResetLoading(true);
+    try {
+      const res = await fetch("/api/targets/reset-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selected), target_ids: Array.from(selected) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reset status");
+      toast.success(data.message || "Contactos restablecidos para pruebas");
+      setSelected(new Set());
+      fetch_(page, listId, debouncedSearch, filters);
+    } catch (err: any) {
+      toast.error(err?.message || "Error al resetear contactos");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
   async function createContact(e: React.FormEvent) {
     e.preventDefault();
     setNewContactLoading(true);
@@ -340,6 +364,15 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
               onClick={() => setShowAddToList(true)}
             >
               <RiListCheck2 size={13} /> Add to list
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+              onClick={resetSelected}
+              disabled={resetLoading}
+              title="Restablece el estado de los prospectos a no contactado para poder probar campañas de nuevo"
+            >
+              <RiRestartLine size={13} className={resetLoading ? "animate-spin" : ""} />
+              <span>{resetLoading ? "Restableciendo..." : "Reset para pruebas"}</span>
             </button>
             <button
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
