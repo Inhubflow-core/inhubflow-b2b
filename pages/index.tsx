@@ -1,8 +1,25 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
-import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers } from "react-icons/fi";
-import { RiMailSendLine, RiReplyLine, RiRobot2Line, RiLinkedinBoxLine, RiFilterLine } from "react-icons/ri";
+import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers, FiUserCheck } from "react-icons/fi";
+import {
+  RiMailSendLine,
+  RiReplyLine,
+  RiRobot2Line,
+  RiLinkedinBoxLine,
+  RiFilterLine,
+  RiUserFollowLine,
+  RiUserSearchLine,
+  RiRadarLine,
+  RiKanbanView,
+  RiFlowChart,
+  RiMailCheckLine,
+  RiArrowRightLine,
+  RiSparklingLine,
+  RiShieldCheckLine,
+  RiPulseLine,
+} from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { UpcomingMeetingsWidget } from "@/components/calendar/UpcomingMeetingsWidget";
 
@@ -11,6 +28,7 @@ interface DashboardStats {
     total_targets: number;
     connections_requested: number;
     connected: number;
+    follows?: number;
     messages_sent: number;
     inmails_sent: number;
     replies_received: number;
@@ -22,13 +40,38 @@ interface DashboardStats {
   };
   today: {
     visits_today: number;
+    follows_today?: number;
     connections_today: number;
     messages_today: number;
     inmails_today: number;
+    emails_today?: number;
   };
-  activity: { day: string; visits: number; connections: number; messages: number; inmails: number; emails: number }[];
+  activity: {
+    day: string;
+    visits: number;
+    follows: number;
+    connections: number;
+    messages: number;
+    inmails: number;
+    emails: number;
+  }[];
   lists: { id: string; name: string }[];
   workflows: { id: string; name: string }[];
+  pipeline?: { id: string; name: string; color: string; order_index: number; count: number }[];
+  sdr?: {
+    mode: string;
+    enabled: boolean;
+    threads_count: number;
+    decisions_count: number;
+    actions_count: number;
+    bookings_count: number;
+    pending_actions: number;
+  };
+  emailHealth?: {
+    connected_accounts: number;
+    sent_today: number;
+    total_daily_limit: number;
+  };
 }
 
 interface AgentStats {
@@ -129,21 +172,21 @@ function FunnelRow({
 }) {
   const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 group">
+    <div className="flex items-center gap-3 px-4 py-2.5 group hover:bg-gray-50/50 dark:hover:bg-gray-800/40 transition-colors">
       <span
         className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs"
         style={{ background: `${color}15`, color }}
       >
         {icon}
       </span>
-      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-24 shrink-0">{label}</span>
+      <span className="text-xs font-medium text-gray-600 dark:text-gray-300 w-32 shrink-0 truncate">{label}</span>
       <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, background: color }}
         />
       </div>
-      <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white w-10 text-right">
+      <span className="text-xs font-bold tabular-nums text-gray-800 dark:text-gray-200 w-10 text-right shrink-0">
         <Counter value={value} />
       </span>
     </div>
@@ -152,7 +195,7 @@ function FunnelRow({
 
 // ── Activity chart ────────────────────────────────────────────────────────────
 
-const DAY_OPTIONS = [7, 14, 30, 90];
+const DAY_OPTIONS = [7, 14, 30, 90] as const;
 
 function ActivityChart({
   data, days, onDaysChange,
@@ -164,6 +207,7 @@ function ActivityChart({
   const { t } = useTranslation();
   const seriesConfig = [
     { key: "visits" as const,      color: "#5aa2ff", label: t("dashboard.visits") },
+    { key: "follows" as const,     color: "#a855f7", label: t("dashboard.follows") },
     { key: "connections" as const, color: "#32d583", label: t("dashboard.connections") },
     { key: "messages" as const,    color: "#f4b740", label: t("dashboard.messages") },
     { key: "inmails" as const,     color: "#e879f9", label: t("dashboard.inmails") },
@@ -171,7 +215,7 @@ function ActivityChart({
   ];
   const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set(seriesConfig.map(s => s.key)));
   const maxVal = Math.max(
-    ...data.flatMap(d => seriesConfig.filter(s => activeSeries.has(s.key)).map(s => d[s.key])),
+    ...data.flatMap(d => seriesConfig.filter(s => activeSeries.has(s.key)).map(s => d[s.key] || 0)),
     1
   );
   const labelEvery = days <= 7 ? 1 : days <= 14 ? 2 : days <= 30 ? 5 : 15;
@@ -189,10 +233,10 @@ function ActivityChart({
   return (
     <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col" style={{ minHeight: 280 }} data-tour="dashboard-chart">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-semibold text-gray-900 dark:text-white">{t("dashboard.activity")}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {seriesConfig.map(s => (
               <button
                 key={s.key}
@@ -206,7 +250,7 @@ function ActivityChart({
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 shrink-0 self-start sm:self-auto">
           {DAY_OPTIONS.map(d => (
             <button
               key={d}
@@ -244,7 +288,7 @@ function ActivityChart({
                   {seriesConfig.filter(s => activeSeries.has(s.key)).map(s => (
                     <div key={s.key} className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
-                      <span style={{ color: s.color }}>{d[s.key]} {s.label.toLowerCase()}</span>
+                      <span style={{ color: s.color }}>{d[s.key] || 0} {s.label.toLowerCase()}</span>
                     </div>
                   ))}
                 </div>
@@ -255,9 +299,9 @@ function ActivityChart({
                       key={s.key}
                       className="flex-1 rounded-t-sm transition-all duration-300"
                       style={{
-                        height: `${Math.max(2, (d[s.key] / maxVal) * 130)}px`,
+                        height: `${Math.max(2, ((d[s.key] || 0) / maxVal) * 130)}px`,
                         background: s.color,
-                        opacity: d[s.key] === 0 ? 0.08 : 0.8,
+                        opacity: (d[s.key] || 0) === 0 ? 0.08 : 0.8,
                       }}
                     />
                   ))}
@@ -276,9 +320,17 @@ function ActivityChart({
   );
 }
 
-// ── AI usage panel ────────────────────────────────────────────────────────────
+// ── AI usage & SDR Center panel ────────────────────────────────────────────────
 
-function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number }) {
+function AiUsagePanel({
+  data,
+  days,
+  sdr,
+}: {
+  data: AgentStats["daily"];
+  days: number;
+  sdr?: DashboardStats["sdr"];
+}) {
   const { t } = useTranslation();
   const totalCost = data.reduce((s, d) => s + (d.cost_usd ?? 0), 0);
   const totalTokens = data.reduce((s, d) => s + (d.input_tokens ?? 0) + (d.output_tokens ?? 0), 0);
@@ -289,14 +341,64 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
   return (
     <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col justify-between h-full">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800 mb-4">
-        <div className="flex items-center gap-2">
-          <RiRobot2Line size={16} className="text-purple-500" />
-          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-            {t("dashboard.aiUsage")}
-          </span>
+      <div>
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800 mb-3.5">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+              <RiRobot2Line size={16} />
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider block">
+                {t("dashboard.sdrAgent")}
+              </span>
+              <span className="text-[10px] text-gray-400">Gemini 3.6 Flash & Automation</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{sdr?.mode === "autopilot" ? t("dashboard.sdrAutoMode") : t("dashboard.sdrApprovalMode")}</span>
+          </div>
         </div>
-        {hasData ? (
+
+        {/* SDR Micro Metrics Grid */}
+        <div className="grid grid-cols-3 gap-2 mb-3.5">
+          <div className="p-2.5 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-500/10">
+            <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 block uppercase tracking-wide">
+              {t("dashboard.sdrDecisions")}
+            </span>
+            <span className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+              <Counter value={sdr?.decisions_count || 0} />
+            </span>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10">
+            <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 block uppercase tracking-wide">
+              Acciones IA
+            </span>
+            <span className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+              <Counter value={sdr?.actions_count || 0} />
+            </span>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/10">
+            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wide">
+              {t("dashboard.sdrMeetings")}
+            </span>
+            <span className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+              <Counter value={sdr?.bookings_count || 0} />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Token & Cost Usage Section */}
+      <div className="border-t border-gray-100 dark:border-gray-800/80 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+            <RiSparklingLine size={13} className="text-purple-400" />
+            <span className="text-xs font-semibold">{t("dashboard.aiUsage")}</span>
+          </div>
           <div className="flex items-center gap-3 text-xs font-medium">
             <span className="text-gray-500 dark:text-gray-400 tabular-nums">
               {totalTokens.toLocaleString()} {t("dashboard.tokens")}
@@ -305,32 +407,19 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
               ${totalCost.toFixed(4)}
             </span>
           </div>
-        ) : (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-            SDR & Asistente IA
-          </span>
-        )}
-      </div>
-
-      {/* Content */}
-      {!hasData ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
-          <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-2.5">
-            <RiRobot2Line size={20} />
-          </div>
-          <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">
-            {t("dashboard.noAiUsage")}
-          </p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 max-w-xs">
-            El consumo de tokens y costos se registrará automáticamente cuando el agente SDR califique leads o redacte respuestas.
-          </p>
         </div>
-      ) : (
-        <div className="flex-1 flex flex-col justify-end pt-2">
-          <div className="flex items-end gap-1" style={{ height: 120 }}>
+
+        {!hasData ? (
+          <div className="py-3 text-center">
+            <p className="text-xs text-gray-400 font-medium">
+              {t("dashboard.noAiUsage")}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-end gap-1" style={{ height: 60 }}>
             {data.map((d, i) => {
               const showLabel = i % labelEvery === 0;
-              const height = Math.max(3, ((d.cost_usd ?? 0) / maxCost) * 100);
+              const height = Math.max(3, ((d.cost_usd ?? 0) / maxCost) * 45);
               return (
                 <div key={d.day} className="flex flex-col items-center flex-1 group relative justify-end" style={{ height: "100%" }}>
                   <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-2.5 py-1.5 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-xl">
@@ -343,14 +432,27 @@ function AiUsagePanel({ data, days }: { data: AgentStats["daily"]; days: number 
                     style={{ height, background: "#a78bfa", opacity: (d.cost_usd ?? 0) === 0 ? 0.12 : 0.85 }}
                   />
                   {showLabel && (
-                    <span className="text-[10px] text-gray-400 mt-1.5 leading-none shrink-0">{d.day.slice(5)}</span>
+                    <span className="text-[9px] text-gray-400 mt-1 leading-none shrink-0">{d.day.slice(5)}</span>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Footer Link */}
+      <div className="border-t border-gray-100 dark:border-gray-800/80 pt-3 mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-gray-400">
+          {sdr?.pending_actions ? `${sdr.pending_actions} acciones pendientes` : "Autonomía comercial activa"}
+        </span>
+        <Link
+          href="/sdr"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+        >
+          Supervisar SDR IA <RiArrowRightLine size={13} />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -497,12 +599,19 @@ export default function Dashboard() {
     ? Math.round((totals.email_replies / totals.emails_sent) * 100)
     : 0;
 
+  // Pipeline stages values
+  const interestedCount = stats.pipeline?.find(s => s.id === 'stage_interested')?.count || 0;
+  const meetingCount = stats.pipeline?.find(s => s.id === 'stage_meeting')?.count || 0;
+  const wonCount = stats.pipeline?.find(s => s.id === 'stage_won')?.count || 0;
+
   const maxFunnelValue = Math.max(
     totals.total_targets,
     totals.connected,
     totals.replies_received,
     totals.emails_sent,
     totals.email_replies,
+    interestedCount,
+    meetingCount,
     1
   );
 
@@ -544,6 +653,7 @@ export default function Dashboard() {
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-0.5">{t("common.today")}</span>
             {[
               { label: t("dashboard.todayVisits", { count: today.visits_today }),       color: "#5aa2ff" },
+              { label: t("dashboard.todayFollows", { count: today.follows_today || 0 }), color: "#a855f7" },
               { label: t("dashboard.todayConnects", { count: today.connections_today }), color: "#32d583" },
               { label: t("dashboard.todayMessages", { count: today.messages_today }),   color: "#f4b740" },
               { label: t("dashboard.todayInmails", { count: today.inmails_today }),     color: "#c084fc" },
@@ -560,21 +670,108 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Quick Action Command Bar ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        <Link
+          href="/lead-finder"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-brand-500/50 dark:hover:border-brand-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-brand-500/10 text-brand-500 group-hover:scale-105 transition-transform">
+            <RiUserSearchLine size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionFindLeads")}</p>
+            <p className="text-[10px] text-gray-400 truncate">Lead Finder</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/workflows"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-amber-500/50 dark:hover:border-amber-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500 group-hover:scale-105 transition-transform">
+            <RiFlowChart size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionNewCampaign")}</p>
+            <p className="text-[10px] text-gray-400 truncate">Secuencias</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/sdr"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-purple-500/50 dark:hover:border-purple-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-purple-500/10 text-purple-500 group-hover:scale-105 transition-transform">
+            <RiRobot2Line size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionSdr")}</p>
+            <p className="text-[10px] text-purple-500 font-medium truncate">{stats.sdr?.decisions_count ? `${stats.sdr.decisions_count} calificados` : "En vivo"}</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/pipeline"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-pink-500/50 dark:hover:border-pink-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-pink-500/10 text-pink-500 group-hover:scale-105 transition-transform">
+            <RiKanbanView size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionPipeline")}</p>
+            <p className="text-[10px] text-gray-400 truncate">Oportunidades</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/signals"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-blue-500/50 dark:hover:border-blue-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-500 group-hover:scale-105 transition-transform">
+            <RiRadarLine size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionSignals")}</p>
+            <p className="text-[10px] text-gray-400 truncate">Radar de Intención</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/email-health"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-xs transition-all group"
+        >
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500 group-hover:scale-105 transition-transform">
+            <RiMailCheckLine size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{t("dashboard.actionEmailHealth")}</p>
+            <p className="text-[10px] text-gray-400 truncate">Entregabilidad</p>
+          </div>
+        </Link>
+      </div>
+
       {/* ── KPI rows — LinkedIn then Email ── */}
       <div className="space-y-4">
-        {/* LinkedIn */}
+        {/* LinkedIn Channel */}
         <div>
           <ChannelHeader
             icon={<RiLinkedinBoxLine size={13} />}
             label={t("dashboard.channelLinkedin")}
             color="#5aa2ff"
           />
-          <div className="grid grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
             <KpiCard
               label={t("dashboard.profilesVisited")}
               value={totals.connections_requested}
               color="#5aa2ff"
               icon={<FiEye size={14} />}
+            />
+            <KpiCard
+              label={t("dashboard.profilesFollowed")}
+              value={totals.follows || 0}
+              color="#a855f7"
+              icon={<RiUserFollowLine size={14} />}
             />
             <KpiCard
               label={t("dashboard.connectionRequests")}
@@ -600,20 +797,20 @@ export default function Dashboard() {
             <KpiCard
               label={t("inbox.title")}
               value={totals.replies_received}
-              color="#c084fc"
+              color="#06b6d4"
               icon={<FiRepeat size={14} />}
             />
           </div>
         </div>
 
-        {/* Email */}
+        {/* Email Channel */}
         <div>
           <ChannelHeader
             icon={<RiMailSendLine size={13} />}
             label={t("dashboard.channelEmail")}
             color="#fb923c"
           />
-          <div className="grid grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
             <KpiCard
               label={t("dashboard.emailsSent")}
               value={totals.emails_sent}
@@ -643,31 +840,45 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Fila 1: Embudo de Conversión & Uso de la IA (Dos columnas en una misma línea) ── */}
+      {/* ── Fila 1: Embudo de Prospección & CRM + Centro SDR IA (Dos columnas en una misma línea) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-        {/* Embudo de Conversión */}
+        {/* Embudo de Prospección & Pipeline */}
         <div className="rounded-2xl border border-gray-300 bg-white shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden flex flex-col justify-between h-full" data-tour="dashboard-funnel">
           <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <RiFilterLine size={16} className="text-brand-500" />
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{t("dashboard.funnel")}</span>
+              <span className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
+                {t("dashboard.crmFunnel")}
+              </span>
             </div>
-            <span className="text-[11px] font-medium text-gray-400">
-              {totals.total_targets} {t("contacts.title").toLowerCase()}
-            </span>
+            <Link
+              href="/pipeline"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors"
+            >
+              {t("dashboard.actionPipeline")} <RiArrowRightLine size={12} />
+            </Link>
           </div>
+
           <div className="divide-y divide-gray-100 dark:divide-gray-800/80 py-1 flex-1 flex flex-col justify-around">
             <FunnelRow icon={<FiUsers size={13} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
+            <FunnelRow icon={<RiUserFollowLine size={13} />} color="#a855f7" label={t("dashboard.profilesFollowed")} value={totals.follows || 0}   max={maxFunnelValue} />
             <FunnelRow icon={<FiUserPlus size={13} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
-            <FunnelRow icon={<FiRepeat size={13} />}       color="#c084fc" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />
-            <FunnelRow icon={<RiMailSendLine size={13} />} color="#fb923c" label={t("dashboard.emailsSent")}    value={totals.emails_sent}         max={maxFunnelValue} />
-            <FunnelRow icon={<RiReplyLine size={13} />}    color="#32d583" label={t("dashboard.emailsReplied")}  value={totals.email_replies}       max={maxFunnelValue} />
+            <FunnelRow icon={<FiRepeat size={13} />}       color="#06b6d4" label={t("inbox.title")}     value={totals.replies_received}    max={maxFunnelValue} />
+            <FunnelRow icon={<RiSparklingLine size={13} />} color="#f59e0b" label="Interesados Calificados"  value={interestedCount}            max={maxFunnelValue} />
+            <FunnelRow icon={<FiUserCheck size={13} />}     color="#10b981" label="Reuniones & Ganados"       value={meetingCount + wonCount}     max={maxFunnelValue} />
+          </div>
+
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-850/30 flex items-center justify-between text-xs">
+            <span className="text-gray-500 dark:text-gray-400">Conversión a oportunidad:</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+              {totals.total_targets > 0 ? (( (interestedCount + meetingCount + wonCount) / totals.total_targets) * 100).toFixed(1) : 0}%
+            </span>
           </div>
         </div>
 
-        {/* Uso de la IA */}
+        {/* Centro de IA & Agente SDR */}
         {hasPremium && agentStats ? (
-          <AiUsagePanel data={agentStats.daily} days={days} />
+          <AiUsagePanel data={agentStats.daily} days={days} sdr={stats.sdr} />
         ) : (
           <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex items-center justify-center h-full">
             <p className="text-xs text-gray-400">{t("dashboard.noAiUsage")}</p>
@@ -675,7 +886,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Fila 2: Actividad (Tamaño completo) ── */}
+      {/* ── Fila 2: Actividad Multicanal (Tamaño completo) ── */}
       <div className="w-full">
         <ActivityChart data={stats.activity} days={days} onDaysChange={setDays} />
       </div>
@@ -684,6 +895,54 @@ export default function Dashboard() {
       <div className="w-full">
         <UpcomingMeetingsWidget />
       </div>
+
+      {/* ── Fila 4: Infraestructura & Salud Operativa ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Email Health Box */}
+        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <RiMailCheckLine size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 dark:text-white">Salud de Envío de Email</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                {stats.emailHealth?.connected_accounts
+                  ? `${stats.emailHealth.connected_accounts} cuenta(s) activa(s) • ${stats.emailHealth.sent_today}/${stats.emailHealth.total_daily_limit} enviados hoy`
+                  : "Conecta tus cuentas SMTP/IMAP para prospección multicanal"}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/email-health"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition-colors shrink-0"
+          >
+            Ver Salud &rarr;
+          </Link>
+        </div>
+
+        {/* Signal Radar Box */}
+        <div className="rounded-2xl border border-gray-300 bg-white p-4 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <RiRadarLine size={18} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-900 dark:text-white">Radar de Señales de Intención</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Monitorea contrataciones, cambios de puesto y financiamiento con IA
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/signals"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 transition-colors shrink-0"
+          >
+            Ver Radar &rarr;
+          </Link>
+        </div>
+      </div>
+
     </div>
     </>
   );
