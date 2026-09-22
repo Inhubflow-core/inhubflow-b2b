@@ -6,34 +6,21 @@ import { useState } from "react";
 import {
   RiLockPasswordLine,
   RiMailLine,
-  RiKeyLine,
   RiSunLine,
   RiMoonLine,
-  RiSendPlaneLine,
-  RiCheckLine,
 } from "react-icons/ri";
-import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
-
-type Mode = "signin" | "signup";
 
 export default function LoginPage() {
   const router = useRouter();
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const { theme, toggleTheme } = useTheme();
-  const [mode, setMode] = useState<Mode>("signin");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    setError("");
-  }
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -50,41 +37,10 @@ export default function LoginPage() {
     }
   }
 
-  async function handleSignUp(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const res = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, inviteCode }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      setLoading(false);
-      setError(data.error ?? t("auth.invalidCredentials"));
-      return;
-    }
-
-    // Auto sign in after signup
-    toast.success("¡Cuenta creada con éxito! Revisa tu correo (si llegó a Spam, márcalo como 'No es Spam').", { duration: 6000 });
-    const signInRes = await signIn("credentials", { email, password, redirect: false });
-    setLoading(false);
-
-    if (signInRes?.ok) {
-      router.replace("/");
-    } else {
-      setError(t("auth.accountCreatedSignInFailed"));
-      switchMode("signin");
-    }
-  }
-
   return (
     <>
       <Head>
-        <title>{mode === "signin" ? t("auth.signIn") : t("auth.signUp")} — InHubFlow Outreach</title>
+        <title>{t("auth.signIn")} — InHubFlow Outreach</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
 
@@ -148,46 +104,14 @@ export default function LoginPage() {
               unoptimized
               priority
             />
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {mode === "signin" ? t("auth.signInTitle") : t("auth.signUpTitle")}
-              </p>
-            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t("auth.signInTitle")}
+            </p>
           </div>
 
           {/* Card Container */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 sm:p-8 shadow-xl dark:shadow-2xl">
-            {/* Mode Switcher Tabs */}
-            <div className="flex bg-gray-100 dark:bg-gray-800/80 rounded-2xl p-1 mb-6">
-              <button
-                type="button"
-                onClick={() => switchMode("signin")}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
-                  mode === "signin"
-                    ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-                }`}
-              >
-                {t("auth.signIn")}
-              </button>
-              <button
-                type="button"
-                onClick={() => switchMode("signup")}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
-                  mode === "signup"
-                    ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-                }`}
-              >
-                {t("auth.signUp")}
-              </button>
-            </div>
-
-            {/* Form */}
-            <form
-              onSubmit={mode === "signin" ? handleSignIn : handleSignUp}
-              className="flex flex-col gap-4"
-            >
+            <form onSubmit={handleSignIn} className="flex flex-col gap-4">
               {/* Email */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -231,42 +155,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Invite code (Sign up only) */}
-              {mode === "signup" && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    {t("auth.inviteCode")}
-                  </label>
-                  <div className="relative">
-                    <RiKeyLine
-                      size={16}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
-                    />
-                    <input
-                      type="password"
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50/50 dark:border-gray-700/80 dark:bg-gray-800/50 pl-10 pr-3.5 py-2.5 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-brand-500 focus:bg-white dark:focus:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
-                      placeholder={t("auth.inviteCodePlaceholder")}
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Spam notice during signup */}
-              {mode === "signup" && (
-                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
-                  <span className="text-base shrink-0 mt-0.5">📬</span>
-                  <div className="space-y-0.5 leading-relaxed">
-                    <strong className="block font-semibold">Tus accesos llegarán a tu correo:</strong>
-                    <span>
-                      Al registrarte te enviaremos la confirmación. Si no la ves en tu bandeja principal, revisa tu carpeta de <strong>Spam</strong> o <strong>Correo no deseado</strong> y márcalo como <strong>&quot;No es Spam&quot;</strong>.
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* Error display */}
               {error && (
                 <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-xs text-center font-medium">
@@ -282,10 +170,8 @@ export default function LoginPage() {
               >
                 {loading ? (
                   <span className="loading loading-spinner loading-xs" />
-                ) : mode === "signin" ? (
-                  t("auth.signInBtn")
                 ) : (
-                  t("auth.signUpBtn")
+                  t("auth.signInBtn")
                 )}
               </button>
             </form>
