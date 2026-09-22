@@ -965,7 +965,10 @@
     "dailyLimits": "Limites Diários",
     "activeHours": "Horário Ativo de Disparos",
     "timezone": "Fuso Horário",
-    "workingDays": "Dias Úteis"
+    "workingDays": "Dias Úteis",
+    "language": "Idioma",
+    "selectLanguage": "Selecionar idioma",
+    "languageDescription": "Escolha o seu idioma preferido para a interface da plataforma."
   },
   "team": {
     "title": "Equipe Comercial & Embaixadores",

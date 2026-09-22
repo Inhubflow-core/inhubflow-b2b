@@ -122,7 +122,7 @@ function MetricTile({
   pulse?: boolean;
 }) {
   return (
-    <div className="p-4 rounded-xl bg-gray-50/70 dark:bg-gray-800/50 border border-gray-200/80 dark:border-gray-800 hover:border-brand-500/30 dark:hover:border-brand-500/30 hover:bg-white dark:hover:bg-gray-850 hover:shadow-xs transition-all group flex flex-col justify-between">
+    <div className="p-4 rounded-xl bg-gray-50/70 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-white dark:hover:bg-gray-850 hover:shadow-xs transition-all group flex flex-col justify-between">
       <div className="flex items-center justify-between mb-2.5">
         <span
           className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 transition-transform group-hover:scale-105"
@@ -339,7 +339,7 @@ function AiUsagePanel({
     <div className="rounded-2xl border border-gray-300 bg-white p-5 shadow-xs dark:border-gray-700 dark:bg-gray-900 flex flex-col justify-between h-full">
       {/* Header */}
       <div>
-        <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800 mb-3.5">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700 mb-3.5">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
               <RiRobot2Line size={16} />
@@ -360,7 +360,7 @@ function AiUsagePanel({
 
         {/* SDR Micro Metrics Grid */}
         <div className="grid grid-cols-3 gap-2 mb-3.5">
-          <div className="p-2.5 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-500/10">
+          <div className="p-2.5 rounded-xl bg-purple-500/5 dark:bg-purple-950/20 border border-purple-500/20 dark:border-purple-500/30">
             <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 block uppercase tracking-wide">
               {t("dashboard.sdrDecisions")}
             </span>
@@ -369,7 +369,7 @@ function AiUsagePanel({
             </span>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/10">
+          <div className="p-2.5 rounded-xl bg-blue-500/5 dark:bg-blue-950/20 border border-blue-500/20 dark:border-blue-500/30">
             <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 block uppercase tracking-wide">
               Acciones IA
             </span>
@@ -378,7 +378,7 @@ function AiUsagePanel({
             </span>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/10">
+          <div className="p-2.5 rounded-xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 dark:border-emerald-500/30">
             <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 block uppercase tracking-wide">
               {t("dashboard.sdrMeetings")}
             </span>
@@ -390,7 +390,7 @@ function AiUsagePanel({
       </div>
 
       {/* AI Token & Cost Usage Section */}
-      <div className="border-t border-gray-100 dark:border-gray-800/80 pt-3">
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
             <RiSparklingLine size={13} className="text-purple-400" />
@@ -439,7 +439,7 @@ function AiUsagePanel({
       </div>
 
       {/* Footer Link */}
-      <div className="border-t border-gray-100 dark:border-gray-800/80 pt-3 mt-2 flex items-center justify-between">
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 flex items-center justify-between">
         <span className="text-[11px] text-gray-400">
           {sdr?.pending_actions ? `${sdr.pending_actions} acciones pendientes` : "Autonomía comercial activa"}
         </span>
@@ -615,8 +615,27 @@ export default function Dashboard() {
   return (
     <>
     <Head>
-      <title>Dashboard B2B</title>
-      <meta name="robots" content="noindex, nofollow" />
+      <title>InHubFlow — Plataforma de Prospección B2B & SDR con IA</title>
+      <meta
+        name="description"
+        content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+      />
+      <meta property="og:site_name" content="InHubFlow" />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content="https://inhubflow.online/" />
+      <meta property="og:title" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+      <meta
+        property="og:description"
+        content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+      />
+      <meta property="og:image" content="https://inhubflow.online/og-image.png" />
+      <meta property="og:image:secure_url" content="https://inhubflow.online/og-image.png" />
+      <meta property="og:image:type" content="image/png" />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:image" content="https://inhubflow.online/og-image.png" />
+      <link rel="image_src" href="https://inhubflow.online/og-image.png" />
     </Head>
 
     <div className="space-y-6">
@@ -671,7 +690,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <Link
           href="/lead-finder"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-brand-500/50 dark:hover:border-brand-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-brand-500 dark:hover:border-brand-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-brand-500/10 text-brand-500 group-hover:scale-105 transition-transform">
             <RiUserSearchLine size={16} />
@@ -684,7 +703,7 @@ export default function Dashboard() {
 
         <Link
           href="/workflows"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-amber-500/50 dark:hover:border-amber-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/10 text-amber-500 group-hover:scale-105 transition-transform">
             <RiFlowChart size={16} />
@@ -697,7 +716,7 @@ export default function Dashboard() {
 
         <Link
           href="/sdr"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-purple-500/50 dark:hover:border-purple-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-purple-500/10 text-purple-500 group-hover:scale-105 transition-transform">
             <RiRobot2Line size={16} />
@@ -710,7 +729,7 @@ export default function Dashboard() {
 
         <Link
           href="/pipeline"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-pink-500/50 dark:hover:border-pink-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-pink-500 dark:hover:border-pink-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-pink-500/10 text-pink-500 group-hover:scale-105 transition-transform">
             <RiKanbanView size={16} />
@@ -723,7 +742,7 @@ export default function Dashboard() {
 
         <Link
           href="/signals"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-blue-500/50 dark:hover:border-blue-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-500 group-hover:scale-105 transition-transform">
             <RiRadarLine size={16} />
@@ -736,7 +755,7 @@ export default function Dashboard() {
 
         <Link
           href="/email-health"
-          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-xs transition-all group"
+          className="flex items-center gap-2.5 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-xs transition-all group"
         >
           <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500 group-hover:scale-105 transition-transform">
             <RiMailCheckLine size={16} />
@@ -751,9 +770,9 @@ export default function Dashboard() {
       {/* ── Executive Multichannel Performance Deck ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {/* LinkedIn Outreach Engine Panel */}
-        <div className="lg:col-span-7 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
+        <div className="lg:col-span-7 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-lg bg-[#0077b5]/10 text-[#0077b5] dark:bg-[#0077b5]/20 dark:text-[#38bdf8] flex items-center justify-center text-base shrink-0">
                   <RiLinkedinBoxLine size={18} />
@@ -827,9 +846,9 @@ export default function Dashboard() {
         </div>
 
         {/* Cold Email & Deliverability Panel */}
-        <div className="lg:col-span-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
+        <div className="lg:col-span-5 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xs p-5 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 dark:bg-orange-500/20 dark:text-orange-400 flex items-center justify-center text-base shrink-0">
                   <RiMailSendLine size={18} />
@@ -887,7 +906,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs">
+          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
               <RiPulseLine size={14} className="text-emerald-500" />
               <span className="text-[11px]">Entregabilidad estimada: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">98.6%</strong></span>
@@ -906,7 +925,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
         {/* Embudo de Prospección & Pipeline */}
         <div className="rounded-2xl border border-gray-300 bg-white shadow-xs dark:border-gray-700 dark:bg-gray-900 overflow-hidden flex flex-col justify-between h-full" data-tour="dashboard-funnel">
-          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <RiFilterLine size={16} className="text-brand-500" />
               <span className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider">
@@ -921,7 +940,7 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          <div className="divide-y divide-gray-100 dark:divide-gray-800/80 py-1 flex-1 flex flex-col justify-around">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700/80 py-1 flex-1 flex flex-col justify-around">
             <FunnelRow icon={<FiUsers size={13} />}        color="#808080" label={t("contacts.title")}        value={totals.total_targets}       max={maxFunnelValue} />
             <FunnelRow icon={<RiUserFollowLine size={13} />} color="#a855f7" label={t("dashboard.profilesFollowed")} value={totals.follows || 0}   max={maxFunnelValue} />
             <FunnelRow icon={<FiUserPlus size={13} />}     color="#32d583" label={t("dashboard.connected")}      value={totals.connected}           max={maxFunnelValue} />
@@ -930,7 +949,7 @@ export default function Dashboard() {
             <FunnelRow icon={<FiUserCheck size={13} />}     color="#10b981" label="Reuniones & Ganados"       value={meetingCount + wonCount}     max={maxFunnelValue} />
           </div>
 
-          <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-850/30 flex items-center justify-between text-xs">
+          <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-850/30 flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400">Conversión a oportunidad:</span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
               {totals.total_targets > 0 ? (( (interestedCount + meetingCount + wonCount) / totals.total_targets) * 100).toFixed(1) : 0}%

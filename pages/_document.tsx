@@ -15,6 +15,37 @@ export default function Document() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="InHubFlow" />
+
+        {/* ── OpenGraph & Social Sharing Meta Tags (WhatsApp, LinkedIn, Telegram, Twitter) ── */}
+        <meta name="title" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+        <meta
+          name="description"
+          content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+        />
+        <meta property="og:site_name" content="InHubFlow" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://inhubflow.online/" />
+        <meta property="og:title" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+        <meta
+          property="og:description"
+          content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+        />
+        <meta property="og:image" content="https://inhubflow.online/og-image.png" />
+        <meta property="og:image:secure_url" content="https://inhubflow.online/og-image.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+        <meta
+          name="twitter:description"
+          content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+        />
+        <meta name="twitter:image" content="https://inhubflow.online/og-image.png" />
+        <link rel="image_src" href="https://inhubflow.online/og-image.png" />
+
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

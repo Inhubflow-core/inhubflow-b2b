@@ -40,8 +40,27 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>{t("auth.signIn")} — InHubFlow Outreach</title>
-        <meta name="robots" content="noindex, nofollow" />
+        <title>InHubFlow — Plataforma de Prospección B2B & SDR con IA</title>
+        <meta
+          name="description"
+          content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+        />
+        <meta property="og:site_name" content="InHubFlow" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://inhubflow.online/login" />
+        <meta property="og:title" content="InHubFlow — Plataforma de Prospección B2B & SDR con IA" />
+        <meta
+          property="og:description"
+          content="Automatiza tu prospección en LinkedIn y Cold Email con agentes de inteligencia artificial, pipelines comerciales y CRM integrado."
+        />
+        <meta property="og:image" content="https://inhubflow.online/og-image.png" />
+        <meta property="og:image:secure_url" content="https://inhubflow.online/og-image.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="https://inhubflow.online/og-image.png" />
+        <link rel="image_src" href="https://inhubflow.online/og-image.png" />
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-[#0c111d] dark:via-[#101828] dark:to-[#080d1a] flex items-center justify-center relative p-4 font-sans transition-colors">

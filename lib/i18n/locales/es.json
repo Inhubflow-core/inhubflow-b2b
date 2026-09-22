@@ -965,7 +965,10 @@
     "dailyLimits": "Límites Diarios",
     "activeHours": "Horario de Envío Activo",
     "timezone": "Zona Horaria",
-    "workingDays": "Días Laborables"
+    "workingDays": "Días Laborables",
+    "language": "Idioma",
+    "selectLanguage": "Seleccionar idioma",
+    "languageDescription": "Elige tu idioma preferido para la interfaz de la plataforma."
   },
   "team": {
     "title": "Equipo Comercial & Embajadores",

@@ -115,7 +115,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
             return (
               <div
                 key={evt.id}
-                className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-850/50 hover:border-brand-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-850/50 hover:border-brand-500 dark:hover:border-brand-500 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {evt.target_image_url ? (

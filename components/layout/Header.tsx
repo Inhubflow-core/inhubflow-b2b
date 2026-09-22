@@ -225,7 +225,7 @@ export default function Header({
           {isLangOpen && (
             <div className="absolute right-0 mt-2 w-44 origin-top-right rounded-2xl border border-gray-300 bg-white p-1.5 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-gray-900 z-50">
               <div className="px-2.5 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                {t("settings.language")}
+                {t("settings.selectLanguage")}
               </div>
               {supportedLocales.map((l) => (
                 <button

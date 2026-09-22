@@ -965,7 +965,10 @@
     "dailyLimits": "Daily Limits",
     "activeHours": "Active Operating Hours",
     "timezone": "Timezone",
-    "workingDays": "Working Days"
+    "workingDays": "Working Days",
+    "language": "Language",
+    "selectLanguage": "Select language",
+    "languageDescription": "Choose your preferred language for the platform interface."
   },
   "team": {
     "title": "Commercial Team & Ambassadors",
