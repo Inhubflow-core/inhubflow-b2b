@@ -114,6 +114,43 @@ export interface CreatedHandoff {
   duplicate: boolean;
 }
 
+export function formatHandoffSummary(reasons: string[], messageBody?: string): string {
+  const cleanBody = (messageBody || "").trim().slice(0, 100);
+
+  // Detect personal/social greetings (birthday, congratulations, holidays)
+  const isPersonalGreeting = /feliz\s*(anivers[aá]rio|cumplea[ñn]os|navidad)|parab[eé]ns|congratulations|happy\s*birthday|felicidades/i.test(
+    messageBody || "",
+  );
+  if (isPersonalGreeting) {
+    return `Mensaje personal / saludo ("${cleanBody}"). Automatización pausada para respuesta manual.`;
+  }
+
+  const reasonDescriptions: Record<string, string> = {
+    invalid_or_missing_citations: "Consulta no cubierta en la base de conocimiento",
+    missing_approved_knowledge: "Tema no documentado en la base de conocimiento",
+    native_calendar_not_available: "Solicitó reunión (sin calendario configurado)",
+    unsupported_numeric_claim: "Solicitó precios o cotización específica",
+    unsupported_url: "Solicitud de enlaces externos no autorizados",
+    intent_requires_human: "El prospecto solicitó hablar con una persona",
+    proposal_requires_human: "Solicitó propuesta comercial personalizada",
+    competitor_escalation: "Mencionó a un competidor directo",
+    high_risk: "Consulta delicada que requiere revisión humana",
+    low_confidence: "Respuesta de baja certeza estadística",
+    max_ai_turns_reached: "Límite de turnos de IA alcanzado",
+    provider_requested_handoff: "Derivación solicitada por la IA",
+  };
+
+  const friendlyReason = reasons
+    .map((r) => reasonDescriptions[r] || r.replace(/_/g, " "))
+    .slice(0, 2)
+    .join(" • ");
+
+  if (cleanBody) {
+    return `${friendlyReason} — Mensaje: "${cleanBody}"`;
+  }
+  return friendlyReason;
+}
+
 export function createHumanHandoff(
   db: Database.Database,
   input: CreateHandoffInput,
@@ -186,13 +223,19 @@ export function createHumanHandoff(
 
     const targetName = thread.target_name || "Lead";
     const href = `/inbox?thread=${encodeURIComponent(input.threadId)}&message=${encodeURIComponent(input.messageId)}`;
+    const cleanSummary =
+      input.summary.includes("invalid_or_missing_citations") ||
+      input.summary.includes("unsupported_numeric_claim") ||
+      input.summary.includes("native_calendar_not_available")
+        ? formatHandoffSummary(input.reasonCodes, input.summary.split("Mensaje:")[1] || input.summary)
+        : input.summary;
     const notification = createAppNotification(db, {
       workspaceOwnerId,
       userId: existing?.assigned_user_id ?? assignee.userId,
       notificationType: "sdr_handoff",
       priority: input.priority ?? "urgent",
       title: "Asistente SDR: intervención requerida",
-      body: `${targetName}: ${input.summary.slice(0, 180)}`,
+      body: `${targetName}: ${cleanSummary.slice(0, 180)}`,
       href,
       entityType: "sdr_handoff",
       entityId: handoffId,

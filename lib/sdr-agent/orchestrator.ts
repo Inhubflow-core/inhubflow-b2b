@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { recordSdrAuditEvent } from "@/lib/audit";
 import { createAppNotification } from "@/lib/notifications/service";
 import { cancelSdrJob, completeSdrJob, failSdrJob, renewSdrJobLease, type LeasedSdrJob } from "./jobs";
-import { createHumanHandoff, markThreadDoNotContact, resolveHandoffAssignee } from "./handoff";
+import { createHumanHandoff, formatHandoffSummary, markThreadDoNotContact, resolveHandoffAssignee } from "./handoff";
 import { evaluatePostProviderGuardrails } from "./guardrails/post-provider";
 import { evaluatePreProviderGuardrails } from "./guardrails/pre-provider";
 import { policyDecision, type SdrPolicyResult, type ThreadPolicyContext } from "./guardrails/types";
@@ -386,7 +386,7 @@ function finishDecision(
         messageId: input.context.message.id,
         decisionId: persisted.id,
         reasonCodes: input.policy.reasons,
-        summary: `${input.policy.reasons.join(", ")}. Mensaje: ${input.context.message.body.slice(0, 500)}`,
+        summary: formatHandoffSummary(input.policy.reasons, input.context.message.body),
         recommendedReply: null,
         priority: input.decision.risk_level === "high" ? "critical" : "urgent",
       });
