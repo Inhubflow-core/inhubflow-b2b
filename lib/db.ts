@@ -894,6 +894,51 @@ function runMigrations(db: Database.Database) {
     }
   } catch { /* migration already done */ }
 
+  // Allow the 'follow' step_type (Follow Profile). Rebuilds the table preserving
+  // every existing column and updates CHECK constraint to include 'follow'.
+  try {
+    const ti = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='workflow_steps'").get() as { sql: string } | undefined;
+    if (ti && !ti.sql.includes("'follow'")) {
+      const cols = (db.prepare("PRAGMA table_info(workflow_steps)").all() as Array<{ name: string }>).map((c) => c.name);
+      const colList = cols.join(", ");
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE workflow_steps_new (
+          id TEXT PRIMARY KEY,
+          workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
+          step_order INTEGER NOT NULL,
+          step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email')),
+          template_id TEXT REFERENCES templates(id),
+          delay_seconds INTEGER DEFAULT 0,
+          connect_note TEXT,
+          message_body TEXT,
+          email_subject TEXT,
+          email_body TEXT,
+          enabled INTEGER DEFAULT 1,
+          ai_enabled INTEGER DEFAULT 0,
+          ai_model TEXT,
+          ai_prompt TEXT,
+          ai_max_words INTEGER,
+          email_position INTEGER DEFAULT 1,
+          message_position INTEGER DEFAULT 1,
+          ai_language TEXT DEFAULT 'English',
+          track TEXT NOT NULL DEFAULT 'linkedin' CHECK(track IN ('linkedin', 'email')),
+          email_signature TEXT,
+          attachment_url TEXT,
+          attachment_name TEXT,
+          attachment_type TEXT,
+          attachment_size INTEGER
+        );
+        INSERT INTO workflow_steps_new (${colList}) SELECT ${colList} FROM workflow_steps;
+        DROP TABLE workflow_steps;
+        ALTER TABLE workflow_steps_new RENAME TO workflow_steps;
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (err) {
+    console.error("[db migration] Error migrating workflow_steps for 'follow':", err);
+  }
+
   // CSV import: allow email-only targets (no LinkedIn URL). targets.linkedin_url was
   // NOT NULL UNIQUE from the base schema — rebuild to make it nullable (still UNIQUE,
   // SQLite allows multiple NULLs under UNIQUE) preserving EVERY current column, same
@@ -1307,7 +1352,7 @@ function initDb(db: Database.Database) {
       id TEXT PRIMARY KEY,
       workflow_id TEXT REFERENCES workflows(id) ON DELETE CASCADE,
       step_order INTEGER NOT NULL,
-      step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'connect', 'message', 'delay')),
+      step_type TEXT NOT NULL CHECK(step_type IN ('visit', 'follow', 'connect', 'message', 'sales_inmail', 'delay', 'email')),
       template_id TEXT REFERENCES templates(id),
       delay_seconds INTEGER DEFAULT 0,
       connect_note TEXT,

@@ -3469,8 +3469,6 @@ export default function WorkflowDetailPage({
 
           {actionSteps.length > 0 && (
             <div>
-              <p className="text-xs text-base-content/30 uppercase tracking-widest px-1 mb-3">{t("campaignDetail.pipeline")}</p>
-
               {/* Render each track independently, delays shown inline before their step */}
               {(["linkedin", "email"] as Track[]).map((track) => {
                 const trackSteps = steps.filter((s) => (s.track ?? (s.step_type === "email" ? "email" : "linkedin")) === track);
@@ -3537,9 +3535,9 @@ export default function WorkflowDetailPage({
 
                 return (
                   <div key={track} className="mb-4">
-                    {trackSteps.some(s => s.track) && (
-                      <p className="text-xs text-base-content/20 uppercase tracking-widest px-1 mb-2">{track}</p>
-                    )}
+                    <p className="text-xs text-base-content/40 uppercase tracking-widest px-1 mb-2 font-semibold">
+                      {track === "linkedin" ? "SEQUÊNCIA LINKEDIN" : "SEQUÊNCIA EMAIL"}
+                    </p>
                     <div className="flex flex-col">{rendered}</div>
                   </div>
                 );
