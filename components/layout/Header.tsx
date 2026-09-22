@@ -6,13 +6,11 @@ import { useTheme } from "@/lib/context/ThemeContext";
 import {
   RiMoonLine,
   RiSunLine,
-  RiApps2Line,
   RiLogoutBoxRLine,
   RiUserLine,
   RiMenuFoldLine,
   RiMenuUnfoldLine,
   RiCheckLine,
-  RiMessage3Line,
   RiSendPlaneLine,
   RiNotification3Line,
   RiVolumeUpLine,
@@ -44,7 +42,6 @@ export default function Header({
 
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
-  const [isSuiteOpen, setIsSuiteOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const {
     notifications,
@@ -61,7 +58,6 @@ export default function Header({
 
   const langRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
-  const suiteRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,9 +67,6 @@ export default function Header({
       }
       if (userRef.current && !userRef.current.contains(e.target as Node)) {
         setIsUserOpen(false);
-      }
-      if (suiteRef.current && !suiteRef.current.contains(e.target as Node)) {
-        setIsSuiteOpen(false);
       }
       if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
         setIsNotificationsOpen(false);
@@ -112,67 +105,6 @@ export default function Header({
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* App Switcher (InHubFlow Suite) */}
-        <div className="relative" ref={suiteRef}>
-          <button
-            onClick={() => setIsSuiteOpen(!isSuiteOpen)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white shadow-xs"
-            title="InHubFlow Apps"
-          >
-            <RiApps2Line size={18} />
-          </button>
-
-          {isSuiteOpen && (
-            <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-2xl border border-gray-300 bg-white p-3 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-gray-900 z-50">
-              <div className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-800 mb-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  InHubFlow Suite
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <a
-                  href="https://b2c.inhubflow.online"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 group"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                    <RiMessage3Line size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                      InHub Omnichannel B2C
-                    </p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      WhatsApp, Instagram & Chatwoot (4 Agentes)
-                    </p>
-                  </div>
-                </a>
-
-                <div className="flex items-center gap-3 rounded-xl p-2.5 bg-brand-500/10 border border-brand-500/20">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500 text-white">
-                    <RiSendPlaneLine size={18} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-brand-600 dark:text-brand-400">
-                        InHub Outreach B2B
-                      </p>
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 bg-brand-500 text-white rounded">
-                        Activo
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      {`LinkedIn & Cold Email (${sessionUser?.role === "admin" ? "Ilimitados" : `${sessionUser?.slots_limit || 4} Slots`})`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Notification center */}
         <div className="relative" ref={notificationRef}>
           <button

@@ -251,7 +251,7 @@ export default function ContactsPage({ lists, total: initialTotal }: { lists: Li
                 {t("contacts.title")}
               </h1>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-                {total.toLocaleString()} {total === 1 ? t("contacts.contactsCount", { count: 1 }) : t("contacts.contactsCountPlural", { count: total })}
+                {total === 1 ? t("contacts.contactsCount", { count: 1 }) : t("contacts.contactsCountPlural", { count: total.toLocaleString() })}
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">

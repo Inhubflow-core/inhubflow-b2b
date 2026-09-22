@@ -75,10 +75,14 @@ const STEP_ICON: Record<string, React.ElementType> = {
   message: RiMessage2Line,
   delay: RiTimeLine,
 };
-const STEP_LABEL: Record<string, string> = {
-  visit: "Visit",
-  connect: "Connect",
-  message: "Message",
+const STEP_LABEL_KEYS: Record<string, string> = {
+  visit: "workflows.stepVisit",
+  connect: "workflows.stepConnect",
+  message: "workflows.stepMessage",
+  sales_inmail: "workflows.stepInmail",
+  salesInmail: "workflows.stepInmail",
+  email: "workflows.stepEmail",
+  coldEmail: "workflows.stepEmail",
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
@@ -181,7 +185,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
       body: JSON.stringify(form),
     });
     setLoading(false);
-    if (!res.ok) { toast.error("Failed to create campaign"); return; }
+    if (!res.ok) { toast.error(t("workflows.createError")); return; }
     const { id } = await res.json();
     router.push(`/workflows/${id}?setup=1`);
   }
@@ -195,9 +199,9 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
 
   async function duplicateWorkflow(id: string, name: string) {
     const res = await fetch(`/api/workflows/${id}/duplicate`, { method: "POST" });
-    if (!res.ok) { toast.error("Failed to duplicate"); return; }
+    if (!res.ok) { toast.error(t("workflows.duplicateError")); return; }
     const { id: newId } = await res.json();
-    toast.success(`"${name} (copy)" created`);
+    toast.success(t("workflows.duplicateSuccess", { name }));
     router.push(`/workflows/${newId}`);
   }
 
@@ -213,13 +217,13 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
 
   async function pauseRun(workflowId: string, runId: string) {
     await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "paused" }) });
-    toast.success("Paused");
+    toast.success(t("workflows.pausedToast"));
     setWorkflows((prev) => prev.map((w) => w.id === workflowId ? { ...w, active_status: "paused" } : w));
   }
 
   async function resumeRun(workflowId: string, runId: string) {
     await fetch(`/api/runs/${runId}/start`, { method: "POST" });
-    toast.success("Resumed");
+    toast.success(t("workflows.resumedToast"));
     setWorkflows((prev) => prev.map((w) => w.id === workflowId ? { ...w, active_status: "running" } : w));
   }
 
@@ -239,7 +243,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
               {t("workflows.title")}
             </h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/15 text-brand-600 dark:text-brand-400">
-              {activeWorkflows.length} {activeWorkflows.length === 1 ? t("workflows.activeCount", { count: 1 }) : t("workflows.activeCountPlural", { count: activeWorkflows.length })}
+              {activeWorkflows.length} {activeWorkflows.length === 1 ? t("workflows.activeCount") : t("workflows.activeCountPlural")}
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -308,12 +312,12 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       {isRunning && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                          Active
+                          {t("workflows.active")}
                         </span>
                       )}
                       {isPaused && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
-                          Paused
+                          {t("workflows.paused")}
                         </span>
                       )}
                     </div>
@@ -322,12 +326,13 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       <div className="flex items-center gap-1 flex-wrap mb-1.5">
                         {actionSteps.map((type, i) => {
                           const StepIcon = STEP_ICON[type] ?? RiEyeLine;
+                          const stepLabel = STEP_LABEL_KEYS[type] ? t(STEP_LABEL_KEYS[type]) : type;
                           return (
                             <span key={i} className="flex items-center gap-1">
                               {i > 0 && <RiArrowRightLine size={9} className="text-gray-400 dark:text-gray-600" />}
                               <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                                 <StepIcon size={11} />
-                                {STEP_LABEL[type] ?? type}
+                                {stepLabel}
                               </span>
                             </span>
                           );
@@ -335,7 +340,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       </div>
                     )}
                     {actionSteps.length === 0 && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">No steps configured</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{t("workflows.noStepsConfigured")}</p>
                     )}
 
                     {/* Assigned Account & Target List */}
@@ -362,7 +367,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                 {w.total_prospects > 0 ? (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-                      <span>{w.completed_prospects} / {w.total_prospects} prospects done</span>
+                      <span>{t("workflows.prospectsDone", { completed: w.completed_prospects, total: w.total_prospects })}</span>
                       <span>{progress}%</span>
                     </div>
                     <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -370,13 +375,13 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                     </div>
                     {(w.connections_sent > 0 || acceptanceRate !== null) && (
                       <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {w.connections_sent > 0 && <span>{w.connections_sent} connected</span>}
-                        {acceptanceRate !== null && <span className="text-emerald-600 dark:text-emerald-400 font-medium">{acceptanceRate}% accepted</span>}
+                        {w.connections_sent > 0 && <span>{t("workflows.connectedCount", { count: w.connections_sent })}</span>}
+                        {acceptanceRate !== null && <span className="text-emerald-600 dark:text-emerald-400 font-medium">{t("workflows.acceptedRate", { rate: acceptanceRate })}</span>}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">No prospects enrolled yet</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{t("workflows.noProspectsEnrolled")}</p>
                 )}
 
                 {/* Footer */}
@@ -385,7 +390,9 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                   onClick={(e) => e.stopPropagation()}
                 >
                   <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {w.action_step_count} step{w.action_step_count !== 1 ? "s" : ""}
+                    {w.action_step_count === 1
+                      ? t("workflows.stepCount", { count: 1 })
+                      : t("workflows.stepCountPlural", { count: w.action_step_count })}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {isRunning && w.active_run_id && (
@@ -393,7 +400,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
                         onClick={() => pauseRun(w.id, w.active_run_id!)}
                       >
-                        <RiPauseLine size={11} /> Pause
+                        <RiPauseLine size={11} /> {t("workflows.pause")}
                       </button>
                     )}
                     {isPaused && w.active_run_id && (
@@ -401,24 +408,25 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-colors"
                         onClick={() => resumeRun(w.id, w.active_run_id!)}
                       >
-                        <RiPlayLine size={11} /> Resume
+                        <RiPlayLine size={11} /> {t("workflows.resume")}
                       </button>
                     )}
                     <button
-                      title="Duplicate workflow"
+                      title={t("workflows.duplicate")}
                       className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => duplicateWorkflow(w.id, w.name)}
                     >
                       <RiFileCopyLine size={12} />
                     </button>
                     <button
-                      title="Archive"
+                      title={t("workflows.archive")}
                       className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => toggleArchive(w.id, true)}
                     >
                       <RiArchiveLine size={12} />
                     </button>
                     <button
+                      title={t("workflows.delete")}
                       className="inline-flex items-center p-1.5 rounded-lg text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
                       onClick={() => setDeleteId(w.id)}
                     >
@@ -444,7 +452,7 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                 className={`transition-transform ${archivedOpen ? "" : "-rotate-90"}`}
               />
               <RiArchiveLine size={12} />
-              Archived ({archivedWorkflows.length})
+              {t("workflows.archivedSection", { count: archivedWorkflows.length })}
             </button>
             {archivedOpen && (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -462,17 +470,24 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate text-gray-900 dark:text-white">{w.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{w.action_step_count} steps · {w.total_prospects} prospects</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {w.action_step_count === 1
+                            ? t("workflows.stepCount", { count: 1 })
+                            : t("workflows.stepCountPlural", { count: w.action_step_count })}
+                          {" · "}
+                          {w.total_prospects} {t("workflows.prospects")}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
-                          title="Restore"
+                          title={t("workflows.restore")}
                           className="inline-flex items-center p-1.5 rounded-lg text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => toggleArchive(w.id, false)}
                         >
                           <RiInboxUnarchiveLine size={12} />
                         </button>
                         <button
+                          title={t("workflows.delete")}
                           className="inline-flex items-center p-1.5 rounded-lg text-xs bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
                           onClick={() => setDeleteId(w.id)}
                         >

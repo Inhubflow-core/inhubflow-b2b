@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { GetServerSideProps } from "next";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
+import { useTranslation } from "@/lib/i18n/LanguageContext";
 import {
   RiArrowLeftLine, RiExternalLinkLine, RiMailLine, RiBuilding2Line,
   RiUserFollowLine, RiUserAddLine, RiMapPinLine, RiBriefcaseLine,
@@ -176,6 +177,7 @@ function TodoDetailModal({ todo, onClose, onSave }: {
   onClose: () => void;
   onSave: (updated: Todo) => void;
 }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueDate, setDueDate] = useState(todo.due_date ?? "");
@@ -207,7 +209,7 @@ function TodoDetailModal({ todo, onClose, onSave }: {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Edit todo</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t("contacts.detail.editTodo")}</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <RiCloseLine size={16} />
           </button>
@@ -219,18 +221,18 @@ function TodoDetailModal({ todo, onClose, onSave }: {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") save(); }}
-            placeholder="Task title"
+            placeholder={t("contacts.detail.taskTitle")}
             className="w-full bg-transparent text-base font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none border-b border-gray-200 dark:border-gray-800 pb-3"
           />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description..."
+            placeholder={t("contacts.detail.addDescription")}
             rows={5}
             className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 leading-relaxed focus:outline-none focus:border-brand-500 resize-none transition-colors shadow-xs"
           />
           <div>
-            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Due date</label>
+            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{t("contacts.detail.dueDate")}</label>
             <div className="relative w-48">
               <RiCalendarLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               <input
@@ -244,14 +246,14 @@ function TodoDetailModal({ todo, onClose, onSave }: {
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Cancel
+            {t("contacts.detail.cancel")}
           </button>
           <button
             onClick={save}
             disabled={!title.trim() || saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("contacts.detail.saving") : t("contacts.detail.save")}
           </button>
         </div>
       </div>
@@ -264,6 +266,7 @@ function LogDetailModal({ log, onClose, onSave }: {
   onClose: () => void;
   onSave: (updated: ActivityLog) => void;
 }) {
+  const { t } = useTranslation();
   const [type, setType] = useState<ActivityLog["type"]>(log.type);
   const [body, setBody] = useState(log.body);
   const [saving, setSaving] = useState(false);
@@ -290,37 +293,30 @@ function LogDetailModal({ log, onClose, onSave }: {
   }
 
   const types = ["note", "call", "email", "meeting", "other"] as const;
-  const placeholders: Record<string, string> = {
-    note: "Write your note...",
-    call: "What was discussed on this call?",
-    email: "Summary of the email sent or received...",
-    meeting: "What happened in this meeting?",
-    other: "Describe the activity...",
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Edit activity</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t("contacts.detail.editActivity")}</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <RiCloseLine size={16} />
           </button>
         </div>
         <div className="px-6 py-5 flex flex-col gap-4">
           <div className="flex gap-1.5">
-            {types.map((t) => (
+            {types.map((tItem) => (
               <button
-                key={t}
-                onClick={() => setType(t)}
+                key={tItem}
+                onClick={() => setType(tItem)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${
-                  type === t
-                    ? LOG_TYPE_COLORS[t] + " ring-1 ring-inset ring-current/20"
+                  type === tItem
+                    ? LOG_TYPE_COLORS[tItem] + " ring-1 ring-inset ring-current/20"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700"
                 }`}
               >
-                {t}
+                {t(`contacts.detail.activityTypes.${tItem}`, { defaultValue: tItem })}
               </button>
             ))}
           </div>
@@ -328,21 +324,21 @@ function LogDetailModal({ log, onClose, onSave }: {
             ref={bodyRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={placeholders[type]}
+            placeholder={t(`contacts.detail.activityPlaceholders.${type}`, { defaultValue: "Describe the activity..." })}
             rows={6}
             className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 leading-relaxed focus:outline-none focus:border-brand-500 resize-none transition-colors shadow-xs"
           />
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Cancel
+            {t("contacts.detail.cancel")}
           </button>
           <button
             onClick={save}
             disabled={!body.trim() || saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("contacts.detail.saving") : t("contacts.detail.save")}
           </button>
         </div>
       </div>
@@ -355,6 +351,7 @@ function TodoModal({ targetId, onClose, onSave }: {
   onClose: () => void;
   onSave: (todo: Todo) => void;
 }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -386,7 +383,7 @@ function TodoModal({ targetId, onClose, onSave }: {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">New todo</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t("contacts.detail.newTodo")}</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <RiCloseLine size={16} />
           </button>
@@ -398,18 +395,18 @@ function TodoModal({ targetId, onClose, onSave }: {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") save(); }}
-            placeholder="Task title"
+            placeholder={t("contacts.detail.taskTitle")}
             className="w-full bg-transparent text-base font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none border-b border-gray-200 dark:border-gray-800 pb-3"
           />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description..."
+            placeholder={t("contacts.detail.addDescription")}
             rows={4}
             className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 leading-relaxed focus:outline-none focus:border-brand-500 resize-none transition-colors shadow-xs"
           />
           <div>
-            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Due date</label>
+            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{t("contacts.detail.dueDate")}</label>
             <div className="relative w-48">
               <RiCalendarLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               <input
@@ -423,14 +420,14 @@ function TodoModal({ targetId, onClose, onSave }: {
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Cancel
+            {t("contacts.detail.cancel")}
           </button>
           <button
             onClick={save}
             disabled={!title.trim() || saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Saving..." : "Create todo"}
+            {saving ? t("contacts.detail.saving") : t("contacts.detail.save")}
           </button>
         </div>
       </div>
@@ -443,6 +440,7 @@ function LogModal({ targetId, onClose, onSave }: {
   onClose: () => void;
   onSave: (log: ActivityLog) => void;
 }) {
+  const { t } = useTranslation();
   const [type, setType] = useState<ActivityLog["type"]>("note");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -470,20 +468,13 @@ function LogModal({ targetId, onClose, onSave }: {
   }
 
   const types = ["note", "call", "email", "meeting", "other"] as const;
-  const placeholders: Record<string, string> = {
-    note: "Write your note...",
-    call: "What was discussed on this call?",
-    email: "Summary of the email sent or received...",
-    meeting: "What happened in this meeting?",
-    other: "Describe the activity...",
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full max-w-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Log activity</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{t("contacts.detail.logActivity")}</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
             <RiCloseLine size={16} />
           </button>
@@ -491,17 +482,17 @@ function LogModal({ targetId, onClose, onSave }: {
         <div className="px-6 py-5 flex flex-col gap-4">
           {/* Type selector */}
           <div className="flex gap-1.5">
-            {types.map((t) => (
+            {types.map((tItem) => (
               <button
-                key={t}
-                onClick={() => setType(t)}
+                key={tItem}
+                onClick={() => setType(tItem)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize ${
-                  type === t
-                    ? LOG_TYPE_COLORS[t] + " ring-1 ring-inset ring-current/20"
+                  type === tItem
+                    ? LOG_TYPE_COLORS[tItem] + " ring-1 ring-inset ring-current/20"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700"
                 }`}
               >
-                {t}
+                {t(`contacts.detail.activityTypes.${tItem}`, { defaultValue: tItem })}
               </button>
             ))}
           </div>
@@ -509,21 +500,21 @@ function LogModal({ targetId, onClose, onSave }: {
             ref={bodyRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={placeholders[type]}
+            placeholder={t(`contacts.detail.activityPlaceholders.${type}`, { defaultValue: "Describe the activity..." })}
             rows={6}
             className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 leading-relaxed focus:outline-none focus:border-brand-500 resize-none transition-colors shadow-xs"
           />
         </div>
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-            Cancel
+            {t("contacts.detail.cancel")}
           </button>
           <button
             onClick={save}
             disabled={!body.trim() || saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {saving ? "Logging..." : "Log activity"}
+            {saving ? t("contacts.detail.logging") : t("contacts.detail.logActivity")}
           </button>
         </div>
       </div>
@@ -541,16 +532,19 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function formatDate(s: string | null) {
+function formatDate(s: string | null, locale: string = "es") {
   if (!s) return null;
-  return new Date(s).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const loc = locale === "es" ? "es-ES" : locale === "pt-BR" ? "pt-BR" : "en-GB";
+  return new Date(s).toLocaleDateString(loc, { day: "numeric", month: "short", year: "numeric" });
 }
 
-function formatTenure(months: number | null) {
+function formatTenure(months: number | null, locale: string = "es") {
   if (!months) return null;
   const y = Math.floor(months / 12);
   const m = months % 12;
-  return [y > 0 ? `${y}y` : null, m > 0 ? `${m}mo` : null].filter(Boolean).join(" ");
+  const ySuffix = locale === "en" ? "y" : "a";
+  const mSuffix = locale === "en" ? "mo" : "m";
+  return [y > 0 ? `${y}${ySuffix}` : null, m > 0 ? `${m}${mSuffix}` : null].filter(Boolean).join(" ");
 }
 
 export default function ContactDetailPage({
@@ -562,6 +556,7 @@ export default function ContactDetailPage({
   activityLogs: ActivityLog[];
   allLists: ListRef[];
 }) {
+  const { t, locale } = useTranslation();
   const functions: string[] = target.apollo_functions ? JSON.parse(target.apollo_functions) : [];
   const positions: { title: string; companyName: string; startDate?: string; endDate?: string; current?: boolean; description?: string }[] =
     target.positions_json ? JSON.parse(target.positions_json) : [];
@@ -620,7 +615,7 @@ export default function ContactDetailPage({
     if (!res.ok) { toast.error(data.error ?? "Failed to add to list"); return; }
     const added = allLists.find((l) => l.id === addListId);
     if (added) setMemberLists((prev) => [...prev, added].sort((a, b) => a.name.localeCompare(b.name)));
-    toast.success(data.added > 0 ? "Added to list" : "Already in this list");
+    toast.success(data.added > 0 ? t("contacts.detail.addedToList") : t("contacts.detail.alreadyInList"));
     setShowAddList(false);
     setAddListId("");
   }
@@ -635,7 +630,7 @@ export default function ContactDetailPage({
     setRemovingListId(null);
     if (!res.ok) { toast.error("Failed to remove from list"); return; }
     setMemberLists((prev) => prev.filter((l) => l.id !== listId));
-    toast.success("Removed from list");
+    toast.success(t("contacts.detail.removedFromList"));
   }
 
   // Open-core: Todos + Activity log (CRM) are premium (ee/). Hidden in the public build.
@@ -679,29 +674,27 @@ export default function ContactDetailPage({
   }
 
   async function saveEmail() {
-    const trimmed = emailDraft.trim();
     const res = await fetch(`/api/targets/${target.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: trimmed }),
+      body: JSON.stringify({ email: emailDraft.trim() || null }),
     });
     if (!res.ok) { toast.error("Failed to save email"); return; }
-    setEmail(trimmed);
+    setEmail(emailDraft.trim());
     setEditingEmail(false);
-    toast.success("Email saved");
+    toast.success(t("contacts.detail.saved"));
   }
 
   async function savePhone() {
-    const trimmed = phoneDraft.trim();
     const res = await fetch(`/api/targets/${target.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: trimmed }),
+      body: JSON.stringify({ phone: phoneDraft.trim() || null }),
     });
     if (!res.ok) { toast.error("Failed to save phone"); return; }
-    setPhone(trimmed);
+    setPhone(phoneDraft.trim());
     setEditingPhone(false);
-    toast.success("Phone saved");
+    toast.success(t("contacts.detail.saved"));
   }
 
   async function saveNotes() {
@@ -713,33 +706,33 @@ export default function ContactDetailPage({
     if (!res.ok) { toast.error("Failed to save notes"); return; }
     setNotes(notesDraft);
     setEditingNotes(false);
-    toast.success("Notes saved");
+    toast.success(t("contacts.detail.saved"));
   }
 
   const connectionStatus = target.degree === 1
-    ? { label: "Connected", color: "bg-success/15 text-success" }
+    ? { label: t("contacts.detail.connected"), color: "bg-success/15 text-success" }
     : target.connection_requested_at
-    ? { label: "Requested", color: "bg-warning/15 text-warning" }
-    : { label: "Not connected", color: "bg-base-300 text-base-content/40" };
+    ? { label: t("contacts.detail.requested"), color: "bg-warning/15 text-warning" }
+    : { label: t("contacts.detail.notConnected"), color: "bg-base-300 text-base-content/40" };
 
   return (
     <>
       <Head>
-        <title>{target.full_name ?? "Contact"} — Dashboard B2B</title>
+        <title>{target.full_name ?? t("contacts.detail.back")} — Dashboard B2B</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       {showTodoModal && (
         <TodoModal
           targetId={target.id}
           onClose={() => setShowTodoModal(false)}
-          onSave={(todo) => { setTodos((prev) => [todo, ...prev]); setShowTodoModal(false); toast.success("Todo created"); }}
+          onSave={(todo) => { setTodos((prev) => [todo, ...prev]); setShowTodoModal(false); toast.success(t("contacts.detail.todoCreated")); }}
         />
       )}
       {selectedTodo && (
         <TodoDetailModal
           todo={selectedTodo}
           onClose={() => setSelectedTodo(null)}
-          onSave={(updated) => { setTodos((prev) => prev.map((t) => t.id === updated.id ? updated : t)); setSelectedTodo(null); toast.success("Saved"); }}
+          onSave={(updated) => { setTodos((prev) => prev.map((t) => t.id === updated.id ? updated : t)); setSelectedTodo(null); toast.success(t("contacts.detail.saved")); }}
         />
       )}
       {showLogModal && (
@@ -753,7 +746,7 @@ export default function ContactDetailPage({
         <LogDetailModal
           log={selectedLog}
           onClose={() => setSelectedLog(null)}
-          onSave={(updated) => { setActivityLogs((prev) => prev.map((l) => l.id === updated.id ? updated : l)); setSelectedLog(null); toast.success("Saved"); }}
+          onSave={(updated) => { setActivityLogs((prev) => prev.map((l) => l.id === updated.id ? updated : l)); setSelectedLog(null); toast.success(t("contacts.detail.saved")); }}
         />
       )}
       <div>
@@ -762,7 +755,7 @@ export default function ContactDetailPage({
           <button onClick={() => history.back()} className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-300/50 transition-colors">
             <RiArrowLeftLine size={16} />
           </button>
-          <span className="text-base-content/40 text-sm">Contact</span>
+          <span className="text-base-content/40 text-sm">{t("contacts.detail.back")}</span>
         </div>
 
         {/* Header — full width */}
@@ -790,12 +783,12 @@ export default function ContactDetailPage({
                   target.email_status === "invalid" ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-error/15 text-error border border-error/20">
                       <RiCloseLine size={12} />
-                      Email invalid
+                      {t("contacts.detail.emailInvalid")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
                       <RiCheckboxCircleLine size={12} />
-                      {target.email_status === "verified" ? "Email verified" : "Email found"}
+                      {target.email_status === "verified" ? t("contacts.detail.emailVerified") : t("contacts.detail.emailFound")}
                     </span>
                   )
                 )}
@@ -810,8 +803,9 @@ export default function ContactDetailPage({
           <div className="flex items-center gap-1.5 shrink-0">
               {target.linkedin_url && (
                 <a href={target.linkedin_url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#0A66C2] text-white hover:bg-[#004182] transition-colors shadow-xs">
-                  <RiLinkedinBoxLine size={15} /> LinkedIn
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#0A66C2] !text-white hover:bg-[#004182] transition-colors shadow-xs"
+                  style={{ color: "#ffffff" }}>
+                  <RiLinkedinBoxLine size={15} className="!text-white shrink-0" style={{ color: "#ffffff" }} /> <span style={{ color: "#ffffff" }}>LinkedIn</span>
                 </a>
               )}
               {target.sales_nav_url && (
@@ -832,15 +826,15 @@ export default function ContactDetailPage({
 
         {/* Contact info */}
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Contact info</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("contacts.detail.contactInfo")}</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center gap-1.5 mb-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.email")}</p>
                 <button
                   onClick={() => { setEmailDraft(email); setEditingEmail(true); setTimeout(() => emailInputRef.current?.focus(), 50); }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                  title="Edit email"
+                  title={t("contacts.detail.editEmail")}
                 >
                   <RiEditLine size={12} />
                 </button>
@@ -854,7 +848,7 @@ export default function ContactDetailPage({
                     onChange={(e) => setEmailDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") saveEmail(); if (e.key === "Escape") setEditingEmail(false); }}
                     className="flex-1 px-3 py-1 rounded-xl bg-white dark:bg-gray-800 border border-brand-500 text-sm focus:outline-none shadow-xs"
-                    placeholder="email@example.com"
+                    placeholder={t("contacts.detail.emailPlaceholder")}
                   />
                   <button onClick={saveEmail} className="text-emerald-600 hover:text-emerald-700"><RiCheckLine size={16} /></button>
                   <button onClick={() => setEditingEmail(false)} className="text-gray-400 hover:text-gray-600"><RiCloseLine size={16} /></button>
@@ -878,11 +872,11 @@ export default function ContactDetailPage({
                   onClick={() => { setEmailDraft(""); setEditingEmail(true); setTimeout(() => emailInputRef.current?.focus(), 50); }}
                   className="text-sm text-gray-400 hover:text-brand-600 transition-colors"
                 >
-                  + Add email
+                  {t("contacts.detail.addEmail")}
                 </button>
               )}
             </div>
-            <Field label="Location" value={
+            <Field label={t("contacts.detail.location")} value={
               target.location ? (
                 <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
                   <RiMapPinLine size={14} className="text-gray-400 shrink-0" />
@@ -892,11 +886,11 @@ export default function ContactDetailPage({
             } />
             <div>
               <div className="flex items-center gap-1.5 mb-0.5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Phone</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.phone")}</p>
                 <button
                   onClick={() => { setPhoneDraft(phone); setEditingPhone(true); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                  title="Edit phone"
+                  title={t("contacts.detail.editPhone")}
                 >
                   <RiEditLine size={12} />
                 </button>
@@ -910,7 +904,7 @@ export default function ContactDetailPage({
                     onChange={(e) => setPhoneDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") savePhone(); if (e.key === "Escape") setEditingPhone(false); }}
                     className="flex-1 px-3 py-1 rounded-xl bg-white dark:bg-gray-800 border border-brand-500 text-sm focus:outline-none shadow-xs"
-                    placeholder="+49 30 1234567"
+                    placeholder={t("contacts.detail.phonePlaceholder")}
                   />
                   <button onClick={savePhone} className="text-emerald-600 hover:text-emerald-700"><RiCheckLine size={16} /></button>
                   <button onClick={() => setEditingPhone(false)} className="text-gray-400 hover:text-gray-600"><RiCloseLine size={16} /></button>
@@ -925,13 +919,13 @@ export default function ContactDetailPage({
                   onClick={() => { setPhoneDraft(""); setEditingPhone(true); setTimeout(() => phoneInputRef.current?.focus(), 50); }}
                   className="text-sm text-gray-400 hover:text-brand-600 transition-colors"
                 >
-                  + Add phone
+                  {t("contacts.detail.addPhone")}
                 </button>
               )}
             </div>
             {functions.length > 0 && (
               <div className="col-span-2">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Functions</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{t("contacts.detail.functions")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {functions.map((f) => (
                     <span key={f} className="inline-flex px-2 py-0.5 rounded-md text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 capitalize">{f}</span>
@@ -940,10 +934,10 @@ export default function ContactDetailPage({
               </div>
             )}
             {target.tenure_months != null && (
-              <Field label="Tenure at current role" value={
+              <Field label={t("contacts.detail.tenure")} value={
                 <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
                   <RiTimeLine size={14} className="text-gray-400 shrink-0" />
-                  {formatTenure(target.tenure_months)}
+                  {formatTenure(target.tenure_months, locale)}
                 </span>
               } />
             )}
@@ -953,7 +947,7 @@ export default function ContactDetailPage({
         {/* Summary */}
         {target.summary && (
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">About</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{t("contacts.detail.about")}</p>
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">{target.summary}</p>
           </div>
         )}
@@ -961,12 +955,12 @@ export default function ContactDetailPage({
         {/* Notes */}
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
           <div className="flex items-center gap-1.5 mb-2">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Notes</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.notes")}</p>
             {!editingNotes && (
               <button
                 onClick={() => { setNotesDraft(notes); setEditingNotes(true); }}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                title="Edit notes"
+                title={t("contacts.detail.editNotes")}
               >
                 <RiEditLine size={12} />
               </button>
@@ -981,14 +975,14 @@ export default function ContactDetailPage({
                 onKeyDown={(e) => { if (e.key === "Escape") setEditingNotes(false); }}
                 rows={5}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-900 dark:text-gray-100 shadow-xs leading-relaxed focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 resize-none"
-                placeholder="Add any context about this person — talking points, mutual connections, research notes..."
+                placeholder={t("contacts.detail.notesPlaceholder")}
               />
               <div className="flex items-center gap-2 justify-end">
                 <button onClick={() => setEditingNotes(false)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors">
-                  <RiCloseLine size={14} /> Cancel
+                  <RiCloseLine size={14} /> {t("contacts.detail.cancel")}
                 </button>
                 <button onClick={saveNotes} className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-xs transition-colors">
-                  <RiCheckLine size={14} /> Save
+                  <RiCheckLine size={14} /> {t("contacts.detail.save")}
                 </button>
               </div>
             </div>
@@ -1004,7 +998,7 @@ export default function ContactDetailPage({
               onClick={() => { setNotesDraft(""); setEditingNotes(true); }}
               className="text-sm text-gray-400 hover:text-brand-600 transition-colors"
             >
-              + Add notes
+              {t("contacts.detail.addNotes")}
             </button>
           )}
         </div>
@@ -1013,12 +1007,12 @@ export default function ContactDetailPage({
         {hasPremium && (
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Activity log</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.activityLog")}</p>
             <button
               onClick={() => setShowLogModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-xs transition-colors"
             >
-              <RiAddLine size={14} /> Log activity
+              <RiAddLine size={14} /> {t("contacts.detail.logActivity")}
             </button>
           </div>
 
@@ -1027,7 +1021,7 @@ export default function ContactDetailPage({
               onClick={() => setShowLogModal(true)}
               className="w-full py-6 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-400 hover:text-gray-600 hover:border-brand-500 transition-colors"
             >
-              Log the first activity
+              {t("contacts.detail.logFirstActivity")}
             </button>
           ) : (
             <div className="flex flex-col gap-0 divide-y divide-gray-200 dark:divide-gray-800">
@@ -1039,10 +1033,10 @@ export default function ContactDetailPage({
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLog(log)}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize ${LOG_TYPE_COLORS[log.type]}`}>
-                        {log.type}
+                        {t(`contacts.detail.activityTypes.${log.type}`, { defaultValue: log.type })}
                       </span>
                       <span className="text-[10px] text-gray-400">
-                        {new Date(log.logged_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatDate(log.logged_at, locale)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-3">{log.body}</p>
@@ -1063,7 +1057,7 @@ export default function ContactDetailPage({
         {/* Career history */}
         {positions.length > 0 && (
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Career history</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("contacts.detail.careerHistory")}</p>
             <div className="flex flex-col gap-3">
               {positions.map((pos, i) => (
                 <div key={i} className="flex gap-3">
@@ -1075,7 +1069,7 @@ export default function ContactDetailPage({
                     <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{pos.companyName}</p>
                     {(pos.startDate || pos.endDate) && (
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {pos.startDate ?? ""}{pos.endDate ? ` — ${pos.endDate}` : pos.current ? " — Present" : ""}
+                        {pos.startDate ?? ""}{pos.endDate ? ` — ${pos.endDate}` : pos.current ? ` — ${t("contacts.detail.present")}` : ""}
                       </p>
                     )}
                     {pos.description && (
@@ -1083,7 +1077,9 @@ export default function ContactDetailPage({
                     )}
                   </div>
                   {pos.current && (
-                    <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-500/20 self-start mt-0.5">Current</span>
+                    <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-500/20 self-start mt-0.5">
+                      {t("contacts.detail.current")}
+                    </span>
                   )}
                 </div>
               ))}
@@ -1094,7 +1090,7 @@ export default function ContactDetailPage({
         {/* Company */}
         {target.companyObj && (
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Company</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("contacts.detail.company")}</p>
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center shrink-0">
                 <RiBuilding2Line size={16} className="text-gray-500" />
@@ -1118,7 +1114,7 @@ export default function ContactDetailPage({
                     </span>
                   )}
                   {target.company_size && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{target.company_size} employees</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{t("contacts.detail.employees", { count: target.company_size })}</span>
                   )}
                   {target.companyObj.domain && (
                     <a href={`https://${target.companyObj.domain}`} target="_blank" rel="noopener noreferrer"
@@ -1142,30 +1138,30 @@ export default function ContactDetailPage({
 
         {/* Outreach timeline */}
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Outreach timeline</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("contacts.detail.outreachTimeline")}</p>
           <div className="flex flex-col gap-3">
-            <Field label="Added" value={formatDate(target.created_at)} />
-            <Field label="Connection requested" value={formatDate(target.connection_requested_at)} />
-            <Field label="Connected" value={formatDate(target.connected_at)} />
-            <Field label="Message sent" value={formatDate(target.message_sent_at)} />
-            <Field label="Last reply" value={formatDate(target.last_replied_at)} />
-            <Field label="Apollo enriched" value={formatDate(target.apollo_enriched_at)} />
+            <Field label={t("contacts.detail.added")} value={formatDate(target.created_at, locale)} />
+            <Field label={t("contacts.detail.connectionRequested")} value={formatDate(target.connection_requested_at, locale)} />
+            <Field label={t("contacts.detail.connectedAt")} value={formatDate(target.connected_at, locale)} />
+            <Field label={t("contacts.detail.messageSent")} value={formatDate(target.message_sent_at, locale)} />
+            <Field label={t("contacts.detail.lastReply")} value={formatDate(target.last_replied_at, locale)} />
+            <Field label={t("contacts.detail.apolloEnriched")} value={formatDate(target.apollo_enriched_at, locale)} />
           </div>
         </div>
 
         {/* Lists */}
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">In lists</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.inLists")}</p>
             <button
               onClick={() => setShowAddList(true)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/40 transition-colors"
             >
-              <RiAddLine size={14} /> Add
+              <RiAddLine size={14} /> {t("contacts.detail.add")}
             </button>
           </div>
           {memberLists.length === 0 ? (
-            <p className="text-xs text-base-content/25">Not in any list yet.</p>
+            <p className="text-xs text-base-content/25">{t("contacts.detail.notInAnyList")}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {memberLists.map((l) => (
@@ -1188,16 +1184,16 @@ export default function ContactDetailPage({
         {showAddList && (
           <div className="modal modal-open">
             <div className="modal-box bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl max-w-sm p-6">
-              <h3 className="font-bold text-base mb-4 text-gray-900 dark:text-white">Add to list</h3>
+              <h3 className="font-bold text-base mb-4 text-gray-900 dark:text-white">{t("contacts.detail.addToListTitle")}</h3>
               {addableLists.length === 0 ? (
-                <p className="text-sm text-gray-400">Already in every list.</p>
+                <p className="text-sm text-gray-400">{t("contacts.detail.alreadyInEveryList")}</p>
               ) : (
                 <select
                   className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 shadow-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 cursor-pointer"
                   value={addListId}
                   onChange={(e) => setAddListId(e.target.value)}
                 >
-                  <option value="">Select a list…</option>
+                  <option value="">{t("contacts.detail.selectList")}</option>
                   {addableLists.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
@@ -1205,7 +1201,7 @@ export default function ContactDetailPage({
               )}
               <div className="modal-action mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
                 <button type="button" className="btn btn-ghost btn-sm text-gray-600 dark:text-gray-400" onClick={() => { setShowAddList(false); setAddListId(""); }}>
-                  Cancel
+                  {t("contacts.detail.cancel")}
                 </button>
                 <button
                   type="button"
@@ -1213,7 +1209,7 @@ export default function ContactDetailPage({
                   disabled={!addListId || addListLoading}
                   onClick={addToList}
                 >
-                  {addListLoading ? <span className="loading loading-spinner loading-xs" /> : "Add"}
+                  {addListLoading ? <span className="loading loading-spinner loading-xs" /> : t("contacts.detail.add")}
                 </button>
               </div>
             </div>
@@ -1226,7 +1222,7 @@ export default function ContactDetailPage({
         <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 mb-4 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Todos</p>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{t("contacts.detail.todos")}</p>
               {todos.filter((t) => t.status === "open").length > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 border border-brand-500/20 text-[10px] font-bold">
                   {todos.filter((t) => t.status === "open").length}
@@ -1237,7 +1233,7 @@ export default function ContactDetailPage({
               onClick={() => setShowTodoModal(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 shadow-xs transition-colors"
             >
-              <RiAddLine size={13} /> Add
+              <RiAddLine size={13} /> {t("contacts.detail.add")}
             </button>
           </div>
 
@@ -1246,7 +1242,7 @@ export default function ContactDetailPage({
               onClick={() => setShowTodoModal(true)}
               className="w-full py-6 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-400 hover:text-gray-600 hover:border-brand-500 transition-colors"
             >
-              Add the first todo
+              {t("contacts.detail.addFirstTodo")}
             </button>
           ) : (
             <div className="flex flex-col divide-y divide-gray-200 dark:divide-gray-800">
@@ -1275,7 +1271,7 @@ export default function ContactDetailPage({
                           overdue ? "bg-error/10 text-error border border-error/20" : "text-gray-400 bg-gray-100 dark:bg-gray-800"
                         }`}>
                           <RiCalendarLine size={9} />
-                          {new Date(todo.due_date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          {new Date(todo.due_date).toLocaleDateString(locale === "es" ? "es-ES" : locale === "pt-BR" ? "pt-BR" : "en-GB", { day: "numeric", month: "short" })}
                         </span>
                       )}
                     </div>
@@ -1296,7 +1292,7 @@ export default function ContactDetailPage({
         {/* Campaign history */}
         {campaignHistory.length > 0 && (
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl p-5 shadow-xs">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Campaign history</p>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("contacts.detail.campaignHistory")}</p>
             <div className="flex flex-col gap-3">
               {campaignHistory.map((run) => {
                 const stateStyle: Record<string, string> = {
@@ -1322,12 +1318,12 @@ export default function ContactDetailPage({
                         {run.workflow_name}
                       </Link>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${stateStyle[run.state] ?? "bg-gray-100 text-gray-500"}`}>
-                        {run.state.replace("_", " ")}
+                        {t(`contacts.detail.campaignStates.${run.state}`, { defaultValue: run.state.replace("_", " ") })}
                       </span>
                     </div>
                     <div className="px-3.5 py-1.5">
                       <span className="text-[10px] text-gray-400 font-medium">
-                        {new Date(run.enrolled_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatDate(run.enrolled_at, locale)}
                       </span>
                     </div>
                     {run.error_message && (
