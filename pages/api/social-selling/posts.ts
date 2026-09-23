@@ -12,6 +12,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getDb();
 
+  const currentUser = session.user as any;
+
   // GET: Listar publicaciones para el calendario
   if (req.method === "GET") {
     try {
@@ -20,7 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let query = "SELECT * FROM social_selling_posts WHERE 1=1";
       const params: any[] = [];
 
-      if (account_id && typeof account_id === "string") {
+      // Si es un miembro de equipo asignado a una cuenta, solo ve su cuenta
+      if (currentUser?.owner_id && currentUser?.assigned_account_id) {
+        query += " AND account_id = ?";
+        params.push(currentUser.assigned_account_id);
+      } else if (account_id && typeof account_id === "string") {
         query += " AND account_id = ?";
         params.push(account_id);
       }
@@ -57,7 +63,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status = "scheduled",
       } = req.body;
 
-      if (!account_id) {
+      const targetAccountId = (currentUser?.owner_id && currentUser?.assigned_account_id)
+        ? currentUser.assigned_account_id
+        : account_id;
+
+      if (!targetAccountId) {
         return res.status(400).json({ error: "account_id es obligatorio" });
       }
 

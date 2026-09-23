@@ -1,6 +1,8 @@
 import Head from "next/head";
 import { useState, useEffect, useMemo } from "react";
 import type { GetServerSideProps } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
 import {
@@ -72,16 +74,54 @@ interface SocialSellingProps {
   initialPosts: SocialPost[];
 }
 
-export const getServerSideProps: GetServerSideProps<SocialSellingProps> = async () => {
+export const getServerSideProps: GetServerSideProps<SocialSellingProps> = async (ctx) => {
+  const session = await getServerSession(ctx.req, ctx.res, authOptions);
+  if (!session) {
+    return {
+      redirect: { destination: "/login", permanent: false },
+    };
+  }
+
+  const currentUser = session.user as any;
   const db = getDb();
 
-  const accounts = db
-    .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts ORDER BY name ASC")
-    .all() as AccountItem[];
+  let accounts: AccountItem[] = [];
 
-  const initialPosts = db
-    .prepare("SELECT * FROM social_selling_posts ORDER BY scheduled_at ASC")
-    .all() as SocialPost[];
+  // 1. Si es un vendedor/miembro del equipo asignado a una cuenta específica:
+  if (currentUser?.owner_id && currentUser?.assigned_account_id) {
+    accounts = db
+      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE id = ?")
+      .all(currentUser.assigned_account_id) as AccountItem[];
+  } else if (currentUser?.owner_id) {
+    accounts = db
+      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE assigned_user_id = ?")
+      .all(currentUser.id) as AccountItem[];
+  } else {
+    // 2. Si es el Administrador/Owner del workspace (o SuperAdmin): ve todas las cuentas de su equipo
+    const isSuperAdmin =
+      currentUser?.role === "admin" ||
+      currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+
+    if (isSuperAdmin) {
+      accounts = db
+        .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts ORDER BY name ASC")
+        .all() as AccountItem[];
+    } else {
+      accounts = db
+        .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? OR owner_id IS NULL ORDER BY name ASC")
+        .all(currentUser.id) as AccountItem[];
+    }
+  }
+
+  const accountIds = accounts.map((a) => a.id);
+  const initialPosts =
+    accountIds.length > 0
+      ? (db
+          .prepare(
+            `SELECT * FROM social_selling_posts WHERE account_id IN (${accountIds.map(() => "?").join(",")}) ORDER BY scheduled_at ASC`
+          )
+          .all(...accountIds) as SocialPost[])
+      : [];
 
   return {
     props: {
