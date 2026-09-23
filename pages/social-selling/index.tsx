@@ -1733,17 +1733,40 @@ function resolveImageUrl(url?: string | null): string {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Fecha y Hora Programada:</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                    <RiTimeLine className="w-3.5 h-3.5 text-purple-600" />
+                    Hora Programada:
+                  </label>
+                  <span className="text-[11px] text-gray-400 capitalize">
+                    {new Date(editingPost.scheduled_at).toLocaleDateString("es-ES", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </span>
+                </div>
                 <input
-                  type="datetime-local"
-                  value={new Date(editingPost.scheduled_at).toISOString().slice(0, 16)}
-                  onChange={(e) =>
-                    setEditingPost({
-                      ...editingPost,
-                      scheduled_at: new Date(e.target.value).toISOString(),
-                    })
-                  }
-                  className="w-full mt-1 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm dark:text-white"
+                  type="time"
+                  value={(() => {
+                    const d = new Date(editingPost.scheduled_at);
+                    if (isNaN(d.getTime())) return "10:00";
+                    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                  })()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const [h, m] = val.split(":").map(Number);
+                    const d = new Date(editingPost.scheduled_at);
+                    if (!isNaN(h) && !isNaN(m)) {
+                      d.setHours(h, m, 0, 0);
+                      setEditingPost({
+                        ...editingPost,
+                        scheduled_at: d.toISOString(),
+                      });
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-semibold dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
