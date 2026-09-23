@@ -521,7 +521,7 @@
     "steps": {
       "visit": "Visit Profile",
       "likeComment": "Like + Comment",
-      "connect": "Connect & Follow",
+      "connect": "Connect + Follow",
       "message": "LinkedIn Message",
       "salesInmail": "Sales Nav InMail",
       "email": "Cold Email",
@@ -543,7 +543,7 @@
       "aiWritesInMail": "AI writes subject + body",
       "noSubjectRequired": "No subject — required",
       "noSubject": "No subject",
-      "connectOnce": "Connection & follow step can only be added once",
+      "connectOnce": "Connect + Follow step can only be added once",
       "likeCommentOnce": "Like + Comment step can only be added once",
       "follow": "Follow Profile",
       "followOnce": "Follow step can only be added once"
@@ -624,7 +624,7 @@
       "connectAutoFollowTip": "When sending the connection invite, LinkedIn automatically starts following this profile to maximize mutual feed visibility.",
       "likeCommentTitle": "2-in-1 AI Post Engagement",
       "likeCommentFormula": "The bot finds the prospect's latest post (within last 90 days), likes it, and drafts a strategic comment following: Connection with post + Industry insight + Subtle value hook.",
-      "likeCommentFallbackNotice": "If the prospect has not posted in the last 90 days, it automatically advances to Connect & Follow.",
+      "likeCommentFallbackNotice": "If the prospect has not posted in the last 90 days, it automatically advances to Connect + Follow.",
       "customCommentPromptLabel": "Additional AI instruction or angle (optional)",
       "customCommentPromptPlaceholder": "e.g. Professional and thoughtful tone. Highlight sales efficiency and technology.",
       "customCommentPromptTip": "AI will use your Campaign Context and the actual post text to generate unique, human comments.",

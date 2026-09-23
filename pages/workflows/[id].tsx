@@ -179,7 +179,7 @@ const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
   follow: "Follow Profile",
   like_comment: "Like + Comment",
-  connect: "Connect & Follow",
+  connect: "Connect + Follow",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
   email: "Cold Email",
@@ -2149,7 +2149,7 @@ function Wizard({
                       </p>
                       <div className="pt-1 border-t border-base-300/40 text-[11px] text-base-content/50 flex items-center gap-1.5">
                         <span>🛡️</span>
-                        <span>{t("campaignWizard.config.likeCommentFallbackNotice") || "Si el prospecto no ha publicado en los últimos 90 días, avanza automáticamente a Conectar y Seguir."}</span>
+                        <span>{t("campaignWizard.config.likeCommentFallbackNotice") || "Si el prospecto no ha publicado en los últimos 90 días, avanza automáticamente a Conectar + Seguir."}</span>
                       </div>
                     </div>
 

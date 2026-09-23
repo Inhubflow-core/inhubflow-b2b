@@ -521,7 +521,7 @@
     "steps": {
       "visit": "Visitar Perfil",
       "likeComment": "Like + Comentario",
-      "connect": "Conectar y Seguir",
+      "connect": "Conectar + Seguir",
       "message": "Mensaje de LinkedIn",
       "salesInmail": "InMail de Sales Nav",
       "email": "Cold Email",
@@ -543,7 +543,7 @@
       "aiWritesInMail": "La IA redacta asunto + cuerpo",
       "noSubjectRequired": "Sin asunto — requerido",
       "noSubject": "Sin asunto",
-      "connectOnce": "El paso de conexión y seguimiento solo se puede agregar una vez",
+      "connectOnce": "El paso de Conectar + Seguir solo se puede agregar una vez",
       "likeCommentOnce": "El paso de Like + Comentario solo se puede agregar una vez",
       "follow": "Seguir Perfil",
       "followOnce": "El paso de seguir perfil solo se puede agregar una vez"
@@ -624,7 +624,7 @@
       "connectAutoFollowTip": "Al solicitar la conexión, LinkedIn activa automáticamente el seguimiento del perfil para maximizar la visibilidad mutua en el feed.",
       "likeCommentTitle": "Interacción 2-en-1 con Inteligencia Artificial",
       "likeCommentFormula": "El bot busca el último post del prospecto (últimos 90 días), le da Like y redacta un comentario estratégico con la fórmula: Conexión con el post + Insight de industria + Anclaje sutil a la propuesta de valor.",
-      "likeCommentFallbackNotice": "Si el prospecto no ha publicado en los últimos 90 días, avanza automáticamente a Conectar y Seguir.",
+      "likeCommentFallbackNotice": "Si el prospecto no ha publicado en los últimos 90 días, avanza automáticamente a Conectar + Seguir.",
       "customCommentPromptLabel": "Instrucción adicional o enfoque para la IA (opcional)",
       "customCommentPromptPlaceholder": "ej. Tono profesional y reflexivo. Menciona la importancia de la eficiencia en ventas y la tecnología.",
       "customCommentPromptTip": "La IA usará el Contexto de tu Campaña y el contenido real del post para generar comentarios únicos y humanos.",

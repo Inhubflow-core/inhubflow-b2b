@@ -541,7 +541,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       const postId = (latestPost.social_id || latestPost.id || "").toString();
 
       if (!postId) {
-        log(db, runProfile.run_id, target.id, "info", `Publicación sin ID identificable para ${name}; continuando con Conectar y Seguir`);
+        log(db, runProfile.run_id, target.id, "info", `Publicación sin ID identificable para ${name}; continuando con Conectar + Seguir`);
         trAdvance(db, tr, steps);
         return;
       }
@@ -553,7 +553,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         if (!isNaN(postTime)) {
           const ageDays = (Date.now() - postTime) / (1000 * 60 * 60 * 24);
           if (ageDays > 90) {
-            log(db, runProfile.run_id, target.id, "info", `${name} no tiene publicaciones en los últimos 90 días (${Math.round(ageDays)}d); continuando con Conectar y Seguir`);
+            log(db, runProfile.run_id, target.id, "info", `${name} no tiene publicaciones en los últimos 90 días (${Math.round(ageDays)}d); continuando con Conectar + Seguir`);
             trAdvance(db, tr, steps);
             return;
           }
