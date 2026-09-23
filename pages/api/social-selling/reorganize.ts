@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
+import { isAccountAuthorized } from "@/lib/social-selling/auth";
 import { getNextBatchPublishingSlots } from "@/lib/social-selling/slots";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -20,6 +21,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+
+  // Validar autorización de la cuenta emisora
+  if (!isAccountAuthorized(db, session.user, account_id)) {
+    return res.status(403).json({ error: "No tienes autorización para reorganizar el calendario de esta cuenta" });
+  }
 
   try {
     // 1. Obtener publicaciones ya publicadas para no colisionar con ellas
@@ -58,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error("[api/social-selling/reorganize] Error:", error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Error al reorganizar el calendario",
+      error: error instanceof Error ? error.message : "Error al reorganizar publicaciones",
     });
   }
 }

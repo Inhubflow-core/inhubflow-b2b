@@ -37,7 +37,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const db = getDb();
   let companyContext = "";
   try {
-    const agent = db.prepare("SELECT company_name, value_proposition FROM sdr_agents LIMIT 1").get() as any;
+    const ownerId = (session.user as any)?.id;
+    let agent: any = null;
+    if (ownerId) {
+      agent = db.prepare("SELECT company_name, value_proposition FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(ownerId);
+    }
+    if (!agent) {
+      agent = db.prepare("SELECT company_name, value_proposition FROM sdr_agents LIMIT 1").get();
+    }
     if (agent?.company_name) {
       companyContext = `Company: ${agent.company_name}. Value proposition: ${agent.value_proposition || ""}`;
     }

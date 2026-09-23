@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import fs from "node:fs";
 import path from "node:path";
 import { unipile } from "@/lib/unipile/client";
+import { getAuthorizedAccountIds, getAuthorizedPost } from "@/lib/social-selling/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -18,21 +19,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getDb();
   if (!unipile.isConfigured()) {
-    return res.status(500).json({ error: "Unipile no está configurado" });
+    return res.status(500).json({ error: "Unipile no está configurado en el servidor" });
+  }
+
+  const currentUser = session.user as any;
+  const allowedAccountIds = getAuthorizedAccountIds(db, currentUser);
+
+  if (allowedAccountIds.length === 0) {
+    return res.status(403).json({ error: "No tienes cuentas de LinkedIn autorizadas" });
   }
 
   const { post_id } = req.body;
 
   try {
-    // Si se pasa post_id, publica ese post específico de inmediato
-    const postsToPublish = post_id
-      ? db.prepare("SELECT * FROM social_selling_posts WHERE id = ?").all(post_id) as any[]
-      : db.prepare(`
+    let postsToPublish: any[] = [];
+
+    if (post_id) {
+      // 1. Publicación manual por ID: comprobar autorización estricta de pertenencia
+      const post = getAuthorizedPost(db, currentUser, post_id);
+      if (!post) {
+        return res.status(404).json({ error: "Publicación no encontrada o no autorizada" });
+      }
+
+      if (post.status === "published") {
+        return res.status(400).json({ error: "Esta publicación ya ha sido enviada a LinkedIn anteriormente" });
+      }
+
+      if (post.status === "publishing") {
+        return res.status(400).json({ error: "La publicación ya se encuentra en proceso de envío" });
+      }
+
+      postsToPublish = [post];
+    } else {
+      // 2. Procesamiento automático de posts vencidos: limitar estrictamente a las cuentas del usuario
+      const placeholders = allowedAccountIds.map(() => "?").join(",");
+      postsToPublish = db
+        .prepare(`
           SELECT * FROM social_selling_posts
-          WHERE status = 'scheduled' AND scheduled_at <= datetime('now')
+          WHERE status = 'scheduled'
+            AND scheduled_at <= datetime('now')
+            AND account_id IN (${placeholders})
           ORDER BY scheduled_at ASC
           LIMIT 5
-        `).all() as any[];
+        `)
+        .all(...allowedAccountIds) as any[];
+    }
 
     if (postsToPublish.length === 0) {
       return res.status(200).json({ message: "No hay posts pendientes para publicar", published: [] });
@@ -41,50 +72,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const results: any[] = [];
 
     for (const post of postsToPublish) {
-      // Marcar como en proceso
-      db.prepare("UPDATE social_selling_posts SET status = 'publishing' WHERE id = ?").run(post.id);
+      // Reclamación atómica y condicional: previene doble ejecución por solicitudes concurrentes
+      const claimResult = db
+        .prepare("UPDATE social_selling_posts SET status = 'publishing' WHERE id = ? AND status IN ('scheduled', 'failed')")
+        .run(post.id);
 
-      // Obtener cuenta de LinkedIn en Unipile
-      const account = db.prepare("SELECT unipile_account_id FROM accounts WHERE id = ?").get(post.account_id) as { unipile_account_id?: string } | undefined;
+      if (claimResult.changes === 0) {
+        results.push({
+          id: post.id,
+          status: "skipped",
+          error: "La publicación ya está en proceso o ya fue publicada",
+        });
+        continue;
+      }
+
+      // Obtener y validar cuenta de LinkedIn en Unipile
+      const account = db
+        .prepare("SELECT unipile_account_id FROM accounts WHERE id = ?")
+        .get(post.account_id) as { unipile_account_id?: string } | undefined;
       const unipileAccountId = account?.unipile_account_id;
 
       if (!unipileAccountId) {
+        const errorMsg = "La cuenta emisora no tiene una sesión activa de LinkedIn en Unipile";
         db.prepare("UPDATE social_selling_posts SET status = 'failed', error_message = ? WHERE id = ?")
-          .run("Cuenta no conectada a Unipile", post.id);
-        results.push({ id: post.id, status: "failed", error: "Cuenta no conectada a Unipile" });
+          .run(errorMsg, post.id);
+        results.push({ id: post.id, status: "failed", error: errorMsg });
         continue;
       }
 
       try {
         // Preparar adjuntos si el post tiene imagen
         let attachments: Array<{ file: Buffer; filename: string; mime_type: string }> | undefined;
+
         if (post.media_url) {
-          try {
-            // Extraer nombre de archivo limpio de URLs como /api/uploads/social-image?file=xyz o /uploads/social-posts/xyz
-            let filename = "";
-            if (post.media_url.includes("file=")) {
-              filename = post.media_url.split("file=")[1]?.split("&")[0] || "";
-            } else {
-              filename = path.basename(post.media_url.split("?")[0]);
-            }
-
-            if (filename) {
-              const primaryPath = path.join(process.cwd(), "public", "uploads", "social-posts", filename);
-              const dataPath = path.join("/data", "uploads", "social-posts", filename);
-              const targetPath = fs.existsSync(primaryPath) ? primaryPath : fs.existsSync(dataPath) ? dataPath : "";
-
-              if (targetPath) {
-                const buffer = fs.readFileSync(targetPath);
-                const ext = path.extname(filename).toLowerCase();
-                const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-                attachments = [{ file: buffer, filename, mime_type: mime }];
-              }
-            }
-          } catch (fileErr) {
-            console.warn(`[publish] No se pudo cargar adjunto de imagen para post ${post.id}:`, fileErr);
+          let filename = "";
+          if (post.media_url.includes("file=")) {
+            filename = post.media_url.split("file=")[1]?.split("&")[0] || "";
+          } else {
+            filename = path.basename(post.media_url.split("?")[0]);
           }
+
+          if (!filename) {
+            throw new Error("La URL de la imagen adjunta no es válida o está malformada");
+          }
+
+          const primaryPath = path.join(process.cwd(), "public", "uploads", "social-posts", filename);
+          const dataPath = path.join("/data", "uploads", "social-posts", filename);
+          const targetPath = fs.existsSync(primaryPath) ? primaryPath : fs.existsSync(dataPath) ? dataPath : "";
+
+          if (!targetPath) {
+            // Protección estricta: NO publicar parcialmente sin imagen si la publicación la requiere
+            throw new Error(`El archivo de imagen adjunto (${filename}) no se encuentra en el servidor. Publicación abortada para no enviar un post incompleto.`);
+          }
+
+          const buffer = fs.readFileSync(targetPath);
+          const ext = path.extname(filename).toLowerCase();
+          const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+          attachments = [{ file: buffer, filename, mime_type: mime }];
         }
 
+        // Publicar en LinkedIn a través de Unipile
         const publishRes = await unipile.createPost({
           account_id: unipileAccountId,
           text: post.content,
@@ -106,6 +153,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (pubErr) {
         const errorMsg = pubErr instanceof Error ? pubErr.message : String(pubErr);
         console.error(`[api/social-selling/publish] Error publicando post ${post.id}:`, pubErr);
+
         db.prepare(`
           UPDATE social_selling_posts
           SET status = 'failed',
@@ -114,6 +162,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `).run(errorMsg, post.id);
 
         results.push({ id: post.id, status: "failed", error: errorMsg });
+
+        if (post_id) {
+          // Si fue una petición individual manual, devolver error HTTP para feedback instantáneo
+          return res.status(400).json({ error: errorMsg, post_id: post.id });
+        }
       }
     }
 

@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import {
+  getAuthorizedAccountIds,
+  isAccountAuthorized,
+  getAuthorizedPost,
+} from "@/lib/social-selling/auth";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -11,10 +16,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
-
   const currentUser = session.user as any;
+  const allowedAccountIds = getAuthorizedAccountIds(db, currentUser);
 
-  // GET: Listar publicaciones para el calendario
+  if (allowedAccountIds.length === 0) {
+    return res.status(200).json({ posts: [] });
+  }
+
+  // GET: Listar publicaciones para el calendario (con aislamiento multi-tenant estricto)
   if (req.method === "GET") {
     try {
       const { account_id, status } = req.query;
@@ -22,13 +31,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let query = "SELECT * FROM social_selling_posts WHERE 1=1";
       const params: any[] = [];
 
-      // Si es un miembro de equipo asignado a una cuenta, solo ve su cuenta
-      if (currentUser?.owner_id && currentUser?.assigned_account_id) {
-        query += " AND account_id = ?";
-        params.push(currentUser.assigned_account_id);
-      } else if (account_id && typeof account_id === "string") {
+      if (account_id && typeof account_id === "string") {
+        if (!isAccountAuthorized(db, currentUser, account_id)) {
+          return res.status(403).json({ error: "No tienes autorización para acceder a esta cuenta" });
+        }
         query += " AND account_id = ?";
         params.push(account_id);
+      } else {
+        // Filtrar exclusivamente por las cuentas autorizadas del usuario
+        const placeholders = allowedAccountIds.map(() => "?").join(",");
+        query += ` AND account_id IN (${placeholders})`;
+        params.push(...allowedAccountIds);
       }
 
       if (status && typeof status === "string") {
@@ -72,6 +85,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "account_id es obligatorio" });
       }
 
+      // Validar autorización de la cuenta emisora
+      if (!isAccountAuthorized(db, currentUser, targetAccountId)) {
+        return res.status(403).json({ error: "No tienes autorización para programar en esta cuenta" });
+      }
+
       if (!content || !content.trim()) {
         return res.status(400).json({ error: "El contenido del post es obligatorio" });
       }
@@ -88,13 +106,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id,
-        (session.user as any)?.id || null,
-        account_id,
+        currentUser?.id || null,
+        targetAccountId,
         topic || null,
         content.trim(),
         image_prompt || null,
         media_url || null,
-        media_type,
+        media_url ? "image" : (media_type || "none"),
         original_post_url || null,
         original_author || null,
         original_content || null,
@@ -111,7 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // PUT: Actualizar un post existente
+  // PUT: Actualizar un post existente (con soporte explícito de borrado de campos opcionales)
   if (req.method === "PUT") {
     try {
       const { id, content, scheduled_at, status, image_prompt, media_url, media_type, account_id } = req.body;
@@ -119,29 +137,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "id es obligatorio" });
       }
 
-      const existing = db.prepare("SELECT * FROM social_selling_posts WHERE id = ?").get(id) as any;
+      // Buscar exclusivamente entre posts autorizados para el usuario
+      const existing = getAuthorizedPost(db, currentUser, id);
       if (!existing) {
-        return res.status(404).json({ error: "Publicación no encontrada" });
+        return res.status(404).json({ error: "Publicación no encontrada o no autorizada" });
       }
+
+      // Si se intenta transferir a otra cuenta, validar que la cuenta de destino esté autorizada
+      if (account_id && account_id !== existing.account_id) {
+        if (!isAccountAuthorized(db, currentUser, account_id)) {
+          return res.status(403).json({ error: "No tienes autorización para mover a la cuenta indicada" });
+        }
+      }
+
+      // Si el post ya fue publicado, impedir reprogramar la fecha histórica
+      if (existing.status === "published" && scheduled_at && scheduled_at !== existing.scheduled_at) {
+        return res.status(400).json({ error: "No se puede reprogramar una publicación que ya fue enviada a LinkedIn" });
+      }
+
+      // Distinguir entre valor no enviado (undefined) y valor intencionalmente borrado (null)
+      const nextContent = content !== undefined ? content : existing.content;
+      const nextScheduledAt = scheduled_at !== undefined ? scheduled_at : existing.scheduled_at;
+      const nextStatus = status !== undefined ? status : existing.status;
+      const nextImagePrompt = image_prompt !== undefined ? image_prompt : existing.image_prompt;
+      const nextMediaUrl = media_url !== undefined ? media_url : existing.media_url;
+      const nextMediaType = media_type !== undefined ? media_type : (nextMediaUrl ? "image" : "none");
+      const nextAccountId = account_id !== undefined ? account_id : existing.account_id;
 
       db.prepare(`
         UPDATE social_selling_posts
-        SET content = COALESCE(?, content),
-            scheduled_at = COALESCE(?, scheduled_at),
-            status = COALESCE(?, status),
-            image_prompt = COALESCE(?, image_prompt),
-            media_url = COALESCE(?, media_url),
-            media_type = COALESCE(?, media_type),
-            account_id = COALESCE(?, account_id)
+        SET content = ?,
+            scheduled_at = ?,
+            status = ?,
+            image_prompt = ?,
+            media_url = ?,
+            media_type = ?,
+            account_id = ?
         WHERE id = ?
       `).run(
-        content ?? null,
-        scheduled_at ?? null,
-        status ?? null,
-        image_prompt ?? null,
-        media_url ?? null,
-        media_type ?? null,
-        account_id ?? null,
+        nextContent,
+        nextScheduledAt,
+        nextStatus,
+        nextImagePrompt,
+        nextMediaUrl,
+        nextMediaType,
+        nextAccountId,
         id
       );
 
@@ -153,12 +193,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // DELETE: Eliminar un post programado
+  // DELETE: Eliminar un post programado (con autorización de pertenencia)
   if (req.method === "DELETE") {
     try {
-      const id = req.query.id as string || req.body.id;
+      const id = (req.query.id as string) || req.body?.id;
       if (!id) {
         return res.status(400).json({ error: "id es obligatorio" });
+      }
+
+      const existing = getAuthorizedPost(db, currentUser, id);
+      if (!existing) {
+        return res.status(404).json({ error: "Publicación no encontrada o no autorizada" });
       }
 
       db.prepare("DELETE FROM social_selling_posts WHERE id = ?").run(id);

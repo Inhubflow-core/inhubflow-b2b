@@ -334,6 +334,19 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
             >
               Publicadas ({counts.published})
             </button>
+            {counts.failed > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter("failed")}
+                className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                  statusFilter === "failed"
+                    ? "bg-red-600 text-white shadow-2xs"
+                    : "text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                }`}
+              >
+                Fallidas ({counts.failed})
+              </button>
+            )}
           </div>
 
           {/* Reorganizar automáticamente */}
@@ -424,14 +437,19 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                       : "10:00";
 
                     const isBeingDragged = draggedPostId === post.id;
+                    const isDraggable = post.status === "scheduled" || post.status === "draft";
 
                     return (
                       <div
                         key={post.id}
-                        draggable={post.status !== "publishing"}
-                        onDragStart={(e) => handleDragStart(e, post.id)}
+                        draggable={isDraggable}
+                        onDragStart={(e) => isDraggable && handleDragStart(e, post.id)}
                         onDragEnd={handleDragEnd}
-                        className={`group relative rounded-xl border p-2 text-left bg-white dark:bg-gray-850 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 ${
+                        className={`group relative rounded-xl border p-2 text-left bg-white dark:bg-gray-850 shadow-2xs hover:shadow-md transition-all border-gray-200 dark:border-gray-700 ${
+                          isDraggable
+                            ? "cursor-grab active:cursor-grabbing hover:border-purple-400 dark:hover:border-purple-500"
+                            : "cursor-default"
+                        } ${
                           isBeingDragged ? "opacity-40 scale-95 border-dashed border-purple-500" : ""
                         }`}
                       >
@@ -463,10 +481,12 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                                 : "Error"}
                             </span>
 
-                            <RiDragMove2Line
-                              className="w-3 h-3 text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity"
-                              title="Arrastrar para mover de día"
-                            />
+                            {isDraggable && (
+                              <RiDragMove2Line
+                                className="w-3 h-3 text-gray-400 opacity-40 group-hover:opacity-100 transition-opacity"
+                                title="Arrastrar para mover de día"
+                              />
+                            )}
                           </div>
                         </div>
 
@@ -491,6 +511,16 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                           {post.content}
                         </p>
 
+                        {/* Mensaje de error si la publicación falló */}
+                        {post.status === "failed" && post.error_message && (
+                          <div
+                            className="text-[10px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-900/40 truncate mb-1"
+                            title={post.error_message}
+                          >
+                            ⚠️ {post.error_message}
+                          </div>
+                        )}
+
                         {/* 4 Botones de Acción Distribuidos (Ver, Publicar, Editar, Eliminar) */}
                         <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
                           {/* 1. Ver (Vista previa) */}
@@ -506,8 +536,8 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                             <RiEyeLine className="w-4 h-4" />
                           </button>
 
-                          {/* 2. Publicar ahora (Verde) */}
-                          {post.status === "scheduled" ? (
+                          {/* 2. Publicar ahora / Reintentar (Verde) */}
+                          {post.status === "scheduled" || post.status === "failed" ? (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -515,7 +545,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                                 setConfirmPublishPost(post);
                               }}
                               disabled={publishLoadingId === post.id}
-                              title="Publicar en LinkedIn ahora mismo"
+                              title={post.status === "failed" ? "Reintentar publicación en LinkedIn" : "Publicar en LinkedIn ahora mismo"}
                               className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white border-none shadow-xs transition-all"
                             >
                               {publishLoadingId === post.id ? (

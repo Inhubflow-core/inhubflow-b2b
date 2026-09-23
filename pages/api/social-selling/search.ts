@@ -4,6 +4,7 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 import { unipile } from "@/lib/unipile/client";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
+import { isAccountAuthorized } from "@/lib/social-selling/auth";
 import type { UnipileSearchPost } from "@/lib/unipile/types";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -37,6 +38,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!targetAccountId) {
       return res.status(400).json({ error: "No hay cuenta de LinkedIn conectada a Unipile para realizar la búsqueda" });
+    }
+
+    // Validar autorización de la cuenta para el usuario en sesión
+    if (!isAccountAuthorized(db, session.user, targetAccountId)) {
+      return res.status(403).json({ error: "No tienes autorización para usar esta cuenta de LinkedIn" });
     }
 
     const resolved = await resolveUnipileAccount(db, targetAccountId);
@@ -108,9 +114,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return text.trim().length >= 25; // Descartar publicaciones vacías o spam de un solo hashtag
       })
       .map((item) => {
-        const likes = Number((item as any).reaction_counter ?? (item as any).likes_count ?? (item as any).reactions_count ?? 0);
-        const comments = Number((item as any).comment_counter ?? (item as any).comments_count ?? 0);
-        const shares = Number((item as any).repost_counter ?? (item as any).shares_count ?? 0);
+        const rawLikes = Number((item as any).reaction_counter ?? (item as any).likes_count ?? (item as any).reactions_count);
+        const rawComments = Number((item as any).comment_counter ?? (item as any).comments_count);
+        const rawShares = Number((item as any).repost_counter ?? (item as any).shares_count);
+
+        const likes = Number.isFinite(rawLikes) && rawLikes >= 0 ? rawLikes : 0;
+        const comments = Number.isFinite(rawComments) && rawComments >= 0 ? rawComments : 0;
+        const shares = Number.isFinite(rawShares) && rawShares >= 0 ? rawShares : 0;
 
         // En LinkedIn los comentarios y reposts representan viralidad real y debate profundo
         const engagementScore = (likes * 1) + (comments * 6) + (shares * 4);
@@ -121,7 +131,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const text = (item as any).text || (item as any).content || "";
         const mediaUrl = (item as any).attachments?.[0]?.url || (item as any).image_url || (item as any).media?.[0]?.url || null;
         const rawPostUrl = (item as any).url || (item as any).share_url || (item as any).post_url || null;
-        const postId = (item as any).id || (item as any).social_id || String(Math.random());
+        const rawId = (item as any).id || (item as any).social_id;
+        const postId = rawId ? String(rawId) : `post_${Buffer.from(text.slice(0, 30)).toString("hex")}`;
         let postUrl = rawPostUrl && typeof rawPostUrl === "string" && rawPostUrl.startsWith("http")
           ? rawPostUrl
           : null;

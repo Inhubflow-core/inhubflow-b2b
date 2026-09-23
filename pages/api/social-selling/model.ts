@@ -32,6 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     topic,
     custom_instruction,
     language = "es",
+    account_id,
   } = req.body;
 
   if (!original_text || typeof original_text !== "string" || !original_text.trim()) {
@@ -45,17 +46,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getDb();
 
-  // 1. Obtener contexto de la empresa desde el SDR
+  // 1. Obtener contexto de la empresa desde el SDR (aislado por workspace/owner)
   let companyContext = "";
   try {
-    const agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents LIMIT 1").get() as any;
+    const ownerId = (session.user as any)?.id;
+    let agent: any = null;
+    if (account_id) {
+      const acc = db.prepare("SELECT owner_id FROM accounts WHERE id = ?").get(account_id) as any;
+      if (acc?.owner_id) {
+        agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(acc.owner_id);
+      }
+    }
+    if (!agent && ownerId) {
+      agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(ownerId);
+    }
+    if (!agent) {
+      agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents LIMIT 1").get();
+    }
+
     if (agent) {
       companyContext += `Empresa: ${agent.company_name || ""}\n`;
       if (agent.value_proposition) companyContext += `Propuesta de valor: ${agent.value_proposition}\n`;
       if (agent.icp_summary) companyContext += `Cliente ideal: ${agent.icp_summary}\n`;
     }
 
-    const sources = db.prepare("SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' LIMIT 3").all() as Array<{ title: string; content?: string }>;
+    const sources = (ownerId
+      ? db.prepare("SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' AND (owner_id = ? OR owner_id IS NULL) LIMIT 3").all(ownerId)
+      : db.prepare("SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' LIMIT 3").all()) as Array<{ title: string; content?: string }>;
+
     if (sources && sources.length > 0) {
       companyContext += "\nConocimiento clave de la empresa:\n" + sources.map(s => `- ${s.title}: ${s.content?.slice(0, 300) || ""}`).join("\n");
     }
