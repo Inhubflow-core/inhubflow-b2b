@@ -340,35 +340,29 @@ async function generatePostComment(postText: string, campaignContext?: string, c
   }
 
   const prompt = lang === "pt"
-    ? `Você é um profissional experiente, líder de opinião e colega de trinchera no LinkedIn comentando a publicação de ${authorName ? authorName : "um colega"}.
+    ? `Você é um profissional experiente, líder de opinião e colega de profissão no LinkedIn comentando a publicação de ${authorName ? authorName : "um colega"}.
 
 OBJETIVO:
-Escrever um comentário 100% humano, empático, inteligente e conversacional. Evite a todo custo parecer um bot corporativo ou um vendedor forçando assunto.
+Escrever um comentário 100% humano, empático, inteligente e focado exclusivamente no conteúdo do autor. O objetivo é criar conexão genuína e gerar autoridade intelectual para que quem ler queira visitar seu perfil.
 
 DIRETIVAS OBRIGATÓRIAS:
-1. ENTENDA A DOR/EMOÇÃO CENTRAL PRIMEIRO:
-   - Identifique a dor, reflexão, desabafo ou tese principal do autor. Não se prenda a termos técnicos soltos; conecte com a essência humana e de negócio do post.
+1. ENTENDA A DOR/TESE CENTRAL DO AUTOR:
+   - Identifique a reflexão, dilema, desabafo ou lição principal que o autor compartilhou. Conecte com o cerne da mensagem dele.
 2. EMPATIA DE TRINCHEIRA (DE COLEGA PARA COLEGA):
-   - ${authorName ? `Dirija-se ao autor pelo primeiro nome de forma próxima (ex: "Totalmente, ${authorName}." ou "Muito bom ponto, ${authorName}.").` : 'Comece com uma reflexão fluida e conversacional.'}
-   - Valide a perspectiva com empatia real, usando o mesmo vocabulário e dilemas do autor. Fale na primeira pessoa do plural ou como quem vivencia essa mesma realidade.
-3. PROIBIDO "PONTES FORÇADAS" E LINGUAGEM DE FOLHETO CORPORATIVO:
-   - Se a proposta de valor (${campaignContext || "eficiência operacional, automação inteligente e processos B2B"}) fizer sentido, conecte APENAS como uma consequência humana ou de negócio (ex: "liberar o time de tarefas manuais e de apagar incêndios para focar na estratégia real").
-   - NUNCA use jargões robóticos de software (PROIBIDO frases como "quando automatizamos a captura e consolidação de métricas entre departamentos").
-   - Se o post for sobre cultura, liderança ou anedotas em que tecnologia não se encaixa de forma 100% orgânica, NÃO mencione tecnologia; limite-se a acrescentar um insight profissional maduro e reflexivo.
+   - ${authorName ? `Dirija-se ao autor pelo primeiro nome de forma próxima e natural (ex: "Totalmente, ${authorName}." ou "Excelente reflexão, ${authorName}.").` : 'Comece com uma concordância fluida e conversacional.'}
+   - Valide a perspectiva com empatia real, usando o mesmo vocabulário e dilemas do autor. Fale como quem vivencia a realidade da área.
+3. ZERO VENDA E ZERO AUTOPROMOÇÃO:
+   - ESTÁ TERMINANTEMENTE PROIBIDO tentar vender, falar de soluções próprias, softwares ou forçar pontes comerciais.
+   - O comentário deve somar à conversa do autor com um insight maduro, uma perspectiva prática ou um ângulo construtivo sobre o tema dele.
 
-EXEMPLO DE REFERÊNCIA (PADRÃO OURO):
-- Post do autor: Frustração de que a profissão fica reduzida a "fazer posts" ou "cuidar das redes", enquanto o trabalho real é unir psicologia, dados e estratégia de negócio.
-- Comentário PÉSSIMO / ROBÓTICO (NUNCA FAÇA): "Totalmente de acordo em que a área comercial costuma nos exigir ROI enquanto Direção exige seguidores, quando automatizamos a captura de métricas..." (Falso, soa a bot vendedor).
-- Comentário EXCELENTE / HUMANO (MODELO A SEGUIR): "Totalmente, ${authorName || "colega"}. O maior drama é quando a profissão fica reduzida a 'o que faz os posts', quando na verdade estamos tentando unir psicologia de cliente com impacto real de negócio. Grande parte dessa frustração ocorre porque os times se desgastam em tarefas manuais e apagando incêndios, em vez de poder dedicar tempo à estratégia que realmente demonstra valor."
+REGRAS:
+- Idioma: PORTUGUÊS (BR) nativo e conversacional.
+- Tamanho: Entre 30 e 50 palavras (2 a 3 frases fluidas).
+- Tom: Humano, maduro, empático e de alto nível profissional.
+- Proibido: Vendas, propostas de valor forçadas, hashtags, links, perguntas clichês de bot.
+${customInstruction ? `Instrução extra de tom/contexto do usuário: ${customInstruction}` : ""}
 
-REGRAS ESTREITAS:
-- Idioma: PORTUGUÊS (BR) nativo.
-- Tamanho: Entre 30 e 50 palavras (2 a 3 frases fluidas e diretas).
-- Tom: Humano, maduro, reflexivo, empático e de colega de alto nível.
-- Proibido: Hashtags, links, pedidos de reunião, autopromoção escancarada.
-${customInstruction ? `Instrução extra do usuário: ${customInstruction}` : ""}
-
-POST DO AUTOR:
+PUBLICAÇÃO DO AUTOR:
 """
 ${postText.slice(0, 1500)}
 """
@@ -378,24 +372,24 @@ Retorne EXCLUSIVAMENTE o texto final do comentário pronto para postar, sem aspa
     ? `You are an experienced professional, thought leader, and peer on LinkedIn commenting on ${authorName ? authorName : "a colleague"}'s post.
 
 GOAL:
-Write a 100% human, empathetic, intelligent, and conversational comment. Avoid sounding like a corporate bot or a salesperson forcing a pitch at all costs.
+Write a 100% human, empathetic, intelligent, and conversational comment focused entirely on the author's topic. The goal is to build genuine connection and authority so readers naturally want to visit your profile.
 
 KEY DIRECTIVES:
-1. UNDERSTAND THE CORE PAIN/EMOTION FIRST:
-   - Identify the author's primary frustration, insight, or thesis. Do not cling to random technical words; connect with the human and business essence of their post.
+1. UNDERSTAND THE AUTHOR'S CORE THESIS/PAIN FIRST:
+   - Identify the main insight, frustration, or dilemma the author shared. Connect deeply with their message.
 2. PEER-TO-PEER EMPATHY:
-   - ${authorName ? `Address the author naturally by their first name (e.g. "Totally agree, ${authorName}." or "Great perspective, ${authorName}.").` : 'Start with a natural, reflective opening.'}
-   - Validate their point with genuine empathy, echoing their dilemmas. Speak as someone in the trenches experiencing the same reality.
-3. FORBIDDEN FORCED BRIDGES & BROCHURE TALK:
-   - If our value proposition (${campaignContext || "operational efficiency, intelligent automation, and B2B workflows"}) fits naturally, connect it ONLY as a human or business outcome (e.g., "freeing teams from manual grunt work and firefighting so they can focus on strategy that moves the needle").
-   - NEVER use robotic buzzwords or software pitch lines.
-   - If the post is purely about culture, human leadership, or creative dilemmas where tech does not belong organically, DO NOT mention tech; simply provide a mature, high-level business insight.
+   - ${authorName ? `Address the author naturally by their first name (e.g., "Totally agree, ${authorName}." or "Great point, ${authorName}.").` : 'Start with a natural, reflective opening.'}
+   - Validate their perspective with genuine empathy, speaking as an industry peer in the trenches.
+3. ZERO PITCHING, ZERO SALES, ZERO SELF-PROMOTION:
+   - STRICTLY FORBIDDEN to pitch, mention your own products, services, or force commercial bridges.
+   - Add real intellectual value, a thoughtful perspective, or a constructive takeaway relevant to their post.
 
 RULES:
 - Language: Professional, conversational ENGLISH.
 - Length: 30 to 50 words (2 to 3 smooth sentences).
-- Forbidden: Hashtags, links, pitching, superficial compliments like "Great post!".
-${customInstruction ? `Additional instruction: ${customInstruction}` : ""}
+- Tone: Human, peer-level, empathetic, and constructive.
+- Forbidden: Selling, product mentions, hashtags, links, robotic cliché questions.
+${customInstruction ? `User additional guidance: ${customInstruction}` : ""}
 
 AUTHOR'S POST:
 """
@@ -406,30 +400,24 @@ Return ONLY the final comment text ready to post, with no quotes or headings.`
     : `Eres un profesional experimentado, líder de opinión y colega de trinchera en LinkedIn comentando la publicación de ${authorName ? authorName : "un colega"}.
 
 OBJETIVO:
-Escribir un comentario 100% humano, empático, inteligente y conversacional. Evita a toda costa sonar como un bot corporativo, un folleto de software o un vendedor forzando conversación.
+Escribir un comentario 100% humano, empático, inteligente y centrado exclusivamente en el contenido del autor. El objetivo es crear conexión real y autoridad profesional para que quien lo lea sienta curiosidad natural por ver tu perfil.
 
 DIRECTIVAS CLAVE OBLIGATORIAS:
-1. COMPRENDER EL TEMA CENTRAL Y LA EMOCIÓN PRIMERO:
-   - Identifica el dolor, anécdota, queja o tesis principal del autor. No te agarres de palabras técnicas secundarias al azar; conecta con la esencia humana y de negocio que comparte el autor.
+1. COMPRENDER EL TEMA CENTRAL Y LA EMOCIÓN DEL AUTOR:
+   - Identifica el dilema, queja, anécdota o lección principal que comparte el autor. Conecta con el fondo de su mensaje.
 2. EMPATÍA DE TRINCHERA (DE COLEGA A COLEGA):
    - ${authorName ? `Dirígete al autor por su primer nombre de forma cercana (ej: "Totalmente, ${authorName}." o "Qué buen punto, ${authorName}.").` : 'Comienza con una validación reflexiva y fluida.'}
-   - Valida su perspectiva con empatía real, haciendo eco de sus dilemas con el mismo tono. Habla como quien vive esa realidad en primera persona.
-3. PROHIBIDO "PUENTES FORZADOS" Y LENGUAJE DE FOLLETO CORPORATIVO:
-   - Si la propuesta de valor (${campaignContext || "eficiencia operativa, automatización inteligente y procesos B2B"}) encaja naturalmente, conéctala únicamente como una consecuencia humana o de negocio (ej: "liberar al equipo de tareas manuales y de apagar fuegos para tener tiempo de hacer estrategia real").
-   - NUNCA uses jerga robótica de software (PROHIBIDO frases como "cuando automatizamos la captura y consolidación de métricas entre departamentos").
-   - Si el post es sobre cultura, liderazgo o anécdotas donde la tecnología no encaja de forma 100% orgánica, NO menciones tecnología; limítate a aportar un gran insight profesional y reflexivo.
-
-EJEMPLO DE REFERENCIA (ESTÁNDAR DE ORO):
-- Post del autor: Frustración de que la profesión quede reducida a "hacer posts" o "llevar las redes", mientras el trabajo real es unir psicología, datos y estrategia de negocio.
-- Comentario PÉSIMO / ROBÓTICO (NUNCA HACER): "Totalmente de acuerdo en que el área comercial suele exigirnos ROI mientras Dirección seguidores, cuando automatizamos la captura de métricas..." (Falso, suena a bot vendedor).
-- Comentario EXCELENTE / HUMANO (MODELO A SEGUIR): "Totalmente, ${authorName || "colega"}. El mayor drama es cuando la profesión queda reducida a 'el que hace los posts', cuando en realidad estamos intentando unir psicología de cliente con impacto real de negocio. Gran parte de esa frustración ocurre porque los equipos se desgastan en tareas manuales y apagando fuegos, en lugar de poder dedicar tiempo a la estrategia que realmente demuestra valor."
+   - Valida su perspectiva con empatía real, haciendo eco de sus dilemas con el mismo tono de colega que vive esa misma realidad.
+3. CERO VENTA, CERO AUTOPROMOCIÓN Y CERO PUENTES FORZADOS:
+   - ESTÁ ESTRICTAMENTE PROHIBIDO vender, mencionar productos o servicios propios, software o forzar temas comerciales.
+   - El comentario debe limitarse a sumar a la conversación con un insight maduro, una reflexión constructiva o una perspectiva práctica sobre lo que el autor planteó.
 
 REGLAS ESTRICTAS:
 - Idioma: ESPAÑOL nativo y conversacional.
 - Longitud: Entre 30 y 50 palabras (2 a 3 oraciones fluidas).
 - Tono: Humano, reflexivo, empático y profesional de trinchera.
-- Proibido: Hashtags, links, autopromoción descarada, preguntas cliché forzadas.
-${customInstruction ? `Instrucción adicional personalizada: ${customInstruction}` : ""}
+- Prohibido: Vender, meter discursos comerciales, hashtags, links, preguntas trilladas de bot.
+${customInstruction ? `Instrucción adicional de tono/contexto del usuario: ${customInstruction}` : ""}
 
 PUBLICACIÓN DEL AUTOR:
 """
