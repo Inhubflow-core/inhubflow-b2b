@@ -661,10 +661,8 @@ function resolveImageUrl(url?: string | null): string {
                 {sampleTopics.map((st) => (
                   <button
                     key={st}
-                    onClick={() => {
-                      setTopic(st);
-                      handleSearchViral(st);
-                    }}
+                    type="button"
+                    onClick={() => setTopic(st)}
                     className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-purple-50 hover:text-purple-600 dark:bg-gray-800 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 text-gray-600 dark:text-gray-300 transition-colors"
                   >
                     {st}
