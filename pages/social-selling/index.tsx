@@ -32,6 +32,7 @@ import {
   RiImageLine,
   RiExternalLinkLine,
 } from "react-icons/ri";
+import { getNextAvailablePublishingSlot } from "@/lib/social-selling/slots";
 
 interface SocialPost {
   id: string;
@@ -154,6 +155,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     content: string;
     image_prompt?: string | null;
     media_url?: string | null;
+    scheduled_at?: string;
   } | null>(null);
 
   // Subida de imagen
@@ -161,10 +163,11 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
 
   // Manual Post State
   const [manualContent, setManualContent] = useState("");
-  const [manualDate, setManualDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 16));
+  const [manualDate, setManualDate] = useState("");
   const [manualImagePrompt, setManualImagePrompt] = useState<string | null>(null);
   const [manualMediaUrl, setManualMediaUrl] = useState<string | null>(null);
   const [isGeneratingManualPrompt, setIsGeneratingManualPrompt] = useState(false);
+  const [isReorganizing, setIsReorganizing] = useState(false);
 
   // Calendar / Scheduled Posts State
   const [posts, setPosts] = useState<SocialPost[]>(initialPosts);
@@ -193,6 +196,35 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
   useEffect(() => {
     refreshPosts();
   }, [selectedAccountId]);
+
+  // Mantener el slot predeterminado para posts manuales en el próximo Lun/Mié/Vie libre
+  useEffect(() => {
+    if (posts) {
+      const slot = getNextAvailablePublishingSlot(posts);
+      setManualDate(slot.toISOString().slice(0, 16));
+    }
+  }, [posts, activeTab]);
+
+  // Reorganizar automáticamente todas las publicaciones pendientes en Lunes, Miércoles y Viernes
+  const handleReorganizeCalendar = async () => {
+    if (!selectedAccountId) return;
+    setIsReorganizing(true);
+    try {
+      const res = await fetch("/api/social-selling/reorganize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_id: selectedAccountId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al reorganizar el calendario");
+      toast.success(data.message || "¡Calendario reorganizado en Lunes, Miércoles y Viernes!");
+      await refreshPosts();
+    } catch (err: any) {
+      toast.error(err.message || "Error al reorganizar");
+    } finally {
+      setIsReorganizing(false);
+    }
+  };
 
   // Copiar Prompt de Imagen al Portapapeles (Asegurando siempre formato 4:3)
   const handleCopyPrompt = async (promptText?: string | null) => {
@@ -346,12 +378,15 @@ function resolveImageUrl(url?: string | null): string {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error modelando el post");
 
+      const nextSlot = getNextAvailablePublishingSlot(posts);
+
       setModeledDraft({
         original: vPost,
         title: data.title,
         content: data.content,
         image_prompt: data.image_prompt || null,
         media_url: null,
+        scheduled_at: nextSlot.toISOString(),
       });
     } catch (err: any) {
       toast.error(err.message || "Error al modelar el post con IA");
@@ -368,7 +403,7 @@ function resolveImageUrl(url?: string | null): string {
     }
 
     try {
-      const scheduledAt = dateStr || new Date(Date.now() + 86400000).toISOString();
+      const scheduledAt = dateStr || getNextAvailablePublishingSlot(posts).toISOString();
       const res = await fetch("/api/social-selling/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -446,7 +481,7 @@ function resolveImageUrl(url?: string | null): string {
     }
 
     try {
-      const scheduledAt = manualDate ? new Date(manualDate).toISOString() : new Date(Date.now() + 86400000).toISOString();
+      const scheduledAt = manualDate ? new Date(manualDate).toISOString() : getNextAvailablePublishingSlot(posts).toISOString();
       const res = await fetch("/api/social-selling/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -916,7 +951,7 @@ function resolveImageUrl(url?: string | null): string {
         {/* CONTENIDO: TAB 2 - CALENDARIO EDITORIAL MENSUAL */}
         {activeTab === "calendar" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                   Calendario de Publicaciones (3 posts por semana)
@@ -925,13 +960,29 @@ function resolveImageUrl(url?: string | null): string {
                   Publicaciones distribuidas automáticamente en Lunes, Miércoles y Viernes en horarios óptimos.
                 </p>
               </div>
-              <button
-                onClick={refreshPosts}
-                className="btn btn-sm btn-ghost gap-1.5 text-xs text-gray-600 dark:text-gray-300"
-              >
-                <RiRefreshLine className="w-3.5 h-3.5" />
-                Actualizar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleReorganizeCalendar}
+                  disabled={isReorganizing || posts.filter((p) => p.status === "scheduled").length === 0}
+                  className="btn btn-sm bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 gap-1.5 text-xs font-semibold rounded-xl"
+                  title="Reorganiza automáticamente todas las publicaciones pendientes en Lunes, Miércoles y Viernes sin colisiones"
+                >
+                  {isReorganizing ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <RiSparklingLine className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  )}
+                  <span>Reorganizar Calendario (Lun, Mié, Vie)</span>
+                </button>
+
+                <button
+                  onClick={refreshPosts}
+                  className="btn btn-sm btn-ghost gap-1.5 text-xs text-gray-600 dark:text-gray-300 rounded-xl"
+                >
+                  <RiRefreshLine className="w-3.5 h-3.5" />
+                  Actualizar
+                </button>
+              </div>
             </div>
 
             {posts.length === 0 ? (
@@ -1372,6 +1423,29 @@ function resolveImageUrl(url?: string | null): string {
                     </div>
                   )}
                 </div>
+                {/* Fecha y Hora de Publicación (Slot asignado Lun, Mié o Vie) */}
+                <div className="bg-purple-50/70 dark:bg-purple-950/30 p-3.5 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                      <RiCalendarEventLine className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      Fecha de Publicación (Slot asignado: Lun, Mié, Vie):
+                    </span>
+                    <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                      Calculado automáticamente sin repetir días para garantizar máxima distribución.
+                    </p>
+                  </div>
+                  <input
+                    type="datetime-local"
+                    value={modeledDraft.scheduled_at ? modeledDraft.scheduled_at.slice(0, 16) : ""}
+                    onChange={(e) =>
+                      setModeledDraft({
+                        ...modeledDraft,
+                        scheduled_at: new Date(e.target.value).toISOString(),
+                      })
+                    }
+                    className="p-2 rounded-xl border border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-800 dark:text-gray-100"
+                  />
+                </div>
               </div>
 
               <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-end gap-3">
@@ -1382,7 +1456,7 @@ function resolveImageUrl(url?: string | null): string {
                   Descartar
                 </button>
                 <button
-                  onClick={() => handleScheduleSingle(modeledDraft.content)}
+                  onClick={() => handleScheduleSingle(modeledDraft.content, modeledDraft.scheduled_at)}
                   className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none rounded-xl px-5"
                 >
                   Aprobar y Programar en Calendario

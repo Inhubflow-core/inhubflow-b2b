@@ -58,8 +58,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+  const [hStr, mStr] = (publishing_time || "10:00").split(":");
+  const hours = parseInt(hStr, 10) || 10;
+  const minutes = parseInt(mStr, 10) || 0;
   const baseStart = start_date ? new Date(start_date) : new Date();
-  const publishingDates = getNextPublishingDates(posts.length, baseStart, publishing_time);
+
+  // Obtener publicaciones existentes de la cuenta para no sobreescribir ni repetir días
+  const existing = db.prepare(
+    "SELECT scheduled_at FROM social_selling_posts WHERE account_id = ? AND status != 'failed'"
+  ).all(account_id) as Array<{ scheduled_at: string }>;
+
+  const { getNextBatchPublishingSlots } = await import("@/lib/social-selling/slots");
+  const publishingDates = getNextBatchPublishingSlots(posts.length, existing, hours, minutes, baseStart);
 
   try {
     const createdPosts: any[] = [];
