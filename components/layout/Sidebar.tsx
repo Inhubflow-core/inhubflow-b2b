@@ -29,25 +29,72 @@ import {
   RiVideoLine,
   RiRadarLine,
   RiMegaphoneLine,
+  RiArrowDownSLine,
+  RiArrowRightSLine,
+  RiContactsBook2Line,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
 
-const mainNav = [
-  { href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
-  { href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#465fff", tour: "nav-lead-finder" },
-  { href: "/signals", labelKey: "nav.signalRadar", icon: RiRadarLine, color: "#465fff", tour: "nav-signals" },
-  { href: "/lists", labelKey: "nav.lists", icon: RiFileList3Line, color: "#12b76a", tour: "nav-lists" },
-  { href: "/contacts", labelKey: "nav.contacts", icon: RiContactsLine, color: "#0ba5ec", tour: "nav-contacts" },
-  { href: "/pipeline", labelKey: "nav.pipeline", icon: RiKanbanView, color: "#ec4899", tour: "nav-pipeline" },
-  { href: "/calendar", labelKey: "nav.calendar", icon: RiCalendarEventLine, color: "#8b5cf6", tour: "nav-calendar" },
-  { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },
-  { href: "/workflows", labelKey: "nav.campaigns", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
-  { href: "/social-selling", labelKey: "nav.socialSelling", icon: RiMegaphoneLine, color: "#8b5cf6", tour: "nav-social-selling" },
-  { href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
-  { href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
-  { href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
+type NavChild = {
+  href: string;
+  labelKey: string;
+  icon: any;
+  color?: string;
+  tour?: string;
+};
+
+type NavItem =
+  | {
+      type: "link";
+      href: string;
+      labelKey: string;
+      icon: any;
+      color?: string;
+      tour?: string;
+    }
+  | {
+      type: "group";
+      id: "leads" | "campaigns";
+      labelKey: string;
+      icon: any;
+      color?: string;
+      children: NavChild[];
+    };
+
+const mainNav: NavItem[] = [
+  { type: "link", href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
+  { type: "link", href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#465fff", tour: "nav-lead-finder" },
+  { type: "link", href: "/signals", labelKey: "nav.signalRadar", icon: RiRadarLine, color: "#465fff", tour: "nav-signals" },
+  {
+    type: "group",
+    id: "leads",
+    labelKey: "nav.leads",
+    icon: RiContactsBook2Line,
+    color: "#12b76a",
+    children: [
+      { href: "/lists", labelKey: "nav.lists", icon: RiFileList3Line, color: "#12b76a", tour: "nav-lists" },
+      { href: "/contacts", labelKey: "nav.contacts", icon: RiContactsLine, color: "#0ba5ec", tour: "nav-contacts" },
+      { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },
+    ],
+  },
+  { type: "link", href: "/pipeline", labelKey: "nav.pipeline", icon: RiKanbanView, color: "#ec4899", tour: "nav-pipeline" },
+  { type: "link", href: "/calendar", labelKey: "nav.calendar", icon: RiCalendarEventLine, color: "#8b5cf6", tour: "nav-calendar" },
+  {
+    type: "group",
+    id: "campaigns",
+    labelKey: "nav.campaigns",
+    icon: RiFlowChart,
+    color: "#f79009",
+    children: [
+      { href: "/workflows", labelKey: "nav.sequences", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
+      { href: "/social-selling", labelKey: "nav.socialSelling", icon: RiMegaphoneLine, color: "#8b5cf6", tour: "nav-social-selling" },
+    ],
+  },
+  { type: "link", href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
+  { type: "link", href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
+  { type: "link", href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
 ];
 
 interface SidebarProps {
@@ -71,6 +118,17 @@ export default function Sidebar({
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [leadsOpen, setLeadsOpen] = useState(false);
+  const [campaignsOpen, setCampaignsOpen] = useState(false);
+
+  useEffect(() => {
+    if (["/lists", "/contacts", "/companies"].some((p) => router.pathname.startsWith(p))) {
+      setLeadsOpen(true);
+    }
+    if (["/workflows", "/social-selling"].some((p) => router.pathname.startsWith(p))) {
+      setCampaignsOpen(true);
+    }
+  }, [router.pathname]);
 
   const helpRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
@@ -195,7 +253,7 @@ export default function Sidebar({
             {!isCollapsed && <span className="truncate font-semibold">SuperAdmin</span>}
             {!isCollapsed && (
               <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                PRO
+                MASTER
               </span>
             )}
           </Link>
@@ -205,7 +263,7 @@ export default function Sidebar({
         {!((session?.user as any)?.owner_id) && (
           <Link
             href="/team"
-            title={isCollapsed ? "Mi Equipo" : undefined}
+            title={isCollapsed ? "Admin" : undefined}
             className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all mb-2 ${
               isActive("/team")
                 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold"
@@ -221,7 +279,7 @@ export default function Sidebar({
             >
               <RiTeamLine size={16} />
             </div>
-            {!isCollapsed && <span className="truncate font-semibold">Mi Equipo</span>}
+            {!isCollapsed && <span className="truncate font-semibold">Admin</span>}
             {!isCollapsed && (
               <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
                 TEAM
@@ -231,34 +289,164 @@ export default function Sidebar({
         )}
 
         {nav.map((item) => {
-          const active = isActive(item.href);
-          const label = t(item.labelKey);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              data-tour={item.tour}
-              title={isCollapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all ${
-                active
-                  ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
-                  : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-              } ${isCollapsed ? "justify-center px-0" : ""}`}
-            >
-              <div
-                className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+          if (item.type === "link") {
+            const active = isActive(item.href);
+            const label = t(item.labelKey);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                data-tour={item.tour}
+                title={isCollapsed ? label : undefined}
+                className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-normal transition-all ${
                   active
-                    ? "bg-brand-500 text-white shadow-xs"
-                    : "text-gray-500 dark:text-gray-400"
+                    ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+                    : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                } ${isCollapsed ? "justify-center px-0" : ""}`}
+              >
+                <div
+                  className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+                    active
+                      ? "bg-brand-500 text-white shadow-xs"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  <item.icon size={17} />
+                </div>
+                {!isCollapsed && <span className="truncate">{label}</span>}
+                {!isCollapsed && active && (
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-500" />
+                )}
+              </Link>
+            );
+          }
+
+          // Collapsible group (Leads, Campañas)
+          const isOpen = item.id === "leads" ? leadsOpen : campaignsOpen;
+          const setOpen = item.id === "leads" ? setLeadsOpen : setCampaignsOpen;
+          const isGroupActive = item.children.some((child) => isActive(child.href));
+          const label = t(item.labelKey);
+
+          if (isCollapsed) {
+            return (
+              <div key={item.id} className="relative group">
+                <button
+                  type="button"
+                  title={label}
+                  onClick={() => setOpen((v) => !v)}
+                  className={`flex items-center justify-center w-full rounded-xl px-0 py-1.5 text-sm transition-all cursor-pointer ${
+                    isGroupActive
+                      ? "bg-brand-500/10 text-brand-600 dark:text-brand-400"
+                      : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                  }`}
+                >
+                  <div
+                    className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+                      isGroupActive
+                        ? "bg-brand-500 text-white shadow-xs"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    <item.icon size={17} />
+                  </div>
+                </button>
+
+                {/* Popover desplegable al hover en modo colapsado */}
+                <div className="hidden group-hover:block absolute left-full top-0 ml-2 w-48 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl p-1.5 z-50">
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800 mb-1">
+                    {label}
+                  </div>
+                  <div className="space-y-0.5">
+                    {item.children.map((child) => {
+                      const childActive = isActive(child.href);
+                      const childLabel = t(child.labelKey);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                            childActive
+                              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
+                              : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 font-normal"
+                          }`}
+                        >
+                          <child.icon size={14} className={childActive ? "text-brand-600 dark:text-brand-400" : "text-gray-400"} />
+                          <span className="truncate">{childLabel}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={item.id} className="space-y-0.5">
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className={`flex items-center gap-3 w-full rounded-xl px-3 py-1.5 text-sm font-normal transition-all cursor-pointer ${
+                  isGroupActive
+                    ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+                    : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                 }`}
               >
-                <item.icon size={17} />
-              </div>
-              {!isCollapsed && <span className="truncate">{label}</span>}
-              {!isCollapsed && active && (
-                <div className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-500" />
+                <div
+                  className={`flex h-6.5 w-6.5 items-center justify-center rounded-lg transition-colors ${
+                    isGroupActive
+                      ? "bg-brand-500 text-white shadow-xs"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  <item.icon size={17} />
+                </div>
+                <span className="truncate">{label}</span>
+                <div className="ml-auto flex items-center pr-0.5">
+                  <RiArrowDownSLine
+                    size={16}
+                    className={`text-gray-400 transition-transform duration-200 ${
+                      isOpen ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className="pl-3 py-0.5 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-800 ml-6 my-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {item.children.map((child) => {
+                    const childActive = isActive(child.href);
+                    const childLabel = t(child.labelKey);
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        data-tour={child.tour}
+                        className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs transition-all ${
+                          childActive
+                            ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
+                            : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white font-normal"
+                        }`}
+                      >
+                        <div
+                          className={`flex h-4.5 w-4.5 items-center justify-center rounded transition-colors ${
+                            childActive
+                              ? "text-brand-600 dark:text-brand-400"
+                              : "text-gray-400 dark:text-gray-500"
+                          }`}
+                        >
+                          <child.icon size={14} />
+                        </div>
+                        <span className="truncate">{childLabel}</span>
+                        {childActive && (
+                          <div className="ml-auto h-1.5 w-1.5 rounded-full bg-brand-500" />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            </Link>
+            </div>
           );
         })}
       </div>
