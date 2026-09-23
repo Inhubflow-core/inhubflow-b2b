@@ -81,8 +81,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const rawChannel = Array.isArray(req.query.channel) ? req.query.channel[0] : req.query.channel;
   const channel = rawChannel && VALID_CHANNELS.has(rawChannel) ? rawChannel : undefined;
-  const rawAccountId = Array.isArray(req.query.accountId) ? req.query.accountId[0] : req.query.accountId;
-  const accountId = rawAccountId?.trim() || undefined;
+  let accountId = rawAccountId?.trim() || undefined;
+
+  // Si es un vendedor/miembro de equipo regular, forzar su cuenta asignada
+  if (!actor.isWorkspaceAdmin && actor.assignedAccountId) {
+    accountId = actor.assignedAccountId;
+  }
 
   if (rawChannel && !channel) {
     return res.status(400).json({ error: "Invalid channel filter" });

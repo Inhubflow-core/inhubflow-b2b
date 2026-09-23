@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDb } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import type { ActiveFilter, FilterOp } from "@/components/ui/FilterBar";
 
 // Parse f[0][field], f[0][op], f[0][value], f[1][field], ... from query
@@ -112,7 +114,7 @@ function buildFilterClause(filters: ActiveFilter[]): { sql: string; params: unkn
   };
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "POST") {
     const db = getDb();
     const { full_name, linkedin_url, title, company, location, email, phone, list_id } = req.body;
@@ -182,11 +184,25 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const db = getDb();
+  const session = await getServerSession(req, res, authOptions);
+  const currentUser = session?.user as any;
+
   const { list_id, page = "0", limit = "50", search } = req.query;
   const offset = Number(page) * Number(limit);
 
   const extraClauses: string[] = [];
   const extraParams: unknown[] = [];
+
+  // Si es un vendedor asignado a una cuenta específica, solo ve sus targets
+  if (currentUser?.owner_id && currentUser?.assigned_account_id) {
+    const accId = currentUser.assigned_account_id;
+    extraClauses.push(`(
+      t.last_replied_account_id = ?
+      OR EXISTS (SELECT 1 FROM linkedin_inbox_messages m WHERE m.target_id = t.id AND m.account_id = ?)
+      OR EXISTS (SELECT 1 FROM run_profiles rp JOIN runs r ON r.id = rp.run_id WHERE rp.target_id = t.id AND r.account_id = ?)
+    )`);
+    extraParams.push(accId, accId, accId);
+  }
 
   if (search && typeof search === "string" && search.trim()) {
     const like = `%${search.trim()}%`;

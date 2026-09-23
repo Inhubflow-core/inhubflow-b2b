@@ -3,10 +3,31 @@ import { getDb } from "@/lib/db";
 import { applyTag } from "@/lib/tags/tags-service";
 import { randomUUID } from "crypto";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const db = getDb();
+  const session = await getServerSession(req, res, authOptions);
+  const currentUser = session?.user as any;
 
   if (req.method === "GET") {
+    let whereClause = "";
+    const params: any[] = [];
+
+    // Si es un vendedor asignado a una cuenta específica:
+    if (currentUser?.owner_id && currentUser?.assigned_account_id) {
+      whereClause = "WHERE r.account_id = ?";
+      params.push(currentUser.assigned_account_id);
+    } else if (currentUser?.owner_id) {
+      whereClause = "WHERE a.assigned_user_id = ?";
+      params.push(currentUser.id);
+    } else if (currentUser && currentUser.role !== "admin" && currentUser.email?.trim().toLowerCase() !== "inhubflow@gmail.com") {
+      // Dueño de la empresa: ve las de sus cuentas
+      whereClause = "WHERE (a.owner_id = ? OR a.owner_id IS NULL)";
+      params.push(currentUser.id);
+    }
+
     const runs = db
       .prepare(
         `SELECT r.*,
@@ -26,10 +47,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
          LEFT JOIN lists l ON l.id = r.list_id
          LEFT JOIN accounts a ON a.id = r.account_id
          LEFT JOIN run_profiles rp ON rp.run_id = r.id
+         ${whereClause}
          GROUP BY r.id
          ORDER BY r.created_at DESC`
       )
-      .all();
+      .all(...params);
     return res.json(runs);
   }
 
