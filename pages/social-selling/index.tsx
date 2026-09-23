@@ -1680,15 +1680,21 @@ function resolveImageUrl(url?: string | null): string {
                       </button>
                     )}
                     <label className="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer">
-                      <RiUploadCloud2Line className="w-3.5 h-3.5" />
-                      {editingPost.media_url ? "Cambiar imagen" : "Subir imagen"}
+                      {isUploadingImage ? (
+                        <span className="loading loading-spinner loading-xs" />
+                      ) : (
+                        <RiUploadCloud2Line className="w-3.5 h-3.5" />
+                      )}
+                      Subir imagen
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
                         className="hidden"
+                        disabled={isUploadingImage}
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (f) handleImageFileChange(f, "edit");
+                          e.target.value = "";
                         }}
                       />
                     </label>
