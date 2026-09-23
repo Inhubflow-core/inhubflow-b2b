@@ -682,7 +682,6 @@ function resolveImageUrl(url?: string | null): string {
 
   // Eliminar un post programado
   const handleDeletePost = async (postId: string) => {
-    if (!confirm("¿Seguro que deseas eliminar este post programado?")) return;
     try {
       const res = await fetch(`/api/social-selling/posts?id=${postId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar");

@@ -79,6 +79,8 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dragOverDayKey, setDragOverDayKey] = useState<string | null>(null);
   const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [confirmPublishPost, setConfirmPublishPost] = useState<SocialPost | null>(null);
+  const [confirmDeletePost, setConfirmDeletePost] = useState<SocialPost | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -504,22 +506,22 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                             <RiEyeLine className="w-4 h-4" />
                           </button>
 
-                          {/* 2. Publicar ahora */}
+                          {/* 2. Publicar ahora (Verde) */}
                           {post.status === "scheduled" ? (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onPublishNow(post.id);
+                                setConfirmPublishPost(post);
                               }}
                               disabled={publishLoadingId === post.id}
-                              title="Publicar en LinkedIn de inmediato"
-                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/40 dark:hover:bg-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs transition-all"
+                              title="Publicar en LinkedIn ahora mismo"
+                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white border-none shadow-xs transition-all"
                             >
                               {publishLoadingId === post.id ? (
-                                <span className="loading loading-spinner loading-xs" />
+                                <span className="loading loading-spinner loading-xs text-white" />
                               ) : (
-                                <RiSendPlaneLine className="w-4 h-4" />
+                                <RiSendPlaneLine className="w-4 h-4 text-white" />
                               )}
                             </button>
                           ) : (
@@ -527,7 +529,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               type="button"
                               disabled
                               title={post.status === "published" ? "Publicación ya enviada" : "Estado: " + post.status}
-                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-gray-50 text-gray-400 dark:bg-gray-850 dark:text-gray-600 border border-gray-100 dark:border-gray-800 cursor-not-allowed opacity-60"
+                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 cursor-not-allowed opacity-80"
                             >
                               <RiCheckLine className="w-4 h-4" />
                             </button>
@@ -546,17 +548,17 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                             <RiEditLine className="w-4 h-4" />
                           </button>
 
-                          {/* 4. Eliminar */}
+                          {/* 4. Eliminar (Rojo) */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onDeletePost(post.id);
+                              setConfirmDeletePost(post);
                             }}
                             title="Eliminar publicación"
-                            className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-950/40 dark:hover:bg-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/40 shadow-2xs transition-all"
+                            className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-red-500 hover:bg-red-600 active:bg-red-700 text-white border-none shadow-xs transition-all"
                           >
-                            <RiDeleteBinLine className="w-4 h-4" />
+                            <RiDeleteBinLine className="w-4 h-4 text-white" />
                           </button>
                         </div>
                       </div>
@@ -585,6 +587,103 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
           })}
         </div>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN: ¿QUIERES PUBLICAR AHORA MISMO? */}
+      {confirmPublishPost && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-sm w-full border border-gray-200 dark:border-gray-800 shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <RiSendPlaneLine className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  ¿Quieres publicar ahora mismo?
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Esta publicación se enviará de inmediato a tu cuenta de LinkedIn conectada.
+                </p>
+              </div>
+            </div>
+
+            {/* Extracto del post */}
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 line-clamp-3 leading-relaxed">
+              {confirmPublishPost.content}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setConfirmPublishPost(null)}
+                className="btn btn-sm btn-ghost text-xs text-gray-600 dark:text-gray-300 rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = confirmPublishPost.id;
+                  setConfirmPublishPost(null);
+                  onPublishNow(id);
+                }}
+                disabled={publishLoadingId === confirmPublishPost.id}
+                className="btn btn-sm bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs"
+              >
+                <RiSendPlaneLine className="w-3.5 h-3.5" />
+                Sí, publicar ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN: ¿QUIERES ELIMINAR ESTA PUBLICACIÓN? */}
+      {confirmDeletePost && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-sm w-full border border-gray-200 dark:border-gray-800 shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center shrink-0">
+                <RiDeleteBinLine className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  ¿Quieres eliminar esta publicación?
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Esta acción no se puede deshacer y se removerá de tu calendario.
+                </p>
+              </div>
+            </div>
+
+            {/* Extracto del post */}
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 line-clamp-3 leading-relaxed">
+              {confirmDeletePost.content}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setConfirmDeletePost(null)}
+                className="btn btn-sm btn-ghost text-xs text-gray-600 dark:text-gray-300 rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = confirmDeletePost.id;
+                  setConfirmDeletePost(null);
+                  onDeletePost(id);
+                }}
+                className="btn btn-sm bg-red-600 hover:bg-red-700 text-white border-none rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs"
+              >
+                <RiDeleteBinLine className="w-3.5 h-3.5" />
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
