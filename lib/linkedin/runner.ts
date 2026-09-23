@@ -286,52 +286,147 @@ function providerErrorBody(error: unknown): string {
   return error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
 }
 
-async function generatePostComment(postText: string, campaignContext?: string, customInstruction?: string): Promise<string> {
+function detectPostLanguage(text: string): "pt" | "en" | "es" {
+  const lower = text.toLowerCase();
+  const ptMatches = (lower.match(/\b(não|com|para|você|mais|uma|este|está|estudo|reflexo|ambiente|gente|líder|liderança|fazemos|obrigado|empresa|mercado|equipe|sua|seus|pelo|pela|isso|isto|sobre|mundo|bora|tenha|demiti|quanto)\b|[ãõçê]/g) || []).length;
+  const enMatches = (lower.match(/\b(the|and|is|with|for|this|that|great|business|company|leadership|culture|team|growth|sales|marketing|work)\b/g) || []).length;
+  const esMatches = (lower.match(/\b(el|la|los|las|para|con|este|esta|está|equipo|empresa|liderazgo|cultura|trabajo|gracias|pero|como|hacer)\b|[ñáíóú]/g) || []).length;
+
+  if (ptMatches > esMatches && ptMatches > enMatches) return "pt";
+  if (enMatches > esMatches && enMatches > ptMatches) return "en";
+  return "es";
+}
+
+function getLocalizedFallbackComment(lang: "pt" | "en" | "es"): string {
+  if (lang === "pt") {
+    return "Excelente reflexão e perspectiva valiosa para o mercado. Totalmente de acordo com a visão.";
+  }
+  if (lang === "en") {
+    return "Great reflection and valuable perspective for the industry. Totally agree with this approach.";
+  }
+  return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+}
+
+interface GenerateCommentResult {
+  text: string;
+  isAiGenerated: boolean;
+  modelUsed?: string;
+  language: "pt" | "en" | "es";
+  errorReason?: string;
+}
+
+async function generatePostComment(postText: string, campaignContext?: string, customInstruction?: string): Promise<GenerateCommentResult> {
+  const lang = detectPostLanguage(postText);
+  const fallback = getLocalizedFallbackComment(lang);
+
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey || !postText.trim()) {
-    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+  if (!apiKey) {
+    console.warn("[runner:generatePostComment] Falta GEMINI_API_KEY en variables de entorno; usando comentario de respaldo");
+    return {
+      text: fallback,
+      isAiGenerated: false,
+      language: lang,
+      errorReason: "Falta GEMINI_API_KEY en variables de entorno",
+    };
   }
 
-  try {
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey });
-    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+  if (!postText.trim()) {
+    return {
+      text: fallback,
+      isAiGenerated: false,
+      language: lang,
+      errorReason: "Texto del post vacío",
+    };
+  }
 
-    const prompt = `Actúa como un profesional de negocios y líder de opinión en LinkedIn.
-Tu objetivo es redactar un comentario estratégico en la publicación de un prospecto siguiendo esta FÓRMULA EXACTA:
-1. [CONEXIÓN AUTÉNTICA]: Valida y conecta con una idea clave o aprendizaje específico del post del autor. Cero frases genéricas como "Buen post".
-2. [TRANSICIÓN CON INSIGHT]: Aporta un punto de vista reflexivo, profesional o dato de la industria que complemente su idea.
-3. [ANCLAJE DE VALOR SUTIL]: Relaciona sutilmente con la propuesta de valor de nuestra empresa (${campaignContext || "soluciones tecnológicas B2B y automatización estratégica"}) sin sonar comercial ni poner enlaces. Despierta curiosidad profesional para que quien lea tu comentario quiera visitar tu perfil.
+  const langDirectives: Record<"pt" | "en" | "es", string> = {
+    pt: "ESCREVA O COMENTÁRIO 100% EM PORTUGUÊS (BR). Proibido usar espanhol ou inglês.",
+    es: "ESCRIBE EL COMENTARIO 100% EN ESPAÑOL. Prohibido usar portugués o inglés.",
+    en: "WRITE THE COMMENT 100% IN ENGLISH. Do not use Spanish or Portuguese.",
+  };
 
-REGLAS ESTRICTAS:
-- Longitud: Corto y conciso, entre 25 y 40 palabras (máximo 3 oraciones).
-- Tono: Humano, positivo, profesional y constructivo.
-- Idioma: Mismo idioma del post del prospecto (si el post es en español, responde en español; si es en portugués, en portugués; si es en inglés, en inglés).
-- Prohibido hashtags, prohibido links, prohibido pedir reuniones o vender directamente.
-${customInstruction ? `Instrucción adicional del usuario: ${customInstruction}` : ""}
+  const prompt = `Você é um executivo experiente e líder de opinião no LinkedIn comentando o post de um colega/prospecto.
+Siga RIGOROSAMENTE esta estrutura estratégica de 3 partes em um único parágrafo fluido:
+1. [CONEXÃO AUTÊNTICA]: Conecte diretamente com uma reflexão, dado ou aprendizado específico do post (ex: métricas citadas, dilemas de liderança). NUNCA use frases genéricas vazias como "Ótimo post" ou "Muito bom".
+2. [TRANSIÇÃO / INSIGHT]: Acrescente um insight profissional maduro que complemente a visão do autor sobre o setor.
+3. [LIGAÇÃO SUTIL COM A PROPOSTA DE VALOR]: Faça uma ponte elegante e sutil com a proposta de valor (${campaignContext || "soluções inteligentes de automação e eficiência B2B"}), sem vender, sem links, sem hashtags e sem parecer comercial. O objetivo é despertar curiosidade profissional genuína para quem ler visitar seu perfil.
 
-PUBLICACIÓN DEL PROSPECTO:
+DIRETIVA DE IDIOMA MANDATÓRIA:
+${langDirectives[lang]}
+
+REGRAS ESTREITAS:
+- Tamanho: Curto e direto, entre 25 e 45 palavras (máximo 2 a 3 frases).
+- Tom: Humano, positivo, profissional, maduro e construtivo.
+- Proibido: Hashtags, links, pedidos de reunião, autopromoção escrachada.
+${customInstruction ? `Instrução adicional personalizada: ${customInstruction}` : ""}
+
+POST DO PROSPECTO:
 """
 ${postText.slice(0, 1500)}
 """
 
-Escribe ÚNICAMENTE el texto final del comentario, sin comillas ni encabezados.`;
+Retorne EXCLUSIVAMENTE o texto final do comentário pronto para postar, sem aspas, sem títulos e sem prefixos.`;
 
-    const res = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-        maxOutputTokens: 150,
-      },
-    });
+  const configuredModel = process.env.GEMINI_MODEL?.trim();
+  const candidateModels = Array.from(new Set([
+    configuredModel,
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+  ].filter(Boolean))) as string[];
 
-    const text = res.text?.trim()?.replace(/^["']|["']$/g, "");
-    if (text && text.length > 10) return text;
-    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey });
+
+    let lastError: unknown = null;
+
+    for (const model of candidateModels) {
+      try {
+        const res = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            temperature: 0.7,
+            maxOutputTokens: 1500,
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
+          },
+        });
+
+        const text = res.text?.trim()?.replace(/^["']|["']$/g, "");
+        if (text && text.length > 15) {
+          return {
+            text,
+            isAiGenerated: true,
+            modelUsed: model,
+            language: lang,
+          };
+        }
+      } catch (modelErr) {
+        lastError = modelErr;
+        console.warn(`[runner:generatePostComment] Modelo ${model} no disponible o falló, probando alternativa:`, modelErr);
+      }
+    }
+
+    console.error("[runner:generatePostComment] Todos los modelos de Gemini fallaron:", lastError);
+    return {
+      text: fallback,
+      isAiGenerated: false,
+      language: lang,
+      errorReason: lastError instanceof Error ? lastError.message : String(lastError),
+    };
   } catch (err) {
-    console.error("[runner:generatePostComment] Error generating AI comment:", err);
-    return "Gran reflexión y valiosa perspectiva para la industria. Totalmente de acuerdo.";
+    console.error("[runner:generatePostComment] Error cargando SDK o inicializando Gemini:", err);
+    return {
+      text: fallback,
+      isAiGenerated: false,
+      language: lang,
+      errorReason: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -579,7 +674,8 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       const campaignContext = workflow?.prompt || "";
       const customInstruction = step.ai_prompt || "";
 
-      const commentText = await generatePostComment(postText, campaignContext, customInstruction);
+      const commentResult = await generatePostComment(postText, campaignContext, customInstruction);
+      const commentText = commentResult.text;
 
       // 3. Publicar comentario en LinkedIn
       if (typeof client.commentOnPost === "function") {
@@ -590,7 +686,11 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
         });
       }
 
-      log(db, runProfile.run_id, target.id, "info", `Like + Comentario publicados en el post de ${name}: "${commentText.slice(0, 50)}..."`);
+      if (commentResult.isAiGenerated) {
+        log(db, runProfile.run_id, target.id, "info", `Like + Comentario IA (${commentResult.language.toUpperCase()}, modelo: ${commentResult.modelUsed}) publicado en el post de ${name}: "${commentText.slice(0, 60)}..."`);
+      } else {
+        log(db, runProfile.run_id, target.id, "warn", `Like + Comentario de respaldo (${commentResult.language.toUpperCase()}) publicado en el post de ${name} [${commentResult.errorReason || "IA no disponible"}]: "${commentText.slice(0, 60)}..."`);
+      }
       trAdvance(db, tr, steps);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
