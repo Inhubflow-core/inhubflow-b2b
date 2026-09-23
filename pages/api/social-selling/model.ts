@@ -4,13 +4,17 @@ import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 
 const CANDIDATE_MODELS = [
-  process.env.GEMINI_MODEL?.trim(),
-  "gemini-3.6-flash",
-  "gemini-flash-latest",
-  "gemini-3.8-flash",
-  "gemini-3.5-flash-lite",
+  // Priorizar modelos estables que no sufren spikes de demanda
   "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.6-flash",
+  ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL.trim()] : []),
 ].filter(Boolean) as string[];
+
+// Evitar modelos problemáticos o saturados conocidos
+const STABLE_MODELS = Array.from(new Set(CANDIDATE_MODELS)).filter(
+  (m) => m !== "gemini-3.8-flash" && m !== "gemini-flash-latest" && m !== "gemini-3.7-flash"
+);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -105,17 +109,14 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
     let generatedPost = "";
     let usedModel = "";
 
-    for (const model of CANDIDATE_MODELS) {
+    for (const model of STABLE_MODELS) {
       try {
         const res = await ai.models.generateContent({
           model,
           contents: prompt,
           config: {
-            temperature: 0.75,
+            temperature: 0.72,
             maxOutputTokens: 2500,
-            thinkingConfig: {
-              thinkingBudget: 0,
-            },
           },
         });
 
@@ -125,14 +126,27 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
           usedModel = model;
           break;
         }
-      } catch (err) {
+      } catch (err: any) {
         lastError = err;
-        console.warn(`[api/social-selling/model] Modelo ${model} falló, probando alternativa:`, err);
+        console.warn(`[api/social-selling/model] Modelo ${model} no disponible, intentando siguiente:`, err?.message || err);
+        // Espera de 300ms antes del siguiente modelo
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
     }
 
     if (!generatedPost) {
-      throw lastError || new Error("No se pudo generar el post con los modelos disponibles");
+      let errMsg = "El servicio de IA está experimentando alta demanda. Por favor reintenta en unos instantes.";
+      if (lastError instanceof Error) {
+        try {
+          const parsed = JSON.parse(lastError.message);
+          if (parsed?.error?.message) {
+            errMsg = parsed.error.message;
+          }
+        } catch {
+          errMsg = lastError.message;
+        }
+      }
+      throw new Error(errMsg);
     }
 
     // Extraer título/primer gancho para resumen
@@ -145,10 +159,10 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
       topic: topic || null,
       original_author: original_author || null,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[api/social-selling/model] Error generating post:", error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : "Error modelando la publicación con IA",
+      error: error?.message || "Error modelando la publicación con IA",
     });
   }
 }
