@@ -11,6 +11,7 @@ import { applyTagsSchema } from "@/lib/tags/schema";
 import { applyCalendarSchema } from "@/lib/calendar/schema";
 import { applySignalSchema } from "@/lib/signals/schema";
 import { applyCompaniesSchema } from "@/lib/companies/schema";
+import { applySocialSellingSchema } from "@/lib/social-selling/schema";
 import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
 
 function resolveDbPath(): string {
@@ -1063,6 +1064,9 @@ function runMigrations(db: Database.Database) {
 
   // Companies and Account-Based Marketing (ABM) module
   applyCompaniesSchema(db);
+
+  // Social Selling module: Viral content radar, AI content modeling, and monthly post scheduler
+  applySocialSellingSchema(db);
 
   // Keep provider implementation details out of customer-facing activity and
   // diagnostics, including historical rows written by older releases.

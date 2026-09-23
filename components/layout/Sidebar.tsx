@@ -28,6 +28,7 @@ import {
   RiTeamLine,
   RiVideoLine,
   RiRadarLine,
+  RiMegaphoneLine,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -43,6 +44,7 @@ const mainNav = [
   { href: "/calendar", labelKey: "nav.calendar", icon: RiCalendarEventLine, color: "#8b5cf6", tour: "nav-calendar" },
   { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },
   { href: "/workflows", labelKey: "nav.campaigns", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
+  { href: "/social-selling", labelKey: "nav.socialSelling", icon: RiMegaphoneLine, color: "#8b5cf6", tour: "nav-social-selling" },
   { href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
   { href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
   { href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },

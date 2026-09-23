@@ -304,6 +304,34 @@ export class UnipileClient {
     });
   }
 
+  /**
+   * Publica un nuevo post en el perfil de LinkedIn de la cuenta especificada
+   */
+  async createPost(params: {
+    account_id: string;
+    text: string;
+    attachments?: Array<{ file: Buffer | Blob | string; filename: string; mime_type?: string }>;
+  }): Promise<{ id?: string; post_id?: string; [key: string]: unknown }> {
+    const body = new FormData();
+    body.append('account_id', params.account_id);
+    body.append('text', params.text);
+    for (const attachment of params.attachments || []) {
+      if (typeof attachment.file === 'string') {
+        body.append('attachments', attachment.file);
+      } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(attachment.file)) {
+        const blob = new Blob([new Uint8Array(attachment.file)], { type: attachment.mime_type || 'application/octet-stream' });
+        body.append('attachments', blob, attachment.filename);
+      } else {
+        body.append('attachments', attachment.file as Blob, attachment.filename);
+      }
+    }
+
+    return this.request<{ id?: string; post_id?: string; [key: string]: unknown }>('/api/v1/posts', {
+      method: 'POST',
+      body,
+    });
+  }
+
   async startChat(params: UnipileStartChatParams): Promise<UnipileStartChatResponse> {
     const body = new FormData();
     body.append('account_id', params.account_id);
