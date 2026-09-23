@@ -536,7 +536,20 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                             <RiEyeLine className="w-4 h-4" />
                           </button>
 
-                          {/* 2. Publicar ahora / Reintentar (Verde) */}
+                          {/* 2. Editar */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditPost(post);
+                            }}
+                            title="Editar publicación"
+                            className="h-7 w-full flex items-center justify-center rounded-lg bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 dark:bg-gray-800 dark:hover:bg-blue-950/60 dark:text-gray-300 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all cursor-pointer"
+                          >
+                            <RiEditLine className="w-4 h-4" />
+                          </button>
+
+                          {/* 3. Publicar ahora / Reintentar (Verde) */}
                           {post.status === "scheduled" || post.status === "failed" ? (
                             <button
                               type="button"
@@ -565,19 +578,6 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               <RiCheckLine className="w-4 h-4" />
                             </button>
                           )}
-
-                          {/* 3. Editar */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditPost(post);
-                            }}
-                            title="Editar publicación"
-                            className="h-7 w-full flex items-center justify-center rounded-lg bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 dark:bg-gray-800 dark:hover:bg-blue-950/60 dark:text-gray-300 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all cursor-pointer"
-                          >
-                            <RiEditLine className="w-4 h-4" />
-                          </button>
 
                           {/* 4. Eliminar (Rojo) */}
                           <button
