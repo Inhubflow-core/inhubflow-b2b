@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
+import fs from "node:fs";
+import path from "node:path";
 import { unipile } from "@/lib/unipile/client";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -54,9 +56,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       try {
+        // Preparar adjuntos si el post tiene imagen
+        let attachments: Array<{ file: Buffer; filename: string; mime_type: string }> | undefined;
+        if (post.media_url) {
+          try {
+            // Extraer nombre de archivo limpio de URLs como /api/uploads/social-image?file=xyz o /uploads/social-posts/xyz
+            let filename = "";
+            if (post.media_url.includes("file=")) {
+              filename = post.media_url.split("file=")[1]?.split("&")[0] || "";
+            } else {
+              filename = path.basename(post.media_url.split("?")[0]);
+            }
+
+            if (filename) {
+              const primaryPath = path.join(process.cwd(), "public", "uploads", "social-posts", filename);
+              const dataPath = path.join("/data", "uploads", "social-posts", filename);
+              const targetPath = fs.existsSync(primaryPath) ? primaryPath : fs.existsSync(dataPath) ? dataPath : "";
+
+              if (targetPath) {
+                const buffer = fs.readFileSync(targetPath);
+                const ext = path.extname(filename).toLowerCase();
+                const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+                attachments = [{ file: buffer, filename, mime_type: mime }];
+              }
+            }
+          } catch (fileErr) {
+            console.warn(`[publish] No se pudo cargar adjunto de imagen para post ${post.id}:`, fileErr);
+          }
+        }
+
         const publishRes = await unipile.createPost({
           account_id: unipileAccountId,
           text: post.content,
+          attachments,
         });
 
         const postUrn = (publishRes.id || publishRes.post_id || "published") as string;

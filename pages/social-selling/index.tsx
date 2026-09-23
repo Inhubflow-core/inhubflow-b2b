@@ -200,6 +200,17 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     }
   };
 
+function resolveImageUrl(url?: string | null): string {
+  if (!url) return "";
+  if (url.startsWith("data:") || url.startsWith("blob:") || url.startsWith("http")) return url;
+  if (url.startsWith("/api/uploads/social-image")) return url;
+  if (url.startsWith("/uploads/social-posts/")) {
+    const filename = url.replace(/^\/uploads\/social-posts\//, "").split("?")[0];
+    return `/api/uploads/social-image?file=${filename}`;
+  }
+  return url;
+}
+
   // Subir archivo de imagen para el post
   const handleImageFileChange = async (file: File, target: "draft" | "edit") => {
     if (!file) return;
@@ -216,8 +227,17 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     try {
       const reader = new FileReader();
       reader.onload = async () => {
+        const base64 = reader.result as string;
+
+        // 1. Mostrar de inmediato la imagen local en la UI (cero latencia para vista previa)
+        if (target === "draft") {
+          setModeledDraft((prev) => (prev ? { ...prev, media_url: base64 } : null));
+        } else if (target === "edit") {
+          setEditingPost((prev) => (prev ? { ...prev, media_url: base64, media_type: "image" } : null));
+        }
+
+        // 2. Subir al servidor en segundo plano
         try {
-          const base64 = reader.result as string;
           const res = await fetch("/api/uploads/social-image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -231,10 +251,11 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Error al subir la imagen");
 
-          if (target === "draft" && modeledDraft) {
-            setModeledDraft({ ...modeledDraft, media_url: data.url });
-          } else if (target === "edit" && editingPost) {
-            setEditingPost({ ...editingPost, media_url: data.url, media_type: "image" });
+          // 3. Reemplazar con la URL oficial de la API
+          if (target === "draft") {
+            setModeledDraft((prev) => (prev ? { ...prev, media_url: data.url } : null));
+          } else if (target === "edit") {
+            setEditingPost((prev) => (prev ? { ...prev, media_url: data.url, media_type: "image" } : null));
           }
           toast.success("¡Imagen subida y adjuntada al post!");
         } catch (uploadErr: any) {
@@ -860,7 +881,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                         {post.media_url && (
                           <div className="relative rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 h-36 bg-gray-100 dark:bg-gray-800">
                             <img
-                              src={post.media_url}
+                              src={resolveImageUrl(post.media_url)}
                               alt="Creativo del post"
                               className="w-full h-full object-cover"
                             />
@@ -1100,7 +1121,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                   {modeledDraft.media_url && (
                     <div className="relative rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 h-44 bg-gray-900 group">
                       <img
-                        src={modeledDraft.media_url}
+                        src={resolveImageUrl(modeledDraft.media_url)}
                         alt="Imagen cargada"
                         className="w-full h-full object-cover"
                       />
@@ -1182,7 +1203,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                 {previewPost.media_url && (
                   <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 max-h-80 bg-gray-100 dark:bg-gray-800">
                     <img
-                      src={previewPost.media_url}
+                      src={resolveImageUrl(previewPost.media_url)}
                       alt="Creativo de LinkedIn"
                       className="w-full h-full object-cover"
                     />
@@ -1279,7 +1300,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                 {editingPost.media_url && (
                   <div className="relative rounded-lg overflow-hidden border border-purple-200 dark:border-purple-800 h-32 bg-gray-900">
                     <img
-                      src={editingPost.media_url}
+                      src={resolveImageUrl(editingPost.media_url)}
                       alt="Imagen adjunta"
                       className="w-full h-full object-cover"
                     />
