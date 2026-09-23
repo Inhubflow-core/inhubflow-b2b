@@ -159,6 +159,13 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
   // Subida de imagen
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Manual Post State
+  const [manualContent, setManualContent] = useState("");
+  const [manualDate, setManualDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 16));
+  const [manualImagePrompt, setManualImagePrompt] = useState<string | null>(null);
+  const [manualMediaUrl, setManualMediaUrl] = useState<string | null>(null);
+  const [isGeneratingManualPrompt, setIsGeneratingManualPrompt] = useState(false);
+
   // Calendar / Scheduled Posts State
   const [posts, setPosts] = useState<SocialPost[]>(initialPosts);
   const [isBatchScheduling, setIsBatchScheduling] = useState(false);
@@ -218,7 +225,7 @@ function resolveImageUrl(url?: string | null): string {
 }
 
   // Subir archivo de imagen para el post
-  const handleImageFileChange = async (file: File, target: "draft" | "edit") => {
+  const handleImageFileChange = async (file: File, target: "draft" | "edit" | "manual") => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Por favor selecciona un archivo de imagen (PNG, JPG o WEBP)");
@@ -240,6 +247,8 @@ function resolveImageUrl(url?: string | null): string {
           setModeledDraft((prev) => (prev ? { ...prev, media_url: base64 } : null));
         } else if (target === "edit") {
           setEditingPost((prev) => (prev ? { ...prev, media_url: base64, media_type: "image" } : null));
+        } else if (target === "manual") {
+          setManualMediaUrl(base64);
         }
 
         // 2. Subir al servidor en segundo plano
@@ -262,6 +271,8 @@ function resolveImageUrl(url?: string | null): string {
             setModeledDraft((prev) => (prev ? { ...prev, media_url: data.url } : null));
           } else if (target === "edit") {
             setEditingPost((prev) => (prev ? { ...prev, media_url: data.url, media_type: "image" } : null));
+          } else if (target === "manual") {
+            setManualMediaUrl(data.url);
           }
           toast.success("¡Imagen subida y adjuntada al post!");
         } catch (uploadErr: any) {
@@ -386,6 +397,78 @@ function resolveImageUrl(url?: string | null): string {
 
       toast.success("¡Post programado con éxito!");
       setModeledDraft(null);
+      await refreshPosts();
+      setActiveTab("calendar");
+    } catch (err: any) {
+      toast.error(err.message || "Error al programar el post");
+    }
+  };
+
+  // Generar prompt de imagen con IA a partir del texto del post manual (en formato 4:3)
+  const handleGenerateManualPrompt = async () => {
+    if (!manualContent || !manualContent.trim()) {
+      toast.error("Escribe primero el contenido del post para que la IA diseñe el prompt visual");
+      return;
+    }
+
+    setIsGeneratingManualPrompt(true);
+    try {
+      const res = await fetch("/api/social-selling/generate-image-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          post_content: manualContent.trim(),
+          topic: topic || "Social Selling",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error generando prompt de imagen");
+
+      setManualImagePrompt(data.image_prompt);
+      toast.success("¡Prompt generado con éxito en formato 4:3!");
+    } catch (err: any) {
+      toast.error(err.message || "Error al generar prompt de imagen");
+    } finally {
+      setIsGeneratingManualPrompt(false);
+    }
+  };
+
+  // Programar publicación manual completa (con prompt y/o imagen)
+  const handleScheduleManual = async () => {
+    if (!selectedAccountId) {
+      toast.error("Selecciona una cuenta de LinkedIn");
+      return;
+    }
+    if (!manualContent || !manualContent.trim()) {
+      toast.error("El contenido del post no puede estar vacío");
+      return;
+    }
+
+    try {
+      const scheduledAt = manualDate ? new Date(manualDate).toISOString() : new Date(Date.now() + 86400000).toISOString();
+      const res = await fetch("/api/social-selling/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_id: selectedAccountId,
+          content: manualContent.trim(),
+          topic: topic || "Publicación Manual",
+          scheduled_at: scheduledAt,
+          image_prompt: manualImagePrompt || null,
+          media_url: manualMediaUrl || null,
+          media_type: manualMediaUrl ? "image" : "none",
+          status: "scheduled",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error programando el post");
+
+      toast.success("¡Publicación programada con éxito!");
+      setManualContent("");
+      setManualImagePrompt(null);
+      setManualMediaUrl(null);
       await refreshPosts();
       setActiveTab("calendar");
     } catch (err: any) {
@@ -1010,48 +1093,152 @@ function resolveImageUrl(url?: string | null): string {
 
         {/* CONTENIDO: TAB 3 - CREAR PUBLICACIÓN MANUAL */}
         {activeTab === "create" && (
-          <div className="max-w-2xl bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white">
-              Crear Nueva Publicación
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Redacta directamente tu post o apóyate en tus borradores para programarlo en la cuenta de LinkedIn seleccionada.
-            </p>
+          <div className="max-w-3xl bg-white dark:bg-gray-900 p-6 sm:p-7 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm space-y-5">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Crear Nueva Publicación
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Redacta directamente tu post, genera el prompt visual con IA (proporción 4:3) y adjunta una imagen para programarlo en LinkedIn.
+              </p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Contenido del post */}
               <div>
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Contenido del Post:</label>
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Contenido del Post:
+                </label>
                 <textarea
-                  id="manualPostContent"
+                  value={manualContent}
+                  onChange={(e) => setManualContent(e.target.value)}
                   rows={8}
                   placeholder="Escribe tu publicación para LinkedIn aquí..."
-                  className="w-full mt-1 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white"
+                  className="w-full mt-1.5 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white leading-relaxed"
                 />
               </div>
 
+              {/* Barra de herramientas creativas: Generar Prompt IA + Subir Imagen */}
+              <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
+                    <RiSparklingLine className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    Creativo Visual (Formato 4:3 predeterminado):
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    {/* Botón Generar Prompt de la Imagen */}
+                    <button
+                      type="button"
+                      onClick={handleGenerateManualPrompt}
+                      disabled={isGeneratingManualPrompt || !manualContent.trim()}
+                      className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none rounded-xl flex items-center gap-1.5 text-xs font-semibold shadow-sm disabled:opacity-50"
+                      title="La IA analiza tu post y redacta el prompt óptimo en inglés con formato 4:3 para Midjourney o Flux"
+                    >
+                      {isGeneratingManualPrompt ? (
+                        <>
+                          <span className="loading loading-spinner loading-xs" />
+                          <span>Diseñando prompt...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RiSparklingLine className="w-4 h-4" />
+                          <span>Generar Prompt de la Imagen</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Botón Subir Imagen */}
+                    <label className="btn btn-sm btn-outline border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-xl flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                      <RiUploadCloud2Line className="w-4 h-4" />
+                      <span>{isUploadingImage ? "Subiendo..." : "Subir Imagen"}</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={isUploadingImage}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleImageFileChange(f, "manual");
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Caja de Prompt Fotográfico Generado */}
+                {manualImagePrompt && (
+                  <div className="bg-white dark:bg-gray-900 p-3.5 rounded-xl border border-purple-200 dark:border-purple-800 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-2 mt-2">
+                    <div className="flex items-center justify-between font-sans">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-purple-700 dark:text-purple-300">
+                          Prompt Fotográfico para Midjourney / Flux:
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                          Formato 4:3
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPrompt(manualImagePrompt)}
+                        className="btn btn-xs bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/60 dark:hover:bg-purple-800 dark:text-purple-200 border-none rounded-lg flex items-center gap-1 font-sans font-semibold"
+                      >
+                        <RiFileCopyLine className="w-3 h-3" />
+                        <span>Copiar Prompt</span>
+                      </button>
+                    </div>
+                    <div className="break-words select-all text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 p-2.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                      {manualImagePrompt}
+                    </div>
+                  </div>
+                )}
+
+                {/* Previsualización de la Imagen Cargada */}
+                {manualMediaUrl && (
+                  <div className="relative rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 h-44 bg-gray-900 group mt-2">
+                    <img
+                      src={resolveImageUrl(manualMediaUrl)}
+                      alt="Imagen adjunta al post manual"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setManualMediaUrl(null)}
+                        className="btn btn-xs btn-circle bg-red-600 hover:bg-red-700 text-white border-none shadow-md"
+                        title="Eliminar imagen"
+                      >
+                        <RiCloseLine className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-[10px] font-semibold text-white px-2.5 py-0.5 rounded-md">
+                      ✓ Imagen adjunta lista para publicar en LinkedIn
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Fecha y Hora de Publicación */}
               <div>
-                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Fecha y Hora de Publicación:</label>
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Fecha y Hora de Publicación:
+                </label>
                 <input
                   type="datetime-local"
-                  id="manualPostDate"
-                  defaultValue={new Date(Date.now() + 86400000).toISOString().slice(0, 16)}
+                  value={manualDate}
+                  onChange={(e) => setManualDate(e.target.value)}
                   className="w-full mt-1 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm dark:text-white"
                 />
               </div>
 
               <div className="pt-2 flex justify-end">
                 <button
-                  onClick={() => {
-                    const contentEl = document.getElementById("manualPostContent") as HTMLTextAreaElement;
-                    const dateEl = document.getElementById("manualPostDate") as HTMLInputElement;
-                    if (!contentEl?.value.trim()) {
-                      toast.error("El contenido no puede estar vacío");
-                      return;
-                    }
-                    handleScheduleSingle(contentEl.value.trim(), new Date(dateEl.value).toISOString());
-                  }}
-                  className="btn btn-primary bg-purple-600 text-white rounded-xl px-6"
+                  type="button"
+                  onClick={handleScheduleManual}
+                  disabled={!manualContent.trim()}
+                  className="btn btn-primary bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 flex items-center gap-2 shadow-sm font-semibold disabled:opacity-50"
                 >
+                  <RiCalendarEventLine className="w-4 h-4" />
                   Programar Publicación
                 </button>
               </div>
