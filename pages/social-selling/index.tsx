@@ -732,78 +732,94 @@ function resolveImageUrl(url?: string | null): string {
         <title>Social Selling | InHubFlow</title>
       </Head>
 
-      <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 p-6 md:p-8 space-y-6">
-        {/* Header Superior */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
-          <div>
+      <div className="space-y-6 pb-16">
+        {/* Top Header Banner */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 border border-brand-500/20 dark:border-brand-500/10 p-5 md:p-6 rounded-2xl">
+          <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                <RiMegaphoneLine className="w-6 h-6" />
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500/10 text-brand-500 dark:bg-brand-500/20">
+                <RiMegaphoneLine size={20} />
+              </span>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                 Social Selling
               </h1>
-              <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
                 Inbound IA
               </span>
             </div>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Escanea publicaciones virales en LinkedIn, modélalas con la identidad de tu empresa y programa tu mes de contenido en minutos.
             </p>
           </div>
 
-          {/* Selector de cuenta emisora */}
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Cuenta emisora:</label>
-            <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="select select-sm select-bordered bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-medium rounded-lg"
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Selector de cuenta emisora */}
+            <div className="flex items-center gap-2 bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-xl text-xs">
+              <label htmlFor="account-select" className="text-gray-600 dark:text-gray-400 font-medium">
+                Cuenta emisora:
+              </label>
+              <select
+                id="account-select"
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                className="text-xs font-semibold bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none cursor-pointer"
+              >
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">
+                    {acc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("create")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-600 transition-all shadow-xs"
             >
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name}
-                </option>
-              ))}
-            </select>
+              <RiAddLine size={18} /> Nueva Publicación
+            </button>
           </div>
         </div>
 
         {/* Barra de Navegación de Pestañas */}
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800">
-          <button
-            onClick={() => setActiveTab("radar")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === "radar"
-                ? "border-purple-600 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-            }`}
-          >
-            <RiRadarLine className="w-4 h-4" />
-            Radar Viral (Buscar y Modelar)
-          </button>
-          <button
-            onClick={() => setActiveTab("calendar")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === "calendar"
-                ? "border-purple-600 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-            }`}
-          >
-            <RiCalendarEventLine className="w-4 h-4" />
-            Calendario Editorial ({posts.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("create")}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-              activeTab === "create"
-                ? "border-purple-600 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-            }`}
-          >
-            <RiAddLine className="w-4 h-4" />
-            Crear Publicación Manual
-          </button>
+        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setActiveTab("radar")}
+              className={`pb-3 text-sm font-semibold transition-all relative ${
+                activeTab === "radar"
+                  ? "text-brand-500 dark:text-brand-400 border-b-2 border-brand-500 dark:border-brand-400"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              Radar Viral (Buscar y Modelar)
+            </button>
+            <button
+              onClick={() => setActiveTab("calendar")}
+              className={`pb-3 text-sm font-semibold transition-all relative ${
+                activeTab === "calendar"
+                  ? "text-brand-500 dark:text-brand-400 border-b-2 border-brand-500 dark:border-brand-400"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              Calendario Editorial
+              {posts.length > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300">
+                  {posts.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("create")}
+              className={`pb-3 text-sm font-semibold transition-all relative ${
+                activeTab === "create"
+                  ? "text-brand-500 dark:text-brand-400 border-b-2 border-brand-500 dark:border-brand-400"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              + Crear Publicación Manual
+            </button>
+          </div>
         </div>
 
         {/* CONTENIDO: TAB 1 - RADAR VIRAL */}
@@ -820,13 +836,13 @@ function resolveImageUrl(url?: string | null): string {
                     onChange={(e) => setTopic(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearchViral()}
                     placeholder="Escribe un tema de tu industria (ej. Automatización de ventas B2B, Retención de talento, etc.)"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white"
                   />
                 </div>
                 <button
                   onClick={() => handleSearchViral()}
                   disabled={isSearching}
-                  className="btn btn-primary bg-purple-600 hover:bg-purple-700 border-none text-white px-6 rounded-xl flex items-center gap-2"
+                  className="btn btn-primary bg-brand-500 hover:bg-brand-600 border-none text-white px-6 rounded-xl flex items-center gap-2 shadow-xs"
                 >
                   {isSearching ? (
                     <>
@@ -850,7 +866,7 @@ function resolveImageUrl(url?: string | null): string {
                     key={st}
                     type="button"
                     onClick={() => setTopic(st)}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-purple-50 hover:text-purple-600 dark:bg-gray-800 dark:hover:bg-purple-900/30 dark:hover:text-purple-300 text-gray-600 dark:text-gray-300 transition-colors"
+                    className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:hover:bg-brand-950/30 dark:hover:text-brand-300 text-gray-600 dark:text-gray-300 transition-colors"
                   >
                     {st}
                   </button>
@@ -860,19 +876,19 @@ function resolveImageUrl(url?: string | null): string {
 
             {/* Cabecera de resultados y botón de Lote Mensual */}
             {viralPosts.length > 0 && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/40 p-4 rounded-xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-brand-50 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-900/40 p-4 rounded-xl">
                 <div>
-                  <h3 className="text-sm font-bold text-purple-950 dark:text-purple-200">
+                  <h3 className="text-sm font-bold text-brand-950 dark:text-brand-200">
                     Se encontraron {viralPosts.length} publicaciones de alto impacto
                   </h3>
-                  <p className="text-xs text-purple-700 dark:text-purple-300">
+                  <p className="text-xs text-brand-700 dark:text-brand-300">
                     Puedes modelar posts individuales o usar el automatizador mensual para programar todo el mes.
                   </p>
                 </div>
                 <button
                   onClick={handleBatchScheduleMonth}
                   disabled={isBatchScheduling}
-                  className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg px-4 flex items-center gap-2 shadow-sm"
+                  className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white border-none rounded-lg px-4 flex items-center gap-2 shadow-xs"
                 >
                   {isBatchScheduling ? (
                     <>
@@ -910,7 +926,7 @@ function resolveImageUrl(url?: string | null): string {
                           className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 font-bold flex items-center justify-center text-sm">
+                        <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 dark:bg-brand-900/40 dark:text-brand-300 font-bold flex items-center justify-center text-sm">
                           {vp.author_name.charAt(0)}
                         </div>
                       )}
@@ -991,7 +1007,7 @@ function resolveImageUrl(url?: string | null): string {
                     <button
                       onClick={() => handleModelPost(vp)}
                       disabled={modelingPostId === vp.id}
-                      className="flex-1 btn btn-sm bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white dark:bg-purple-900/30 dark:hover:bg-purple-700 dark:text-purple-300 dark:hover:text-white border border-purple-200 dark:border-purple-800 rounded-xl flex items-center justify-center gap-1.5 transition-all font-semibold text-xs truncate"
+                      className="flex-1 btn btn-sm bg-brand-50 hover:bg-brand-500 text-brand-700 hover:text-white dark:bg-brand-950/40 dark:hover:bg-brand-600 dark:text-brand-300 dark:hover:text-white border border-brand-200 dark:border-brand-800 rounded-xl flex items-center justify-center gap-1.5 transition-all font-semibold text-xs truncate shadow-xs"
                     >
                       {modelingPostId === vp.id ? (
                         <>
@@ -1015,13 +1031,13 @@ function resolveImageUrl(url?: string | null): string {
         {/* CONTENIDO: TAB 2 - CALENDARIO EDITORIAL MENSUAL CON DRAG & DROP */}
         {activeTab === "calendar" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-purple-500/5 dark:bg-purple-950/20 p-4 rounded-2xl border border-purple-200/60 dark:border-purple-900/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-brand-500/5 dark:bg-brand-950/20 p-4 rounded-2xl border border-brand-200/60 dark:border-brand-900/40">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                     Calendario Editorial
                   </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
                     {posts.length} {posts.length === 1 ? "publicación" : "publicaciones"}
                   </span>
                 </div>
@@ -1038,7 +1054,7 @@ function resolveImageUrl(url?: string | null): string {
                     onClick={() => setCalendarViewMode("month")}
                     className={`join-item btn btn-xs gap-1 font-semibold ${
                       calendarViewMode === "month"
-                        ? "btn-primary bg-purple-600 border-purple-600 text-white"
+                        ? "btn-primary bg-brand-500 border-brand-500 text-white"
                         : "btn-ghost text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                     }`}
                     title="Vista de calendario mensual con cuadrícula de días y drag & drop"
@@ -1050,7 +1066,7 @@ function resolveImageUrl(url?: string | null): string {
                     onClick={() => setCalendarViewMode("cards")}
                     className={`join-item btn btn-xs gap-1 font-semibold ${
                       calendarViewMode === "cards"
-                        ? "btn-primary bg-purple-600 border-purple-600 text-white"
+                        ? "btn-primary bg-brand-500 border-brand-500 text-white"
                         : "btn-ghost text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                     }`}
                     title="Vista en lista detallada de tarjetas"
@@ -1063,7 +1079,7 @@ function resolveImageUrl(url?: string | null): string {
 
             {posts.length === 0 ? (
               <div className="bg-white dark:bg-gray-900 p-12 text-center rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4 shadow-sm">
-                <div className="w-12 h-12 mx-auto rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
+                <div className="w-12 h-12 mx-auto rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-600 flex items-center justify-center">
                   <RiCalendarEventLine className="w-6 h-6" />
                 </div>
                 <h4 className="text-base font-bold text-gray-900 dark:text-white">
@@ -1075,13 +1091,13 @@ function resolveImageUrl(url?: string | null): string {
                 <div className="flex items-center justify-center gap-3 pt-2">
                   <button
                     onClick={() => setActiveTab("radar")}
-                    className="btn btn-primary bg-purple-600 text-white rounded-xl px-5"
+                    className="btn btn-primary bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-5 shadow-xs"
                   >
                     Ir al Radar Viral
                   </button>
                   <button
                     onClick={() => setActiveTab("create")}
-                    className="btn btn-outline border-purple-300 text-purple-700 dark:text-purple-300 rounded-xl px-5"
+                    className="btn btn-outline border-brand-300 text-brand-700 dark:text-brand-300 hover:bg-brand-50 rounded-xl px-5"
                   >
                     Crear Publicación Manual
                   </button>
@@ -1124,7 +1140,7 @@ function resolveImageUrl(url?: string | null): string {
                       <div className="space-y-3">
                         {/* Fecha y Estado */}
                         <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-xs font-bold text-purple-600 dark:text-purple-400 capitalize">
+                          <span className="flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400 capitalize">
                             <RiTimeLine className="w-3.5 h-3.5" />
                             {formattedDate} • {formattedTime}
                           </span>
@@ -1170,14 +1186,14 @@ function resolveImageUrl(url?: string | null): string {
 
                         {/* Acciones de Prompt de imagen si existe */}
                         {post.image_prompt && (
-                          <div className="flex items-center justify-between bg-purple-50/50 dark:bg-purple-950/20 px-2.5 py-1.5 rounded-lg border border-purple-100 dark:border-purple-900/30">
-                            <span className="text-[11px] text-purple-700 dark:text-purple-300 truncate font-mono">
+                          <div className="flex items-center justify-between bg-brand-50/50 dark:bg-brand-950/20 px-2.5 py-1.5 rounded-lg border border-brand-100 dark:border-brand-900/30">
+                            <span className="text-[11px] text-brand-700 dark:text-brand-300 truncate font-mono">
                               Prompt IA disponible
                             </span>
                             <button
                               type="button"
                               onClick={() => handleCopyPrompt(post.image_prompt)}
-                              className="btn btn-xs btn-ghost text-purple-600 hover:text-purple-800 gap-1 text-[11px] font-semibold h-6 min-h-0 px-2"
+                              className="btn btn-xs btn-ghost text-brand-600 hover:text-brand-800 gap-1 text-[11px] font-semibold h-6 min-h-0 px-2"
                               title="Copiar prompt de imagen"
                             >
                               <RiFileCopyLine className="w-3 h-3" />
@@ -1197,7 +1213,7 @@ function resolveImageUrl(url?: string | null): string {
                       <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-4 flex items-center justify-between">
                         <button
                           onClick={() => setPreviewPost(post)}
-                          className="btn btn-xs btn-ghost gap-1 text-gray-600 hover:text-purple-600 dark:text-gray-400 text-[11px]"
+                          className="btn btn-xs btn-ghost gap-1 text-gray-600 hover:text-brand-600 dark:text-gray-400 text-[11px]"
                         >
                           <RiEyeLine className="w-3.5 h-3.5" />
                           Vista previa
@@ -1264,15 +1280,15 @@ function resolveImageUrl(url?: string | null): string {
                   onChange={(e) => setManualContent(e.target.value)}
                   rows={8}
                   placeholder="Escribe tu publicación para LinkedIn aquí..."
-                  className="w-full mt-1.5 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white leading-relaxed"
+                  className="w-full mt-1.5 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white leading-relaxed"
                 />
               </div>
 
               {/* Barra de herramientas creativas: Generar Prompt IA + Subir Imagen */}
-              <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 space-y-3">
+              <div className="p-4 rounded-xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-100 dark:border-brand-900/30 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
-                    <RiSparklingLine className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-xs font-bold text-brand-950 dark:text-brand-200 flex items-center gap-1.5">
+                    <RiSparklingLine className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                     Creativo Visual (Formato 4:3 predeterminado):
                   </span>
 
@@ -1282,7 +1298,7 @@ function resolveImageUrl(url?: string | null): string {
                       type="button"
                       onClick={handleGenerateManualPrompt}
                       disabled={isGeneratingManualPrompt || !manualContent.trim()}
-                      className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none rounded-xl flex items-center gap-1.5 text-xs font-semibold shadow-sm disabled:opacity-50"
+                      className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white border-none rounded-xl flex items-center gap-1.5 text-xs font-semibold shadow-xs disabled:opacity-50"
                       title="La IA analiza tu post y redacta el prompt óptimo en inglés con formato 4:3 para Midjourney o Flux"
                     >
                       {isGeneratingManualPrompt ? (
@@ -1299,7 +1315,7 @@ function resolveImageUrl(url?: string | null): string {
                     </button>
 
                     {/* Botón Subir Imagen */}
-                    <label className="btn btn-sm btn-outline border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-xl flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
+                    <label className="btn btn-sm btn-outline border-brand-300 dark:border-brand-700 hover:bg-brand-50 dark:hover:bg-brand-950/40 text-brand-700 dark:text-brand-300 rounded-xl flex items-center gap-1.5 text-xs font-semibold cursor-pointer">
                       <RiUploadCloud2Line className="w-4 h-4" />
                       <span>{isUploadingImage ? "Subiendo..." : "Subir Imagen"}</span>
                       <input
@@ -1318,20 +1334,20 @@ function resolveImageUrl(url?: string | null): string {
 
                 {/* Caja de Prompt Fotográfico Generado */}
                 {manualImagePrompt && (
-                  <div className="bg-white dark:bg-gray-900 p-3.5 rounded-xl border border-purple-200 dark:border-purple-800 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-2 mt-2">
+                  <div className="bg-white dark:bg-gray-900 p-3.5 rounded-xl border border-brand-200 dark:border-brand-800 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-2 mt-2">
                     <div className="flex items-center justify-between font-sans">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-purple-700 dark:text-purple-300">
+                        <span className="font-bold text-brand-700 dark:text-brand-300">
                           Prompt Fotográfico para Midjourney / Flux:
                         </span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
                           Formato 4:3
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleCopyPrompt(manualImagePrompt)}
-                        className="btn btn-xs bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/60 dark:hover:bg-purple-800 dark:text-purple-200 border-none rounded-lg flex items-center gap-1 font-sans font-semibold"
+                        className="btn btn-xs bg-brand-100 hover:bg-brand-200 text-brand-700 dark:bg-brand-900/60 dark:hover:bg-brand-800 dark:text-brand-200 border-none rounded-lg flex items-center gap-1 font-sans font-semibold"
                       >
                         <RiFileCopyLine className="w-3 h-3" />
                         <span>Copiar Prompt</span>
@@ -1345,7 +1361,7 @@ function resolveImageUrl(url?: string | null): string {
 
                 {/* Previsualización de la Imagen Cargada */}
                 {manualMediaUrl && (
-                  <div className="relative rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 h-44 bg-gray-900 group mt-2">
+                  <div className="relative rounded-xl overflow-hidden border border-brand-200 dark:border-brand-800 h-44 bg-gray-900 group mt-2">
                     <img
                       src={resolveImageUrl(manualMediaUrl)}
                       alt="Imagen adjunta al post manual"
@@ -1386,7 +1402,7 @@ function resolveImageUrl(url?: string | null): string {
                   type="button"
                   onClick={handleScheduleManual}
                   disabled={!manualContent.trim()}
-                  className="btn btn-primary bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 flex items-center gap-2 shadow-sm font-semibold disabled:opacity-50"
+                  className="btn btn-primary bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-6 flex items-center gap-2 shadow-xs font-semibold disabled:opacity-50"
                 >
                   <RiCalendarEventLine className="w-4 h-4" />
                   Programar Publicación
@@ -1400,8 +1416,8 @@ function resolveImageUrl(url?: string | null): string {
         {modeledDraft && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-900 rounded-3xl max-w-3xl w-full border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-purple-50/50 dark:bg-purple-950/20">
-                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300 font-bold text-sm">
+              <div className="p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-brand-50/50 dark:bg-brand-950/20">
+                <div className="flex items-center gap-2 text-brand-700 dark:text-brand-300 font-bold text-sm">
                   <RiSparklingLine className="w-5 h-5" />
                   Post Modelado con la Identidad de tu Empresa (SDR)
                 </div>
@@ -1424,7 +1440,7 @@ function resolveImageUrl(url?: string | null): string {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider">
                     Versión Modelada (Gancho + Insight + Propuesta de Valor + CTA)
                   </label>
                   <textarea
@@ -1433,16 +1449,16 @@ function resolveImageUrl(url?: string | null): string {
                       setModeledDraft({ ...modeledDraft, content: e.target.value })
                     }
                     rows={8}
-                    className="w-full mt-1 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white"
+                    className="w-full mt-1 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 dark:text-white"
                   />
                 </div>
 
                 {/* SECCIÓN CREATIVO VISUAL: BOTONES COPIAR PROMPT Y SUBIR IMAGEN */}
-                <div className="bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/30 dark:to-indigo-950/30 p-4 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 space-y-3">
+                <div className="bg-gradient-to-r from-brand-50/70 to-indigo-50/70 dark:from-brand-950/30 dark:to-indigo-950/30 p-4 rounded-2xl border border-brand-200/80 dark:border-brand-800/60 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h5 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                        <RiSparklingLine className="w-4 h-4 text-purple-600" />
+                        <RiSparklingLine className="w-4 h-4 text-brand-600" />
                         Creativo Visual para LinkedIn
                       </h5>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -1455,14 +1471,14 @@ function resolveImageUrl(url?: string | null): string {
                       <button
                         type="button"
                         onClick={() => handleCopyPrompt(modeledDraft.image_prompt)}
-                        className="btn btn-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded-lg gap-1.5 font-bold shadow-xs py-1 px-2.5 h-auto min-h-0"
+                        className="btn btn-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-brand-700 dark:text-brand-300 border border-brand-300 dark:border-brand-700 rounded-lg gap-1.5 font-bold shadow-xs py-1 px-2.5 h-auto min-h-0"
                       >
                         <RiFileCopyLine className="w-3.5 h-3.5" />
                         Copiar prompt de imagen
                       </button>
 
                       {/* Botón 2: Subir Imagen */}
-                      <label className="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg gap-1.5 font-bold cursor-pointer shadow-xs py-1 px-2.5 h-auto min-h-0">
+                      <label className="btn btn-xs bg-brand-500 hover:bg-brand-600 text-white border-none rounded-lg gap-1.5 font-bold cursor-pointer shadow-xs py-1 px-2.5 h-auto min-h-0">
                         {isUploadingImage ? (
                           <span className="loading loading-spinner loading-xs" />
                         ) : (
@@ -1485,12 +1501,12 @@ function resolveImageUrl(url?: string | null): string {
 
                   {/* Vista del Prompt de Imagen */}
                   {modeledDraft.image_prompt && (
-                    <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-1">
+                    <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-brand-100 dark:border-brand-900/40 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-1">
                       <div className="flex items-center justify-between font-sans">
-                        <span className="font-bold text-purple-600 dark:text-purple-400 not-italic">
+                        <span className="font-bold text-brand-600 dark:text-brand-400 not-italic">
                           Prompt Fotográfico para Midjourney / Flux:
                         </span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
                           Formato 4:3
                         </span>
                       </div>
@@ -1500,7 +1516,7 @@ function resolveImageUrl(url?: string | null): string {
 
                   {/* Preview de la imagen subida */}
                   {modeledDraft.media_url && (
-                    <div className="relative rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 h-44 bg-gray-900 group">
+                    <div className="relative rounded-xl overflow-hidden border border-brand-200 dark:border-brand-800 h-44 bg-gray-900 group">
                       <img
                         src={resolveImageUrl(modeledDraft.media_url)}
                         alt="Imagen cargada"
@@ -1517,19 +1533,19 @@ function resolveImageUrl(url?: string | null): string {
                         </button>
                       </div>
                       <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-xs text-white text-[11px] px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
-                        <RiImageLine className="w-3.5 h-3.5 text-purple-400" /> Imagen adjunta lista para publicar
+                        <RiImageLine className="w-3.5 h-3.5 text-brand-400" /> Imagen adjunta lista para publicar
                       </div>
                     </div>
                   )}
                 </div>
                 {/* Fecha y Hora de Publicación (Slot asignado Lun, Mié o Vie) */}
-                <div className="bg-purple-50/70 dark:bg-purple-950/30 p-3.5 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="bg-brand-50/70 dark:bg-brand-950/30 p-3.5 rounded-2xl border border-brand-200/80 dark:border-brand-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <span className="text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center gap-1.5">
-                      <RiCalendarEventLine className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="text-xs font-bold text-brand-950 dark:text-brand-200 flex items-center gap-1.5">
+                      <RiCalendarEventLine className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                       Fecha de Publicación (Slot asignado: Lun, Mié, Vie):
                     </span>
-                    <p className="text-[11px] text-purple-700 dark:text-purple-300">
+                    <p className="text-[11px] text-brand-700 dark:text-brand-300">
                       Calculado automáticamente sin repetir días para garantizar máxima distribución.
                     </p>
                   </div>
@@ -1542,7 +1558,7 @@ function resolveImageUrl(url?: string | null): string {
                         scheduled_at: new Date(e.target.value).toISOString(),
                       })
                     }
-                    className="p-2 rounded-xl border border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-800 dark:text-gray-100"
+                    className="p-2 rounded-xl border border-brand-300 dark:border-brand-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-800 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -1556,7 +1572,7 @@ function resolveImageUrl(url?: string | null): string {
                 </button>
                 <button
                   onClick={() => handleScheduleSingle(modeledDraft.content, modeledDraft.scheduled_at)}
-                  className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white border-none rounded-xl px-5"
+                  className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white border-none rounded-xl px-5 shadow-xs"
                 >
                   Aprobar y Programar en Calendario
                 </button>
@@ -1585,7 +1601,7 @@ function resolveImageUrl(url?: string | null): string {
               {/* Feed Card LinkedIn */}
               <div className="p-5 space-y-4 overflow-y-auto">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-base">
+                  <div className="w-12 h-12 rounded-full bg-brand-500 text-white font-bold flex items-center justify-center text-base shadow-xs">
                     {selectedAccount?.name?.charAt(0) || "U"}
                   </div>
                   <div>
@@ -1661,10 +1677,10 @@ function resolveImageUrl(url?: string | null): string {
               </div>
 
               {/* Botones Creativo Visual en Edición */}
-              <div className="bg-purple-50/50 dark:bg-purple-950/20 p-3.5 rounded-xl border border-purple-100 dark:border-purple-900/40 space-y-2.5">
+              <div className="bg-brand-50/50 dark:bg-brand-950/20 p-3.5 rounded-xl border border-brand-100 dark:border-brand-900/40 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
-                    <RiImageLine className="w-4 h-4 text-purple-600" />
+                    <RiImageLine className="w-4 h-4 text-brand-600" />
                     Imagen del Post
                   </span>
                   <div className="flex items-center gap-2">
@@ -1672,13 +1688,13 @@ function resolveImageUrl(url?: string | null): string {
                       <button
                         type="button"
                         onClick={() => handleCopyPrompt(editingPost.image_prompt)}
-                        className="btn btn-xs bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg gap-1 font-semibold"
+                        className="btn btn-xs bg-white dark:bg-gray-800 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 rounded-lg gap-1 font-semibold"
                       >
                         <RiFileCopyLine className="w-3.5 h-3.5" />
                         Copiar prompt
                       </button>
                     )}
-                    <label className="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer">
+                    <label className="btn btn-xs bg-brand-500 hover:bg-brand-600 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer shadow-xs">
                       {isUploadingImage ? (
                         <span className="loading loading-spinner loading-xs" />
                       ) : (
@@ -1701,10 +1717,10 @@ function resolveImageUrl(url?: string | null): string {
                 </div>
 
                 {editingPost.image_prompt && (
-                  <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono bg-white/70 dark:bg-gray-900/60 p-2.5 rounded-lg border border-purple-100 dark:border-purple-900/30 space-y-1">
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono bg-white/70 dark:bg-gray-900/60 p-2.5 rounded-lg border border-brand-100 dark:border-brand-900/30 space-y-1">
                     <div className="flex items-center justify-between font-sans">
-                      <strong className="text-purple-600 dark:text-purple-400">Prompt Fotográfico:</strong>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                      <strong className="text-brand-600 dark:text-brand-400">Prompt Fotográfico:</strong>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300">
                         Formato 4:3
                       </span>
                     </div>
@@ -1713,7 +1729,7 @@ function resolveImageUrl(url?: string | null): string {
                 )}
 
                 {editingPost.media_url && (
-                  <div className="relative rounded-lg overflow-hidden border border-purple-200 dark:border-purple-800 h-32 bg-gray-900">
+                  <div className="relative rounded-lg overflow-hidden border border-brand-200 dark:border-brand-800 h-32 bg-gray-900">
                     <img
                       src={resolveImageUrl(editingPost.media_url)}
                       alt="Imagen adjunta"
@@ -1734,7 +1750,7 @@ function resolveImageUrl(url?: string | null): string {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                    <RiTimeLine className="w-3.5 h-3.5 text-purple-600" />
+                    <RiTimeLine className="w-3.5 h-3.5 text-brand-600" />
                     Hora Programada:
                   </label>
                   <span className="text-[11px] text-gray-400 capitalize">
@@ -1765,7 +1781,7 @@ function resolveImageUrl(url?: string | null): string {
                       });
                     }
                   }}
-                  className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-semibold dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-semibold dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
 
@@ -1773,7 +1789,7 @@ function resolveImageUrl(url?: string | null): string {
                 <button onClick={() => setEditingPost(null)} className="btn btn-sm btn-ghost">
                   Cancelar
                 </button>
-                <button onClick={handleSaveEdit} className="btn btn-sm bg-purple-600 text-white rounded-xl">
+                <button onClick={handleSaveEdit} className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl shadow-xs">
                   Guardar Cambios
                 </button>
               </div>

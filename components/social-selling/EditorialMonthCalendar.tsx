@@ -276,7 +276,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Actualizar publicaciones"
           >
             <RiRefreshLine size={17} />
@@ -295,7 +295,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar por texto o tema..."
-              className="w-48 sm:w-56 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-2xs"
+              className="w-48 sm:w-56 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-500 shadow-2xs"
             />
           </div>
 
@@ -306,7 +306,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
               onClick={() => setStatusFilter("all")}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 statusFilter === "all"
-                  ? "bg-purple-600 text-white shadow-2xs"
+                  ? "bg-brand-500 text-white shadow-2xs"
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
@@ -354,13 +354,13 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
             type="button"
             onClick={onReorganize}
             disabled={isReorganizing || counts.scheduled === 0}
-            className="btn btn-sm bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 gap-1.5 text-xs font-semibold rounded-xl shadow-2xs"
+            className="btn btn-sm bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:hover:bg-brand-900/60 dark:text-brand-300 border border-brand-200 dark:border-brand-800 gap-1.5 text-xs font-semibold rounded-xl shadow-2xs"
             title="Distribuir automáticamente las publicaciones pendientes en Lunes, Miércoles y Viernes"
           >
             {isReorganizing ? (
               <span className="loading loading-spinner loading-xs" />
             ) : (
-              <RiSparklingLine className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <RiSparklingLine className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
             )}
             <span className="hidden sm:inline">Reorganizar (Lun, Mié, Vie)</span>
           </button>
@@ -398,7 +398,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                 onDrop={(e) => handleDrop(e, cell.date)}
                 className={`min-h-[170px] md:min-h-[195px] p-2 flex flex-col justify-between transition-all ${
                   isDragTarget
-                    ? "bg-purple-100/80 dark:bg-purple-950/70 ring-2 ring-purple-500 ring-inset shadow-inner"
+                    ? "bg-brand-100/80 dark:bg-brand-950/70 ring-2 ring-brand-500 ring-inset shadow-inner"
                     : cell.isCurrentMonth
                     ? "bg-white dark:bg-gray-900 hover:bg-gray-50/70 dark:hover:bg-gray-850/50"
                     : "bg-gray-50/70 dark:bg-gray-950/60 text-gray-400 dark:text-gray-600"
@@ -409,7 +409,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                   <span
                     className={`inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 transition-colors ${
                       cell.isToday
-                        ? "bg-purple-600 text-white font-bold shadow-xs"
+                        ? "bg-brand-500 text-white font-bold shadow-xs"
                         : cell.isCurrentMonth
                         ? "text-gray-700 dark:text-gray-300 font-bold"
                         : "text-gray-400 dark:text-gray-600"
@@ -419,7 +419,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                   </span>
 
                   {cell.posts.length > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                       {cell.posts.length} {cell.posts.length === 1 ? "post" : "posts"}
                     </span>
                   )}
@@ -447,15 +447,15 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                         onDragEnd={handleDragEnd}
                         className={`group relative rounded-xl border p-2 text-left bg-white dark:bg-gray-850 shadow-2xs hover:shadow-md transition-all border-gray-200 dark:border-gray-700 ${
                           isDraggable
-                            ? "cursor-grab active:cursor-grabbing hover:border-purple-400 dark:hover:border-purple-500"
+                            ? "cursor-grab active:cursor-grabbing hover:border-brand-400 dark:hover:border-brand-500"
                             : "cursor-default"
                         } ${
-                          isBeingDragged ? "opacity-40 scale-95 border-dashed border-purple-500" : ""
+                          isBeingDragged ? "opacity-40 scale-95 border-dashed border-brand-500" : ""
                         }`}
                       >
                         {/* Cabecera de la tarjeta: Hora + Badge de Estado + Indicador Drag */}
                         <div className="flex items-center justify-between gap-1 mb-1.5">
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-purple-600 dark:text-purple-400">
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-brand-600 dark:text-brand-400">
                             <RiTimeLine className="w-3 h-3 shrink-0" />
                             {formattedTime}
                           </span>
@@ -530,7 +530,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               e.stopPropagation();
                               onPreviewPost(post);
                             }}
-                            className="h-7 w-full flex items-center justify-center rounded-lg bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 dark:bg-gray-800 dark:hover:bg-purple-950/60 dark:text-gray-300 dark:hover:text-purple-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all cursor-pointer"
+                            className="h-7 w-full flex items-center justify-center rounded-lg bg-gray-100 hover:bg-brand-50 text-gray-700 hover:text-brand-600 dark:bg-gray-800 dark:hover:bg-brand-950/60 dark:text-gray-300 dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all cursor-pointer"
                             title="Ver vista previa"
                           >
                             <RiEyeLine className="w-4 h-4" />
@@ -602,12 +602,12 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                     <div
                       className={`h-full min-h-[60px] flex items-center justify-center border-2 border-dashed rounded-xl transition-all ${
                         isDragTarget
-                          ? "border-purple-400 bg-purple-50/50 dark:bg-purple-950/40"
+                          ? "border-brand-400 bg-brand-50/50 dark:bg-brand-950/40"
                           : "border-transparent text-gray-300 dark:text-gray-700 text-[10px]"
                       }`}
                     >
                       {isDragTarget ? (
-                        <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 animate-pulse">
+                        <span className="text-[11px] font-bold text-brand-600 dark:text-brand-400 animate-pulse">
                           Soltar para reprogramar aquí
                         </span>
                       ) : null}
