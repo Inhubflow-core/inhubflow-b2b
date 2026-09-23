@@ -230,8 +230,8 @@ export default function WorkflowsPage({ initialWorkflows }: { initialWorkflows: 
   return (
     <>
       <Head>
-        <title>Campaigns — Dashboard B2B</title>
-        <meta name="description" content="Manage your LinkedIn outreach campaigns and sequences." />
+        <title>Secuencias — InHubFlow B2B</title>
+        <meta name="description" content="Automatización y secuencias omnicanal de prospección en LinkedIn y Cold Email." />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div>
