@@ -54,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         content,
         topic,
         scheduled_at,
+        image_prompt,
         media_url,
         media_type = "none",
         original_post_url,
@@ -81,16 +82,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       db.prepare(`
         INSERT INTO social_selling_posts (
-          id, user_id, account_id, topic, content, media_url, media_type,
+          id, user_id, account_id, topic, content, image_prompt, media_url, media_type,
           original_post_url, original_author, original_content, original_metrics_json,
           scheduled_at, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id,
         (session.user as any)?.id || null,
         account_id,
         topic || null,
         content.trim(),
+        image_prompt || null,
         media_url || null,
         media_type,
         original_post_url || null,
@@ -112,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // PUT: Actualizar un post existente
   if (req.method === "PUT") {
     try {
-      const { id, content, scheduled_at, status, media_url, media_type, account_id } = req.body;
+      const { id, content, scheduled_at, status, image_prompt, media_url, media_type, account_id } = req.body;
       if (!id) {
         return res.status(400).json({ error: "id es obligatorio" });
       }
@@ -127,6 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         SET content = COALESCE(?, content),
             scheduled_at = COALESCE(?, scheduled_at),
             status = COALESCE(?, status),
+            image_prompt = COALESCE(?, image_prompt),
             media_url = COALESCE(?, media_url),
             media_type = COALESCE(?, media_type),
             account_id = COALESCE(?, account_id)
@@ -135,6 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         content ?? null,
         scheduled_at ?? null,
         status ?? null,
+        image_prompt ?? null,
         media_url ?? null,
         media_type ?? null,
         account_id ?? null,

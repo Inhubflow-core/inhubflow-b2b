@@ -99,14 +99,22 @@ POST ORIGINAL DE REFERENCIA (${original_author || "Líder de industria"}):
 ${original_text.slice(0, 2000)}
 """
 
-Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin comillas introductorias, sin notas de autor ni encabezados tipo "Aquí tienes el post:".`;
+REGLA DE FORMATO DE SALIDA:
+Primero escribe el texto completo del post para LinkedIn.
+Luego, en una línea separada al final, incluye un prompt fotográfico profesional en inglés para generar una imagen impactante que acompañe el post en herramientas como Midjourney o Flux.
+Delimita el prompt de imagen exactamente con estos marcadores:
+<<<IMAGE_PROMPT>>>
+[Aquí el prompt de imagen en inglés: fotografía editorial, iluminación cinematográfica, estética corporativa moderna o minimalista, hiperrealista, 35mm lens]
+<<<END_IMAGE_PROMPT>>>
+
+Sin notas introductorias ni encabezados tipo "Aquí tienes el post:".`;
 
   try {
     const { GoogleGenAI } = await import("@google/genai");
     const ai = new GoogleGenAI({ apiKey });
 
     let lastError: unknown = null;
-    let generatedPost = "";
+    let rawOutput = "";
     let usedModel = "";
 
     for (const model of STABLE_MODELS) {
@@ -122,7 +130,7 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
 
         const text = res.text?.trim()?.replace(/^```markdown|^```|```$/g, "").trim();
         if (text && text.length > 50) {
-          generatedPost = text;
+          rawOutput = text;
           usedModel = model;
           break;
         }
@@ -134,7 +142,7 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
       }
     }
 
-    if (!generatedPost) {
+    if (!rawOutput) {
       let errMsg = "El servicio de IA está experimentando alta demanda. Por favor reintenta en unos instantes.";
       if (lastError instanceof Error) {
         try {
@@ -149,12 +157,30 @@ Escribe ÚNICAMENTE el texto final del post listo para publicar en LinkedIn. Sin
       throw new Error(errMsg);
     }
 
+    // Extraer image_prompt de los delimitadores
+    let imagePrompt = "";
+    const promptMatch = rawOutput.match(/<<<IMAGE_PROMPT>>>([\s\S]*?)<<<END_IMAGE_PROMPT>>>/);
+    if (promptMatch && promptMatch[1]) {
+      imagePrompt = promptMatch[1].trim();
+    }
+
+    // Limpiar el texto del post quitando los delimitadores
+    const cleanedPost = rawOutput
+      .replace(/<<<IMAGE_PROMPT>>>[\s\S]*?<<<END_IMAGE_PROMPT>>>/g, "")
+      .trim();
+
+    // Fallback inteligente si la IA no generó el prompt de imagen
+    if (!imagePrompt) {
+      imagePrompt = `A high-end cinematic editorial photograph of a business leader and modern technology setup, representing "${topic || "B2B growth"}", minimalist modern office, soft volumetric lighting, shot on 35mm lens, photorealistic, 8k resolution, elegant color grading`;
+    }
+
     // Extraer título/primer gancho para resumen
-    const firstLine = generatedPost.split("\n")[0]?.replace(/^[#*\s-]+/, "").slice(0, 90) || topic || "Publicación de Social Selling";
+    const firstLine = cleanedPost.split("\n")[0]?.replace(/^[#*\s-]+/, "").slice(0, 90) || topic || "Publicación de Social Selling";
 
     return res.status(200).json({
       title: firstLine,
-      content: generatedPost,
+      content: cleanedPost,
+      image_prompt: imagePrompt,
       model_used: usedModel,
       topic: topic || null,
       original_author: original_author || null,

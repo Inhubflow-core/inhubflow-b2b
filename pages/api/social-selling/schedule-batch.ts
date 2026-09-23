@@ -66,10 +66,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const insertStmt = db.prepare(`
       INSERT INTO social_selling_posts (
-        id, user_id, account_id, topic, content, media_url, media_type,
+        id, user_id, account_id, topic, content, image_prompt, media_url, media_type,
         original_post_url, original_author, original_content, original_metrics_json,
         scheduled_at, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
     `);
 
     db.transaction(() => {
@@ -86,8 +86,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           postItem.account_id || account_id,
           topic || postItem.topic || null,
           postItem.content.trim(),
+          postItem.image_prompt || null,
           postItem.media_url || null,
-          postItem.media_type || "none",
+          postItem.media_type || (postItem.media_url ? "image" : "none"),
           postItem.original_post_url || null,
           postItem.original_author || null,
           postItem.original_content || null,

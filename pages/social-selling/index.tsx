@@ -26,6 +26,10 @@ import {
   RiArrowRightLine,
   RiAddLine,
   RiFileList3Line,
+  RiFileCopyLine,
+  RiImageAddLine,
+  RiUploadCloud2Line,
+  RiImageLine,
 } from "react-icons/ri";
 
 interface SocialPost {
@@ -33,6 +37,7 @@ interface SocialPost {
   account_id: string;
   topic: string | null;
   content: string;
+  image_prompt?: string | null;
   media_url: string | null;
   media_type: string;
   original_post_url: string | null;
@@ -146,7 +151,12 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     original: ViralPost;
     title: string;
     content: string;
+    image_prompt?: string | null;
+    media_url?: string | null;
   } | null>(null);
+
+  // Subida de imagen
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Calendar / Scheduled Posts State
   const [posts, setPosts] = useState<SocialPost[]>(initialPosts);
@@ -175,6 +185,70 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
   useEffect(() => {
     refreshPosts();
   }, [selectedAccountId]);
+
+  // Copiar Prompt de Imagen al Portapapeles
+  const handleCopyPrompt = async (promptText?: string | null) => {
+    if (!promptText) {
+      toast.error("No hay un prompt de imagen generado para este post");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(promptText);
+      toast.success("¡Prompt de imagen copiado al portapapeles! Listo para Midjourney o Flux.");
+    } catch {
+      toast.error("No se pudo copiar automáticamente. Por favor selecciónalo y copia manualmente.");
+    }
+  };
+
+  // Subir archivo de imagen para el post
+  const handleImageFileChange = async (file: File, target: "draft" | "edit") => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor selecciona un archivo de imagen (PNG, JPG o WEBP)");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("La imagen supera el límite de 15 MB");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = reader.result as string;
+          const res = await fetch("/api/uploads/social-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: file.name,
+              contentType: file.type,
+              base64,
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Error al subir la imagen");
+
+          if (target === "draft" && modeledDraft) {
+            setModeledDraft({ ...modeledDraft, media_url: data.url });
+          } else if (target === "edit" && editingPost) {
+            setEditingPost({ ...editingPost, media_url: data.url, media_type: "image" });
+          }
+          toast.success("¡Imagen subida y adjuntada al post!");
+        } catch (uploadErr: any) {
+          toast.error(uploadErr.message || "Error al procesar subida");
+        } finally {
+          setIsUploadingImage(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsUploadingImage(false);
+      toast.error(err.message || "Error al leer el archivo");
+    }
+  };
 
   // Buscar posts virales por tema
   const handleSearchViral = async (customTopic?: string) => {
@@ -238,6 +312,8 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
         original: vPost,
         title: data.title,
         content: data.content,
+        image_prompt: data.image_prompt || null,
+        media_url: null,
       });
     } catch (err: any) {
       toast.error(err.message || "Error al modelar el post con IA");
@@ -263,6 +339,9 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
           content,
           topic: topic || "Inbound",
           scheduled_at: scheduledAt,
+          image_prompt: modeledDraft?.image_prompt || null,
+          media_url: modeledDraft?.media_url || null,
+          media_type: modeledDraft?.media_url ? "image" : "none",
           original_post_url: modeledDraft?.original.post_url,
           original_author: modeledDraft?.original.author_name,
           original_content: modeledDraft?.original.text,
@@ -323,6 +402,9 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
           if (res.ok && data.content) {
             modeledList.push({
               content: data.content,
+              image_prompt: data.image_prompt || null,
+              media_url: null,
+              media_type: "none",
               original_post_url: vp.post_url || undefined,
               original_author: vp.author_name || undefined,
               original_content: vp.text || undefined,
@@ -413,6 +495,9 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
           content: editingPost.content,
           scheduled_at: editingPost.scheduled_at,
           status: editingPost.status,
+          image_prompt: editingPost.image_prompt || null,
+          media_url: editingPost.media_url || null,
+          media_type: editingPost.media_url ? "image" : "none",
         }),
       });
       if (!res.ok) throw new Error("Error actualizando");
@@ -771,10 +856,42 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                           </span>
                         </div>
 
+                        {/* Preview de imagen si existe */}
+                        {post.media_url && (
+                          <div className="relative rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 h-36 bg-gray-100 dark:bg-gray-800">
+                            <img
+                              src={post.media_url}
+                              alt="Creativo del post"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                              <RiImageLine className="w-3 h-3" /> Imagen adjunta
+                            </div>
+                          </div>
+                        )}
+
                         {/* Preview del contenido */}
-                        <div className="text-xs text-gray-700 dark:text-gray-300 line-clamp-5 whitespace-pre-line leading-relaxed font-normal bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                        <div className="text-xs text-gray-700 dark:text-gray-300 line-clamp-4 whitespace-pre-line leading-relaxed font-normal bg-gray-50 dark:bg-gray-800/40 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
                           {post.content}
                         </div>
+
+                        {/* Acciones de Prompt de imagen si existe */}
+                        {post.image_prompt && (
+                          <div className="flex items-center justify-between bg-purple-50/50 dark:bg-purple-950/20 px-2.5 py-1.5 rounded-lg border border-purple-100 dark:border-purple-900/30">
+                            <span className="text-[11px] text-purple-700 dark:text-purple-300 truncate font-mono">
+                              Prompt IA disponible
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPrompt(post.image_prompt)}
+                              className="btn btn-xs btn-ghost text-purple-600 hover:text-purple-800 gap-1 text-[11px] font-semibold h-6 min-h-0 px-2"
+                              title="Copiar prompt de imagen"
+                            >
+                              <RiFileCopyLine className="w-3 h-3" />
+                              Copiar prompt
+                            </button>
+                          </div>
+                        )}
 
                         {post.topic && (
                           <div className="text-[11px] text-gray-400">
@@ -918,9 +1035,90 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                     onChange={(e) =>
                       setModeledDraft({ ...modeledDraft, content: e.target.value })
                     }
-                    rows={10}
+                    rows={8}
                     className="w-full mt-1 p-3.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:text-white"
                   />
+                </div>
+
+                {/* SECCIÓN CREATIVO VISUAL: BOTONES COPIAR PROMPT Y SUBIR IMAGEN */}
+                <div className="bg-gradient-to-r from-purple-50/70 to-indigo-50/70 dark:from-purple-950/30 dark:to-indigo-950/30 p-4 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h5 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                        <RiSparklingLine className="w-4 h-4 text-purple-600" />
+                        Creativo Visual para LinkedIn
+                      </h5>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Copia el prompt fotográfico generado por IA o sube directamente tu imagen.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Botón 1: Copiar Prompt de Imagen */}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPrompt(modeledDraft.image_prompt)}
+                        className="btn btn-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700 rounded-lg gap-1.5 font-bold shadow-xs py-1 px-2.5 h-auto min-h-0"
+                      >
+                        <RiFileCopyLine className="w-3.5 h-3.5" />
+                        Copiar prompt de imagen
+                      </button>
+
+                      {/* Botón 2: Subir Imagen */}
+                      <label className="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg gap-1.5 font-bold cursor-pointer shadow-xs py-1 px-2.5 h-auto min-h-0">
+                        {isUploadingImage ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <RiUploadCloud2Line className="w-3.5 h-3.5" />
+                        )}
+                        Subir imagen
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          disabled={isUploadingImage}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleImageFileChange(f, "draft");
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Vista del Prompt de Imagen */}
+                  {modeledDraft.image_prompt && (
+                    <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
+                      <span className="font-sans font-bold text-purple-600 dark:text-purple-400 not-italic mr-1.5">
+                        Prompt Fotográfico:
+                      </span>
+                      {modeledDraft.image_prompt}
+                    </div>
+                  )}
+
+                  {/* Preview de la imagen subida */}
+                  {modeledDraft.media_url && (
+                    <div className="relative rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 h-44 bg-gray-900 group">
+                      <img
+                        src={modeledDraft.media_url}
+                        alt="Imagen cargada"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setModeledDraft({ ...modeledDraft, media_url: null })}
+                          className="btn btn-xs btn-circle bg-red-600 hover:bg-red-700 text-white border-none shadow-md"
+                          title="Quitar imagen"
+                        >
+                          <RiCloseLine className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-xs text-white text-[11px] px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
+                        <RiImageLine className="w-3.5 h-3.5 text-purple-400" /> Imagen adjunta lista para publicar
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -945,7 +1143,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
         {/* MODAL: VISTA PREVIA ESTILO LINKEDIN */}
         {previewPost && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-xl w-full border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-xl w-full border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5">
                   <RiLinkedinBoxFill className="w-4 h-4 text-blue-600" />
@@ -960,7 +1158,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
               </div>
 
               {/* Feed Card LinkedIn */}
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 overflow-y-auto">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-base">
                     {selectedAccount?.name?.charAt(0) || "U"}
@@ -979,6 +1177,17 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                 <div className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line leading-relaxed">
                   {previewPost.content}
                 </div>
+
+                {/* Imagen del post en el Feed de LinkedIn si existe */}
+                {previewPost.media_url && (
+                  <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 max-h-80 bg-gray-100 dark:bg-gray-800">
+                    <img
+                      src={previewPost.media_url}
+                      alt="Creativo de LinkedIn"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
 
                 {/* Botones simulados de LinkedIn */}
                 <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-around text-xs text-gray-500 font-semibold">
@@ -1003,7 +1212,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
         {/* MODAL: EDITAR POST */}
         {editingPost && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-xl w-full border border-gray-200 dark:border-gray-800 shadow-2xl p-6 space-y-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-xl w-full border border-gray-200 dark:border-gray-800 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">
                   Editar Publicación Programada
@@ -1021,9 +1230,69 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
                 <textarea
                   value={editingPost.content}
                   onChange={(e) => setEditingPost({ ...editingPost, content: e.target.value })}
-                  rows={8}
+                  rows={7}
                   className="w-full mt-1 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm dark:text-white"
                 />
+              </div>
+
+              {/* Botones Creativo Visual en Edición */}
+              <div className="bg-purple-50/50 dark:bg-purple-950/20 p-3.5 rounded-xl border border-purple-100 dark:border-purple-900/40 space-y-2.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+                    <RiImageLine className="w-4 h-4 text-purple-600" />
+                    Imagen del Post
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {editingPost.image_prompt && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPrompt(editingPost.image_prompt)}
+                        className="btn btn-xs bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg gap-1 font-semibold"
+                      >
+                        <RiFileCopyLine className="w-3.5 h-3.5" />
+                        Copiar prompt
+                      </button>
+                    )}
+                    <label className="btn btn-xs bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg gap-1 font-semibold cursor-pointer">
+                      <RiUploadCloud2Line className="w-3.5 h-3.5" />
+                      {editingPost.media_url ? "Cambiar imagen" : "Subir imagen"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleImageFileChange(f, "edit");
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {editingPost.image_prompt && (
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono bg-white/70 dark:bg-gray-900/60 p-2.5 rounded-lg border border-purple-100 dark:border-purple-900/30">
+                    <strong className="font-sans text-purple-600">Prompt: </strong>
+                    {editingPost.image_prompt}
+                  </div>
+                )}
+
+                {editingPost.media_url && (
+                  <div className="relative rounded-lg overflow-hidden border border-purple-200 dark:border-purple-800 h-32 bg-gray-900">
+                    <img
+                      src={editingPost.media_url}
+                      alt="Imagen adjunta"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditingPost({ ...editingPost, media_url: null, media_type: "none" })}
+                      className="absolute top-2 right-2 btn btn-xs btn-circle bg-red-600 text-white border-none"
+                      title="Eliminar imagen"
+                    >
+                      <RiCloseLine className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
