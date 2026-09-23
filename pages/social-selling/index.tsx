@@ -187,15 +187,20 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     refreshPosts();
   }, [selectedAccountId]);
 
-  // Copiar Prompt de Imagen al Portapapeles
+  // Copiar Prompt de Imagen al Portapapeles (Asegurando siempre formato 4:3)
   const handleCopyPrompt = async (promptText?: string | null) => {
     if (!promptText) {
       toast.error("No hay un prompt de imagen generado para este post");
       return;
     }
+    let normalized = promptText.trim();
+    if (!normalized.includes("4:3")) {
+      normalized = normalized.replace(/--ar\s+\d+:\d+/gi, "").replace(/aspect ratio\s+\d+:\d+/gi, "").trim();
+      normalized = `${normalized.replace(/,\s*$/, "")}, aspect ratio 4:3 --ar 4:3`;
+    }
     try {
-      await navigator.clipboard.writeText(promptText);
-      toast.success("¡Prompt de imagen copiado al portapapeles! Listo para Midjourney o Flux.");
+      await navigator.clipboard.writeText(normalized);
+      toast.success("¡Prompt copiado (Formato 4:3)! Listo para Midjourney o Flux.");
     } catch {
       toast.error("No se pudo copiar automáticamente. Por favor selecciónalo y copia manualmente.");
     }
@@ -1143,11 +1148,16 @@ function resolveImageUrl(url?: string | null): string {
 
                   {/* Vista del Prompt de Imagen */}
                   {modeledDraft.image_prompt && (
-                    <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed">
-                      <span className="font-sans font-bold text-purple-600 dark:text-purple-400 not-italic mr-1.5">
-                        Prompt Fotográfico:
-                      </span>
-                      {modeledDraft.image_prompt}
+                    <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-purple-100 dark:border-purple-900/40 text-[11px] text-gray-700 dark:text-gray-300 font-mono leading-relaxed space-y-1">
+                      <div className="flex items-center justify-between font-sans">
+                        <span className="font-bold text-purple-600 dark:text-purple-400 not-italic">
+                          Prompt Fotográfico para Midjourney / Flux:
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                          Formato 4:3
+                        </span>
+                      </div>
+                      <div className="break-words">{modeledDraft.image_prompt}</div>
                     </div>
                   )}
 
@@ -1325,9 +1335,14 @@ function resolveImageUrl(url?: string | null): string {
                 </div>
 
                 {editingPost.image_prompt && (
-                  <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono bg-white/70 dark:bg-gray-900/60 p-2.5 rounded-lg border border-purple-100 dark:border-purple-900/30">
-                    <strong className="font-sans text-purple-600">Prompt: </strong>
-                    {editingPost.image_prompt}
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono bg-white/70 dark:bg-gray-900/60 p-2.5 rounded-lg border border-purple-100 dark:border-purple-900/30 space-y-1">
+                    <div className="flex items-center justify-between font-sans">
+                      <strong className="text-purple-600 dark:text-purple-400">Prompt Fotográfico:</strong>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                        Formato 4:3
+                      </span>
+                    </div>
+                    <div className="break-words">{editingPost.image_prompt}</div>
                   </div>
                 )}
 

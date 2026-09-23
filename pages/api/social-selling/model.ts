@@ -102,9 +102,14 @@ ${original_text.slice(0, 2000)}
 REGLA DE FORMATO DE SALIDA:
 Primero escribe el texto completo del post para LinkedIn.
 Luego, en una línea separada al final, incluye un prompt fotográfico profesional en inglés para generar una imagen impactante que acompañe el post en herramientas como Midjourney o Flux.
+
+REGLA OBLIGATORIA DE TAMAÑO / PROPORCIÓN DE IMAGEN:
+El tamaño y relación de aspecto de la imagen DEBE ser SIEMPRE 4:3 por defecto.
+En el prompt en inglés DEBES incluir obligatoriamente al final: "aspect ratio 4:3, format 4:3 --ar 4:3".
+
 Delimita el prompt de imagen exactamente con estos marcadores:
 <<<IMAGE_PROMPT>>>
-[Aquí el prompt de imagen en inglés: fotografía editorial, iluminación cinematográfica, estética corporativa moderna o minimalista, hiperrealista, 35mm lens]
+[Aquí el prompt de imagen en inglés: fotografía editorial, iluminación cinematográfica, estética corporativa moderna o minimalista, hiperrealista, 35mm lens, aspect ratio 4:3 --ar 4:3]
 <<<END_IMAGE_PROMPT>>>
 
 Sin notas introductorias ni encabezados tipo "Aquí tienes el post:".`;
@@ -169,9 +174,14 @@ Sin notas introductorias ni encabezados tipo "Aquí tienes el post:".`;
       .replace(/<<<IMAGE_PROMPT>>>[\s\S]*?<<<END_IMAGE_PROMPT>>>/g, "")
       .trim();
 
-    // Fallback inteligente si la IA no generó el prompt de imagen
-    if (!imagePrompt) {
-      imagePrompt = `A high-end cinematic editorial photograph of a business leader and modern technology setup, representing "${topic || "B2B growth"}", minimalist modern office, soft volumetric lighting, shot on 35mm lens, photorealistic, 8k resolution, elegant color grading`;
+    // Normalizar y forzar SIEMPRE la proporción 4:3 por defecto
+    if (imagePrompt) {
+      imagePrompt = imagePrompt.replace(/--ar\s+\d+:\d+/gi, "").trim();
+      imagePrompt = imagePrompt.replace(/aspect ratio\s+\d+:\d+/gi, "").trim();
+      imagePrompt = imagePrompt.replace(/,\s*$/, "").trim();
+      imagePrompt = `${imagePrompt}, aspect ratio 4:3 --ar 4:3`;
+    } else {
+      imagePrompt = `A high-end cinematic editorial photograph of a business leader and modern technology setup, representing "${topic || "B2B growth"}", minimalist modern office, soft volumetric lighting, shot on 35mm lens, photorealistic, 8k resolution, elegant color grading, aspect ratio 4:3 --ar 4:3`;
     }
 
     // Extraer título/primer gancho para resumen
