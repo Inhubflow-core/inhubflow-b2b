@@ -30,6 +30,7 @@ import {
   RiImageAddLine,
   RiUploadCloud2Line,
   RiImageLine,
+  RiExternalLinkLine,
 } from "react-icons/ri";
 
 interface SocialPost {
@@ -717,6 +718,10 @@ function resolveImageUrl(url?: string | null): string {
                         <img
                           src={vp.author_avatar}
                           alt={vp.author_name}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                           className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
                         />
                       ) : (
@@ -737,20 +742,29 @@ function resolveImageUrl(url?: string | null): string {
 
                     {/* Métricas de Engagement */}
                     <div className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-gray-800/40 p-2 rounded-lg text-gray-600 dark:text-gray-300">
-                      <span className="flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400">
+                      <span className="flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400" title="Reacciones">
                         <RiThumbUpLine className="w-3.5 h-3.5" />
                         {vp.likes_count.toLocaleString()}
                       </span>
-                      <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400" title="Comentarios">
                         <RiChat1Line className="w-3.5 h-3.5" />
                         {vp.comments_count.toLocaleString()}
                       </span>
                       {vp.shares_count > 0 && (
-                        <span className="flex items-center gap-1 text-gray-500">
+                        <span className="flex items-center gap-1 text-gray-500" title="Veces compartido">
                           <RiShareForwardLine className="w-3.5 h-3.5" />
                           {vp.shares_count}
                         </span>
                       )}
+                      {vp.comments_count >= 2 ? (
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          💬 Debate activo
+                        </span>
+                      ) : vp.likes_count >= 15 ? (
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                          🚀 Alto alcance
+                        </span>
+                      ) : null}
                     </div>
 
                     {/* Contenido del Post */}
@@ -760,27 +774,49 @@ function resolveImageUrl(url?: string | null): string {
 
                     {vp.media_url && (
                       <div className="rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800 h-28 bg-gray-100 dark:bg-gray-800">
-                        <img src={vp.media_url} alt="Media" className="w-full h-full object-cover" />
+                        <img
+                          src={vp.media_url}
+                          alt="Creativo de LinkedIn"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            // Si la URL de LinkedIn expira o no carga, ocultar el contenedor limpiamente
+                            e.currentTarget.parentElement?.classList.add("hidden");
+                          }}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     )}
                   </div>
 
-                  {/* Botón de Acción para Modelar */}
-                  <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-4">
+                  {/* Botones de Acción */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-4 flex items-center gap-2">
+                    {vp.post_url ? (
+                      <a
+                        href={vp.post_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm btn-outline border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl flex items-center justify-center gap-1.5 transition-all text-xs font-semibold px-3 shrink-0"
+                        title="Abrir publicación original en LinkedIn"
+                      >
+                        <RiExternalLinkLine className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                        <span>Ver Publicación</span>
+                      </a>
+                    ) : null}
+
                     <button
                       onClick={() => handleModelPost(vp)}
                       disabled={modelingPostId === vp.id}
-                      className="w-full btn btn-sm bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white dark:bg-purple-900/30 dark:hover:bg-purple-700 dark:text-purple-300 dark:hover:text-white border border-purple-200 dark:border-purple-800 rounded-xl flex items-center justify-center gap-2 transition-all font-semibold"
+                      className="flex-1 btn btn-sm bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white dark:bg-purple-900/30 dark:hover:bg-purple-700 dark:text-purple-300 dark:hover:text-white border border-purple-200 dark:border-purple-800 rounded-xl flex items-center justify-center gap-1.5 transition-all font-semibold text-xs truncate"
                     >
                       {modelingPostId === vp.id ? (
                         <>
                           <span className="loading loading-spinner loading-xs" />
-                          Modelando con IA...
+                          <span className="truncate">Modelando...</span>
                         </>
                       ) : (
                         <>
-                          <RiSparklingLine className="w-4 h-4" />
-                          Modelar y Programar
+                          <RiSparklingLine className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Modelar y Programar</span>
                         </>
                       )}
                     </button>
