@@ -13,6 +13,7 @@ import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
   RiDragMove2Line,
+  RiCheckLine,
 } from "react-icons/ri";
 
 export interface SocialPost {
@@ -488,83 +489,75 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                           {post.content}
                         </p>
 
-                        {/* Prompt de Imagen si existe */}
-                        {post.image_prompt && (
-                          <div className="flex items-center justify-between bg-purple-50/70 dark:bg-purple-950/30 px-1.5 py-0.5 rounded text-[10px] text-purple-700 dark:text-purple-300 mb-1 border border-purple-100 dark:border-purple-900/40">
-                            <span className="truncate font-mono">Prompt 4:3 listo</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCopyPrompt(post.image_prompt);
-                              }}
-                              className="text-purple-600 hover:text-purple-800 font-bold ml-1"
-                              title="Copiar prompt"
-                            >
-                              <RiFileCopyLine className="w-2.5 h-2.5 inline" />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Barra de Acciones al Pasar el Ratón (Hover) */}
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800 mt-1">
+                        {/* 4 Botones de Acción Distribuidos (Ver, Publicar, Editar, Eliminar) */}
+                        <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-gray-100 dark:border-gray-800 mt-2">
+                          {/* 1. Ver (Vista previa) */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onPreviewPost(post);
                             }}
-                            className="text-[10px] text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 flex items-center gap-0.5 font-medium"
-                            title="Vista previa completa"
+                            className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 dark:bg-gray-800 dark:hover:bg-purple-950/60 dark:text-gray-300 dark:hover:text-purple-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all"
+                            title="Ver vista previa"
                           >
-                            <RiEyeLine className="w-3 h-3" />
-                            Ver
+                            <RiEyeLine className="w-4 h-4" />
                           </button>
 
-                          <div className="flex items-center gap-1">
-                            {post.status === "scheduled" && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPublishNow(post.id);
-                                }}
-                                disabled={publishLoadingId === post.id}
-                                title="Publicar en LinkedIn de inmediato"
-                                className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                              >
-                                {publishLoadingId === post.id ? (
-                                  <span className="loading loading-spinner loading-xs" />
-                                ) : (
-                                  <RiSendPlaneLine className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-
+                          {/* 2. Publicar ahora */}
+                          {post.status === "scheduled" ? (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onEditPost(post);
+                                onPublishNow(post.id);
                               }}
-                              title="Editar publicación"
-                              className="p-1 rounded text-gray-500 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+                              disabled={publishLoadingId === post.id}
+                              title="Publicar en LinkedIn de inmediato"
+                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white dark:bg-emerald-950/40 dark:hover:bg-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs transition-all"
                             >
-                              <RiEditLine className="w-3 h-3" />
+                              {publishLoadingId === post.id ? (
+                                <span className="loading loading-spinner loading-xs" />
+                              ) : (
+                                <RiSendPlaneLine className="w-4 h-4" />
+                              )}
                             </button>
-
+                          ) : (
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeletePost(post.id);
-                              }}
-                              title="Eliminar publicación"
-                              className="p-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                              disabled
+                              title={post.status === "published" ? "Publicación ya enviada" : "Estado: " + post.status}
+                              className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-gray-50 text-gray-400 dark:bg-gray-850 dark:text-gray-600 border border-gray-100 dark:border-gray-800 cursor-not-allowed opacity-60"
                             >
-                              <RiDeleteBinLine className="w-3 h-3" />
+                              <RiCheckLine className="w-4 h-4" />
                             </button>
-                          </div>
+                          )}
+
+                          {/* 3. Editar */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditPost(post);
+                            }}
+                            title="Editar publicación"
+                            className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-blue-100 text-gray-700 hover:text-blue-700 dark:bg-gray-800 dark:hover:bg-blue-950/60 dark:text-gray-300 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-700 shadow-2xs transition-all"
+                          >
+                            <RiEditLine className="w-4 h-4" />
+                          </button>
+
+                          {/* 4. Eliminar */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeletePost(post.id);
+                            }}
+                            title="Eliminar publicación"
+                            className="btn btn-xs h-7 min-h-0 px-0 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-950/40 dark:hover:bg-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/40 shadow-2xs transition-all"
+                          >
+                            <RiDeleteBinLine className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     );
