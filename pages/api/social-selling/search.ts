@@ -29,10 +29,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Unipile no está configurado en el servidor" });
     }
 
-    const resolved = await resolveUnipileAccount(db, requestedAccountId);
-    if (!resolved.unipileAccountId) {
+    let targetAccountId = requestedAccountId;
+    if (!targetAccountId) {
+      const firstAcc = db.prepare("SELECT id FROM accounts WHERE unipile_account_id IS NOT NULL LIMIT 1").get() as any;
+      targetAccountId = firstAcc?.id;
+    }
+
+    if (!targetAccountId) {
       return res.status(400).json({ error: "No hay cuenta de LinkedIn conectada a Unipile para realizar la búsqueda" });
     }
+
+    const resolved = await resolveUnipileAccount(db, targetAccountId);
 
     const cleanTopic = topic.trim();
     // Búsqueda profunda en LinkedIn mediante Unipile con paginación

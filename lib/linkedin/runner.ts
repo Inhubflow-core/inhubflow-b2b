@@ -733,7 +733,7 @@ export async function processSingleTrack(db: ReturnType<typeof getDb>, tr: Track
       const campaignContext = workflow?.prompt || "";
       const customInstruction = step.ai_prompt || "";
 
-      const authorFirstName = (target.first_name || target.name || name || "").trim().split(" ")[0];
+      const authorFirstName = (target.first_name || target.full_name || name || "").trim().split(" ")[0];
       const commentResult = await generatePostComment(postText, campaignContext, customInstruction, authorFirstName);
       const commentText = commentResult.text;
 

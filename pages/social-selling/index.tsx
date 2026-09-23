@@ -33,6 +33,7 @@ import {
   RiExternalLinkLine,
 } from "react-icons/ri";
 import { getNextAvailablePublishingSlot } from "@/lib/social-selling/slots";
+import { EditorialMonthCalendar } from "@/components/social-selling/EditorialMonthCalendar";
 
 interface SocialPost {
   id: string;
@@ -171,6 +172,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
 
   // Calendar / Scheduled Posts State
   const [posts, setPosts] = useState<SocialPost[]>(initialPosts);
+  const [calendarViewMode, setCalendarViewMode] = useState<"month" | "cards">("month");
   const [isBatchScheduling, setIsBatchScheduling] = useState(false);
 
   // Modals
@@ -223,6 +225,60 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
       toast.error(err.message || "Error al reorganizar");
     } finally {
       setIsReorganizing(false);
+    }
+  };
+
+  // Reprogramar post al arrastrar y soltar (Drag and Drop) dentro del calendario
+  const handleReschedulePost = async (postId: string, newDate: Date) => {
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+
+    // Mantener la hora original del post o las 10:00 AM si no estuviese definida
+    const currentScheduled = new Date(post.scheduled_at);
+    const targetDate = new Date(newDate);
+    if (!isNaN(currentScheduled.getTime())) {
+      targetDate.setHours(currentScheduled.getHours(), currentScheduled.getMinutes(), 0, 0);
+    } else {
+      targetDate.setHours(10, 0, 0, 0);
+    }
+
+    const newIso = targetDate.toISOString();
+
+    // Actualización optimista inmediata en la interfaz
+    const previousPosts = [...posts];
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, scheduled_at: newIso } : p))
+    );
+
+    try {
+      const res = await fetch("/api/social-selling/posts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: postId,
+          scheduled_at: newIso,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "No se pudo reprogramar la publicación");
+      }
+
+      const formattedDate = targetDate.toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+      const formattedTime = targetDate.toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      toast.success(`Publicación reprogramada para el ${formattedDate} (${formattedTime})`);
+    } catch (err: any) {
+      setPosts(previousPosts);
+      toast.error(err.message || "Error al mover la publicación");
     }
   };
 
@@ -528,7 +584,16 @@ function resolveImageUrl(url?: string | null): string {
 
     try {
       const targetPosts = viralPosts.slice(0, 12);
-      const modeledList: Array<{ content: string; original_post_url?: string; original_author?: string; original_content?: string; original_metrics?: any }> = [];
+      const modeledList: Array<{
+        content: string;
+        image_prompt?: string | null;
+        media_url?: string | null;
+        media_type?: string;
+        original_post_url?: string;
+        original_author?: string;
+        original_content?: string;
+        original_metrics?: any;
+      }> = [];
 
       for (let i = 0; i < targetPosts.length; i++) {
         const vp = targetPosts[i];
@@ -948,45 +1013,57 @@ function resolveImageUrl(url?: string | null): string {
           </div>
         )}
 
-        {/* CONTENIDO: TAB 2 - CALENDARIO EDITORIAL MENSUAL */}
+        {/* CONTENIDO: TAB 2 - CALENDARIO EDITORIAL MENSUAL CON DRAG & DROP */}
         {activeTab === "calendar" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-purple-500/5 dark:bg-purple-950/20 p-4 rounded-2xl border border-purple-200/60 dark:border-purple-900/40">
               <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Calendario de Publicaciones (3 posts por semana)
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Publicaciones distribuidas automáticamente en Lunes, Miércoles y Viernes en horarios óptimos.
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Calendario Editorial
+                  </h3>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                    {posts.length} {posts.length === 1 ? "publicación" : "publicaciones"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Arrastra y suelta (drag and drop) publicaciones entre casillas para reprogramar fechas al instante.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleReorganizeCalendar}
-                  disabled={isReorganizing || posts.filter((p) => p.status === "scheduled").length === 0}
-                  className="btn btn-sm bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 gap-1.5 text-xs font-semibold rounded-xl"
-                  title="Reorganiza automáticamente todas las publicaciones pendientes en Lunes, Miércoles y Viernes sin colisiones"
-                >
-                  {isReorganizing ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <RiSparklingLine className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  )}
-                  <span>Reorganizar Calendario (Lun, Mié, Vie)</span>
-                </button>
 
-                <button
-                  onClick={refreshPosts}
-                  className="btn btn-sm btn-ghost gap-1.5 text-xs text-gray-600 dark:text-gray-300 rounded-xl"
-                >
-                  <RiRefreshLine className="w-3.5 h-3.5" />
-                  Actualizar
-                </button>
+              {/* Selector de modo de vista: Mes vs Tarjetas */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="join border border-gray-300 dark:border-gray-700 rounded-xl p-0.5 bg-gray-100 dark:bg-gray-800 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarViewMode("month")}
+                    className={`join-item btn btn-xs gap-1 font-semibold ${
+                      calendarViewMode === "month"
+                        ? "btn-primary bg-purple-600 border-purple-600 text-white"
+                        : "btn-ghost text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                    title="Vista de calendario mensual con cuadrícula de días y drag & drop"
+                  >
+                    <RiCalendarEventLine size={13} /> Vista Mes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarViewMode("cards")}
+                    className={`join-item btn btn-xs gap-1 font-semibold ${
+                      calendarViewMode === "cards"
+                        ? "btn-primary bg-purple-600 border-purple-600 text-white"
+                        : "btn-ghost text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                    title="Vista en lista detallada de tarjetas"
+                  >
+                    <RiFileList3Line size={13} /> Tarjetas
+                  </button>
+                </div>
               </div>
             </div>
 
             {posts.length === 0 ? (
-              <div className="bg-white dark:bg-gray-900 p-12 text-center rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4">
+              <div className="bg-white dark:bg-gray-900 p-12 text-center rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4 shadow-sm">
                 <div className="w-12 h-12 mx-auto rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
                   <RiCalendarEventLine className="w-6 h-6" />
                 </div>
@@ -994,15 +1071,38 @@ function resolveImageUrl(url?: string | null): string {
                   No hay publicaciones programadas aún
                 </h4>
                 <p className="text-sm text-gray-500 max-w-md mx-auto">
-                  Ve a la pestaña <strong>Radar Viral</strong> para buscar los mejores posts de tu nicho y calendarizar tu mes en un solo clic.
+                  Ve a la pestaña <strong>Radar Viral</strong> para buscar los mejores posts de tu nicho y calendarizar tu mes en un solo clic, o crea una publicación manual.
                 </p>
-                <button
-                  onClick={() => setActiveTab("radar")}
-                  className="btn btn-primary bg-purple-600 text-white rounded-xl px-5"
-                >
-                  Ir al Radar Viral
-                </button>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => setActiveTab("radar")}
+                    className="btn btn-primary bg-purple-600 text-white rounded-xl px-5"
+                  >
+                    Ir al Radar Viral
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("create")}
+                    className="btn btn-outline border-purple-300 text-purple-700 dark:text-purple-300 rounded-xl px-5"
+                  >
+                    Crear Publicación Manual
+                  </button>
+                </div>
               </div>
+            ) : calendarViewMode === "month" ? (
+              <EditorialMonthCalendar
+                posts={posts}
+                onReschedulePost={handleReschedulePost}
+                onPreviewPost={setPreviewPost}
+                onEditPost={setEditingPost}
+                onDeletePost={handleDeletePost}
+                onPublishNow={handlePublishNow}
+                onCopyPrompt={handleCopyPrompt}
+                publishLoadingId={publishLoadingId}
+                onReorganize={handleReorganizeCalendar}
+                isReorganizing={isReorganizing}
+                onRefresh={refreshPosts}
+                resolveImageUrl={resolveImageUrl}
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {posts.map((post) => {
@@ -1059,7 +1159,7 @@ function resolveImageUrl(url?: string | null): string {
                               className="w-full h-full object-cover"
                             />
                             <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                              <RiImageLine className="w-3 h-3" /> Imagen adjunta
+                              <RiImageLine className="w-3 h-3" /> Imagen adjunta (4:3)
                             </div>
                           </div>
                         )}

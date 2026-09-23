@@ -81,6 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   const rawChannel = Array.isArray(req.query.channel) ? req.query.channel[0] : req.query.channel;
   const channel = rawChannel && VALID_CHANNELS.has(rawChannel) ? rawChannel : undefined;
+  const rawAccountId = Array.isArray(req.query.account) ? req.query.account[0] : req.query.account;
   let accountId = rawAccountId?.trim() || undefined;
 
   // Si es un vendedor/miembro de equipo regular, forzar su cuenta asignada
