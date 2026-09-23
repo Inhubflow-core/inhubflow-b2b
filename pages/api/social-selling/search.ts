@@ -111,6 +111,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const authorName = (item as any).author?.name || (item as any).author?.username || (item as any).actor?.name || "Líder de Industria";
         const authorHeadline = (item as any).author?.headline || (item as any).author?.occupation || "";
         const authorAvatar = (item as any).author?.profile_picture_url || (item as any).author?.avatar || null;
+        const text = (item as any).text || (item as any).content || "";
+        const mediaUrl = (item as any).attachments?.[0]?.url || (item as any).image_url || (item as any).media?.[0]?.url || null;
         const rawPostUrl = (item as any).url || (item as any).share_url || (item as any).post_url || null;
         const postId = (item as any).id || (item as any).social_id || String(Math.random());
         let postUrl = rawPostUrl && typeof rawPostUrl === "string" && rawPostUrl.startsWith("http")
