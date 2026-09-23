@@ -364,13 +364,13 @@ export default function Sidebar({
                         <Link
                           key={child.href}
                           href={child.href}
-                          className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                          className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
                             childActive
-                              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
+                              ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
                               : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 font-normal"
                           }`}
                         >
-                          <child.icon size={14} className={childActive ? "text-brand-600 dark:text-brand-400" : "text-gray-400"} />
+                          <child.icon size={16} className={childActive ? "text-brand-600 dark:text-brand-400" : "text-gray-400"} />
                           <span className="truncate">{childLabel}</span>
                         </Link>
                       );
@@ -422,20 +422,20 @@ export default function Sidebar({
                         key={child.href}
                         href={child.href}
                         data-tour={child.tour}
-                        className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs transition-all ${
+                        className={`flex items-center gap-3 rounded-xl px-2.5 py-1.5 text-sm font-normal transition-all ${
                           childActive
-                            ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold"
-                            : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white font-normal"
+                            ? "bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium"
+                            : "text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                         }`}
                       >
                         <div
-                          className={`flex h-4.5 w-4.5 items-center justify-center rounded transition-colors ${
+                          className={`flex h-6 w-6 items-center justify-center rounded-lg transition-colors ${
                             childActive
                               ? "text-brand-600 dark:text-brand-400"
-                              : "text-gray-400 dark:text-gray-500"
+                              : "text-gray-500 dark:text-gray-400"
                           }`}
                         >
-                          <child.icon size={14} />
+                          <child.icon size={16} />
                         </div>
                         <span className="truncate">{childLabel}</span>
                         {childActive && (
@@ -551,7 +551,7 @@ export default function Sidebar({
           <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
             {isCollapsed ? <RiMenuUnfoldLine size={17} /> : <RiMenuFoldLine size={17} />}
           </div>
-          {!isCollapsed && <span className="text-xs font-medium truncate">{t("nav.collapseMenu")}</span>}
+          {!isCollapsed && <span className="text-sm font-normal truncate">{t("nav.collapseMenu")}</span>}
         </button>
       </div>
     </aside>
