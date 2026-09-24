@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 const ACCOUNT_COLUMNS = `id, name, email, is_authenticated, unipile_status AS linkedin_connection_status, daily_connection_limit, daily_message_limit, daily_inmail_limit,
   active_hours_start, active_hours_end, timezone, working_days, created_at,
   inbox_synced_at, accepted_sync_at, li_connections, li_pending, li_profile_views,
-  li_stats_synced_at, connections_synced_through_ms`;
+  li_stats_synced_at, connections_synced_through_ms, profile_image_url`;
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const db = getDb();

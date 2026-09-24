@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const ACCOUNT_COLUMNS = `a.id, a.name, a.email, a.is_authenticated, a.unipile_status AS linkedin_connection_status, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
       a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
       a.inbox_synced_at, a.accepted_sync_at, a.li_connections, a.li_pending, a.li_profile_views,
-      a.li_stats_synced_at, a.connections_synced_through_ms, a.owner_id, a.assigned_user_id`;
+      a.li_stats_synced_at, a.connections_synced_through_ms, a.owner_id, a.assigned_user_id, a.profile_image_url`;
 
     if (req.method === "GET") {
       // 1. If user is a team member with an explicitly assigned account:

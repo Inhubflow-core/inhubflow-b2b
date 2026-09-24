@@ -222,6 +222,15 @@ export class UnipileClient {
   }
 
   /**
+   * Obtiene el perfil propio de la cuenta de LinkedIn conectada (incluyendo profile_picture_url)
+   */
+  async getOwnProfile(accountId: string): Promise<UnipileProfile> {
+    return this.request<UnipileProfile>(
+      `/api/v1/users/me?account_id=${encodeURIComponent(accountId)}`
+    );
+  }
+
+  /**
    * Envía una solicitud de conexión (invitación) en LinkedIn
    */
   async sendInvitation(params: UnipileSendInvitationParams): Promise<UnipileSendInvitationResponse> {

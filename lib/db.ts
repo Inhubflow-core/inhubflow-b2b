@@ -713,6 +713,7 @@ function runMigrations(db: Database.Database) {
     // Unipile API Integration
     "ALTER TABLE accounts ADD COLUMN unipile_account_id TEXT",
     "ALTER TABLE accounts ADD COLUMN unipile_status TEXT",
+    "ALTER TABLE accounts ADD COLUMN profile_image_url TEXT",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_unipile_account_id ON accounts(unipile_account_id) WHERE unipile_account_id IS NOT NULL",
     "ALTER TABLE targets ADD COLUMN unipile_provider_id TEXT",
     "ALTER TABLE targets ADD COLUMN unipile_chat_id TEXT",
