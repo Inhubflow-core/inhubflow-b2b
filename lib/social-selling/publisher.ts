@@ -131,7 +131,7 @@ export async function publishDueScheduledPosts(
   let query = `
     SELECT * FROM social_selling_posts
     WHERE status = 'scheduled'
-      AND scheduled_at <= datetime('now')
+      AND datetime(scheduled_at) <= datetime('now')
   `;
   const params: any[] = [];
 
