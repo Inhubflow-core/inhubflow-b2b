@@ -171,9 +171,29 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
     }
   };
 
+  // Auto-refresco periódico y comprobación de publicaciones vencidas cada 30 segundos
   useEffect(() => {
-    refreshPosts();
-  }, [selectedAccountId]);
+    const checkAndRefresh = async () => {
+      try {
+        await fetch("/api/social-selling/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      } catch {
+        // ignore
+      }
+      refreshPosts();
+    };
+
+    checkAndRefresh();
+
+    const interval = setInterval(() => {
+      checkAndRefresh();
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [selectedAccountId, activeTab]);
 
   // Mantener el slot predeterminado para posts manuales en el próximo Lun/Mié/Vie libre
   useEffect(() => {
