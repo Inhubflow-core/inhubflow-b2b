@@ -1249,14 +1249,13 @@ function resolveImageUrl(url?: string | null): string {
                               onClick={() => handlePublishNow(post.id)}
                               disabled={publishLoadingId === post.id}
                               title="Publicar en LinkedIn de inmediato"
-                              className="btn btn-xs text-white border-none rounded-lg flex items-center gap-1 shadow-xs hover:opacity-90 active:scale-95"
-                              style={{ backgroundColor: "#059669", color: "#ffffff", borderColor: "#059669" }}
+                              className="btn btn-xs rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer active:scale-95 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-500/20 dark:border-emerald-800/50"
                             >
                               {publishLoadingId === post.id ? (
-                                <span className="loading loading-spinner loading-xs" />
+                                <span className="loading loading-spinner loading-xs text-emerald-600 dark:text-emerald-400" />
                               ) : (
                                 <>
-                                  <RiSendPlaneLine className="w-3.5 h-3.5 text-white" />
+                                  <RiSendPlaneLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                                   <span>Publicar</span>
                                 </>
                               )}
@@ -1267,10 +1266,9 @@ function resolveImageUrl(url?: string | null): string {
                           <button
                             onClick={() => setConfirmDeletePost(post)}
                             title="Eliminar post"
-                            className="btn btn-xs text-white border-none rounded-lg flex items-center gap-1 shadow-xs hover:opacity-90 active:scale-95"
-                            style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
+                            className="btn btn-xs rounded-lg flex items-center gap-1 shadow-2xs transition-all cursor-pointer active:scale-95 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 dark:bg-red-950/40 dark:hover:bg-red-900/50 border border-red-500/20 dark:border-red-800/50"
                           >
-                            <RiDeleteBinLine className="w-3.5 h-3.5 text-white" />
+                            <RiDeleteBinLine className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                             <span>Eliminar</span>
                           </button>
                         </div>
@@ -1866,10 +1864,9 @@ function resolveImageUrl(url?: string | null): string {
                     setConfirmDeletePost(null);
                     await handleDeletePost(id);
                   }}
-                  className="btn btn-sm text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs border-none hover:opacity-90 active:scale-95"
-                  style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
+                  className="btn btn-sm rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 bg-red-500/15 hover:bg-red-500/25 text-red-700 dark:text-red-300 border border-red-500/30"
                 >
-                  <RiDeleteBinLine className="w-3.5 h-3.5 text-white" />
+                  <RiDeleteBinLine className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                   Sí, eliminar
                 </button>
               </div>

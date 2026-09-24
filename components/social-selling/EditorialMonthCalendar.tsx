@@ -549,7 +549,7 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                             <RiEditLine className="w-4 h-4" />
                           </button>
 
-                          {/* 3. Publicar ahora / Reintentar (Verde) */}
+                          {/* 3. Publicar ahora / Reintentar (Verde suave / transparente) */}
                           {post.status === "scheduled" || post.status === "failed" ? (
                             <button
                               type="button"
@@ -559,13 +559,12 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               }}
                               disabled={publishLoadingId === post.id}
                               title={post.status === "failed" ? "Reintentar publicación en LinkedIn" : "Publicar en LinkedIn ahora mismo"}
-                              className="h-7 w-full flex items-center justify-center rounded-lg text-white shadow-xs transition-all cursor-pointer hover:opacity-90 active:scale-95 disabled:opacity-50"
-                              style={{ backgroundColor: "#059669", color: "#ffffff", border: "1px solid #059669" }}
+                              className="h-7 w-full flex items-center justify-center rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-500/20 dark:border-emerald-800/50 shadow-2xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                             >
                               {publishLoadingId === post.id ? (
-                                <span className="loading loading-spinner loading-xs text-white" />
+                                <span className="loading loading-spinner loading-xs text-emerald-600 dark:text-emerald-400" />
                               ) : (
-                                <RiSendPlaneLine className="w-4 h-4 text-white" />
+                                <RiSendPlaneLine className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                               )}
                             </button>
                           ) : (
@@ -573,13 +572,13 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               type="button"
                               disabled
                               title={post.status === "published" ? "Publicación ya enviada" : "Estado: " + post.status}
-                              className="h-7 w-full flex items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 cursor-not-allowed opacity-80"
+                              className="h-7 w-full flex items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:border-emerald-800/40 cursor-not-allowed opacity-80"
                             >
                               <RiCheckLine className="w-4 h-4" />
                             </button>
                           )}
 
-                          {/* 4. Eliminar (Rojo) */}
+                          {/* 4. Eliminar (Rojo suave / transparente) */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -587,10 +586,9 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                               setConfirmDeletePost(post);
                             }}
                             title="Eliminar publicación"
-                            className="h-7 w-full flex items-center justify-center rounded-lg text-white shadow-xs transition-all cursor-pointer hover:opacity-90 active:scale-95"
-                            style={{ backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #dc2626" }}
+                            className="h-7 w-full flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 dark:bg-red-950/40 dark:hover:bg-red-900/50 border border-red-500/20 dark:border-red-800/50 shadow-2xs transition-all cursor-pointer active:scale-95"
                           >
-                            <RiDeleteBinLine className="w-4 h-4 text-white" />
+                            <RiDeleteBinLine className="w-4 h-4 text-red-600 dark:text-red-400" />
                           </button>
                         </div>
                       </div>
@@ -659,10 +657,9 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                   onPublishNow(id);
                 }}
                 disabled={publishLoadingId === confirmPublishPost.id}
-                className="btn btn-sm btn-success text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs border-none hover:opacity-90 active:scale-95"
-                style={{ backgroundColor: "#059669", color: "#ffffff", borderColor: "#059669" }}
+                className="btn btn-sm rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
               >
-                <RiSendPlaneLine className="w-3.5 h-3.5 text-white" />
+                <RiSendPlaneLine className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Sí, publicar ahora
               </button>
             </div>
@@ -708,10 +705,9 @@ export const EditorialMonthCalendar: React.FC<EditorialMonthCalendarProps> = ({
                   setConfirmDeletePost(null);
                   onDeletePost(id);
                 }}
-                className="btn btn-sm btn-error text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs border-none hover:opacity-90 active:scale-95"
-                style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
+                className="btn btn-sm rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 bg-red-500/15 hover:bg-red-500/25 text-red-700 dark:text-red-300 border border-red-500/30"
               >
-                <RiDeleteBinLine className="w-3.5 h-3.5 text-white" />
+                <RiDeleteBinLine className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                 Sí, eliminar
               </button>
             </div>
