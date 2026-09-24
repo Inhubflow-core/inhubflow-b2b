@@ -32,6 +32,8 @@ import {
   RiArrowDownSLine,
   RiArrowRightSLine,
   RiContactsBook2Line,
+  RiFocus2Fill as RiTargetFill,
+  RiNodeTree,
 } from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -85,10 +87,10 @@ const mainNav: NavItem[] = [
     type: "group",
     id: "campaigns",
     labelKey: "nav.campaigns",
-    icon: RiFlowChart,
+    icon: RiTargetFill,
     color: "#f79009",
     children: [
-      { href: "/workflows", labelKey: "nav.sequences", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
+      { href: "/workflows", labelKey: "nav.sequences", icon: RiNodeTree, color: "#f79009", tour: "nav-workflows" },
       { href: "/social-selling", labelKey: "nav.socialSelling", icon: RiMegaphoneLine, color: "#8b5cf6", tour: "nav-social-selling" },
     ],
   },
