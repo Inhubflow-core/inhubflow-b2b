@@ -4,35 +4,35 @@ import { useRouter } from "next/router";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
 import {
-  MdOutlineDashboard,
-  MdOutlineAccountTree,
-  MdOutlineFormatListBulleted,
-  MdOutlineLogout,
-  MdOutlineManageAccounts,
-  MdOutlineArrowCircleUp,
-  MdOutlineBusiness,
-  MdOutlinePeople,
-  MdOutlineViewKanban,
-  MdOutlineInbox,
-  MdOutlineMarkEmailRead,
-  MdOutlineEvent,
-  MdOutlineHelpOutline,
-  MdOutlineExplore,
-  MdOutlineSupportAgent,
-  MdOutlineLanguage,
-  MdOutlinePersonSearch,
-  MdOutlineSmartToy,
-  MdOutlineChevronLeft,
-  MdOutlineChevronRight,
-  MdOutlineAdminPanelSettings,
-  MdOutlineGroups,
-  MdOutlineOndemandVideo,
-  MdOutlineSensors,
-  MdOutlineCampaign,
-  MdOutlineKeyboardArrowDown,
-  MdOutlineKeyboardArrowRight,
-  MdOutlineContactPage,
-} from "react-icons/md";
+  RiLayoutGridLine,
+  RiFlowChart,
+  RiFileList3Line,
+  RiLogoutBoxLine,
+  RiUserSettingsLine,
+  RiArrowUpCircleLine,
+  RiBuildingLine,
+  RiContactsLine,
+  RiKanbanView,
+  RiInboxLine,
+  RiMailCheckLine,
+  RiCalendarEventLine,
+  RiQuestionLine,
+  RiCompassLine,
+  RiCustomerService2Line,
+  RiGlobalLine,
+  RiUserSearchLine,
+  RiRobotLine,
+  RiMenuFoldLine,
+  RiMenuUnfoldLine,
+  RiShieldCheckLine,
+  RiTeamLine,
+  RiVideoLine,
+  RiRadarLine,
+  RiMegaphoneLine,
+  RiArrowDownSLine,
+  RiArrowRightSLine,
+  RiContactsBook2Line,
+} from "react-icons/ri";
 import { pathToTourPage, replayPageTour } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
@@ -64,37 +64,37 @@ type NavItem =
     };
 
 const mainNav: NavItem[] = [
-  { type: "link", href: "/", labelKey: "nav.dashboard", icon: MdOutlineDashboard, color: "#465fff", tour: "nav-dashboard" },
-  { type: "link", href: "/lead-finder", labelKey: "nav.leadFinder", icon: MdOutlinePersonSearch, color: "#465fff", tour: "nav-lead-finder" },
-  { type: "link", href: "/signals", labelKey: "nav.signalRadar", icon: MdOutlineSensors, color: "#465fff", tour: "nav-signals" },
+  { type: "link", href: "/", labelKey: "nav.dashboard", icon: RiLayoutGridLine, color: "#465fff", tour: "nav-dashboard" },
+  { type: "link", href: "/lead-finder", labelKey: "nav.leadFinder", icon: RiUserSearchLine, color: "#465fff", tour: "nav-lead-finder" },
+  { type: "link", href: "/signals", labelKey: "nav.signalRadar", icon: RiRadarLine, color: "#465fff", tour: "nav-signals" },
   {
     type: "group",
     id: "leads",
     labelKey: "nav.leads",
-    icon: MdOutlineContactPage,
+    icon: RiContactsBook2Line,
     color: "#12b76a",
     children: [
-      { href: "/lists", labelKey: "nav.lists", icon: MdOutlineFormatListBulleted, color: "#12b76a", tour: "nav-lists" },
-      { href: "/contacts", labelKey: "nav.contacts", icon: MdOutlinePeople, color: "#0ba5ec", tour: "nav-contacts" },
-      { href: "/companies", labelKey: "nav.companies", icon: MdOutlineBusiness, color: "#7a5af8", tour: "nav-companies" },
+      { href: "/lists", labelKey: "nav.lists", icon: RiFileList3Line, color: "#12b76a", tour: "nav-lists" },
+      { href: "/contacts", labelKey: "nav.contacts", icon: RiContactsLine, color: "#0ba5ec", tour: "nav-contacts" },
+      { href: "/companies", labelKey: "nav.companies", icon: RiBuildingLine, color: "#7a5af8", tour: "nav-companies" },
     ],
   },
-  { type: "link", href: "/pipeline", labelKey: "nav.pipeline", icon: MdOutlineViewKanban, color: "#ec4899", tour: "nav-pipeline" },
-  { type: "link", href: "/calendar", labelKey: "nav.calendar", icon: MdOutlineEvent, color: "#8b5cf6", tour: "nav-calendar" },
+  { type: "link", href: "/pipeline", labelKey: "nav.pipeline", icon: RiKanbanView, color: "#ec4899", tour: "nav-pipeline" },
+  { type: "link", href: "/calendar", labelKey: "nav.calendar", icon: RiCalendarEventLine, color: "#8b5cf6", tour: "nav-calendar" },
   {
     type: "group",
     id: "campaigns",
     labelKey: "nav.campaigns",
-    icon: MdOutlineAccountTree,
+    icon: RiFlowChart,
     color: "#f79009",
     children: [
-      { href: "/workflows", labelKey: "nav.sequences", icon: MdOutlineAccountTree, color: "#f79009", tour: "nav-workflows" },
-      { href: "/social-selling", labelKey: "nav.socialSelling", icon: MdOutlineCampaign, color: "#8b5cf6", tour: "nav-social-selling" },
+      { href: "/workflows", labelKey: "nav.sequences", icon: RiFlowChart, color: "#f79009", tour: "nav-workflows" },
+      { href: "/social-selling", labelKey: "nav.socialSelling", icon: RiMegaphoneLine, color: "#8b5cf6", tour: "nav-social-selling" },
     ],
   },
-  { type: "link", href: "/inbox", labelKey: "nav.inbox", icon: MdOutlineInbox, color: "#0086c9", tour: "nav-inbox" },
-  { type: "link", href: "/sdr", labelKey: "nav.sdrAgent", icon: MdOutlineSmartToy, color: "#8b5cf6", tour: "nav-sdr" },
-  { type: "link", href: "/email-health", labelKey: "nav.emailHealth", icon: MdOutlineMarkEmailRead, color: "#fb6514", tour: "nav-email-health" },
+  { type: "link", href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
+  { type: "link", href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
+  { type: "link", href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
 ];
 
 interface SidebarProps {
@@ -248,7 +248,7 @@ export default function Sidebar({
                   : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
               }`}
             >
-              <MdOutlineAdminPanelSettings size={17} />
+              <RiShieldCheckLine size={17} />
             </div>
             {!isCollapsed && <span className="truncate font-semibold">SuperAdmin</span>}
             {!isCollapsed && (
@@ -277,7 +277,7 @@ export default function Sidebar({
                   : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
               }`}
             >
-              <MdOutlineGroups size={16} />
+              <RiTeamLine size={16} />
             </div>
             {!isCollapsed && <span className="truncate font-semibold">Admin</span>}
             {!isCollapsed && (
@@ -403,7 +403,7 @@ export default function Sidebar({
                 </div>
                 <span className="truncate">{label}</span>
                 <div className="ml-auto flex items-center pr-0.5">
-                  <MdOutlineKeyboardArrowDown
+                  <RiArrowDownSLine
                     size={16}
                     className={`text-gray-400 transition-transform duration-200 ${
                       isOpen ? "rotate-0" : "-rotate-90"
@@ -455,7 +455,7 @@ export default function Sidebar({
       {updateAvailable && !isCollapsed && (
         <div className="mx-3 mb-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MdOutlineArrowCircleUp size={16} />
+            <RiArrowUpCircleLine size={16} />
             <span>v{latestVersion} disponible</span>
           </div>
           <Link href="/settings" className="font-bold underline text-xs">
@@ -477,7 +477,7 @@ export default function Sidebar({
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
           <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-            <MdOutlineManageAccounts size={17} />
+            <RiUserSettingsLine size={17} />
           </div>
           {!isCollapsed && <span>{t("nav.settings")}</span>}
         </Link>
@@ -493,7 +493,7 @@ export default function Sidebar({
           } ${isCollapsed ? "justify-center px-0" : ""}`}
         >
           <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-            <MdOutlineSupportAgent size={17} />
+            <RiCustomerService2Line size={17} />
           </div>
           {!isCollapsed && <span>{t("nav.support")}</span>}
         </Link>
@@ -508,7 +508,7 @@ export default function Sidebar({
             }`}
           >
             <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-              <MdOutlineHelpOutline size={17} />
+              <RiQuestionLine size={17} />
             </div>
             {!isCollapsed && <span>{t("nav.help")}</span>}
           </button>
@@ -523,7 +523,7 @@ export default function Sidebar({
                   }}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors text-left"
                 >
-                  <MdOutlineExplore size={14} className="text-gray-400 shrink-0" />
+                  <RiCompassLine size={14} className="text-gray-400 shrink-0" />
                   {t("nav.replayTour")}
                 </button>
               )}
@@ -532,7 +532,7 @@ export default function Sidebar({
                 onClick={() => setHelpOpen(false)}
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
               >
-                <MdOutlineOndemandVideo size={14} className="text-gray-400 shrink-0" />
+                <RiVideoLine size={14} className="text-gray-400 shrink-0" />
                 {t("nav.tutorials")}
               </Link>
             </div>
@@ -549,7 +549,7 @@ export default function Sidebar({
           }`}
         >
           <div className="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400">
-            {isCollapsed ? <MdOutlineChevronRight size={17} /> : <MdOutlineChevronLeft size={17} />}
+            {isCollapsed ? <RiMenuUnfoldLine size={17} /> : <RiMenuFoldLine size={17} />}
           </div>
           {!isCollapsed && <span className="text-sm font-normal truncate">{t("nav.collapseMenu")}</span>}
         </button>

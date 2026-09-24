@@ -6,33 +6,13 @@ import { useSession } from "next-auth/react";
 import { getDb } from "@/lib/db";
 import { toast } from "sonner";
 import {
-  MdOutlineAdd,
-  MdOutlineDeleteOutline,
-  MdOutlineEdit,
-  MdOutlineMail,
-  MdOutlineSecurity,
-  MdOutlineVpnKey,
-  MdOutlineSmartphone,
-  MdOutlineDownload,
-  MdOutlineCheck,
-  MdOutlineClose,
-  MdOutlineLock,
-  MdOutlinePower,
-  MdOutlineArrowBack,
-  MdOutlineArrowForward,
-  MdOutlineChatBubbleOutline,
-  MdOutlineSettings,
-  MdOutlineContentCopy,
-  MdOutlineLockOpen,
-  MdOutlineBolt,
-  MdOutlineKeyboardArrowDown,
-  MdOutlineExplore,
-  MdOutlineLanguage,
-  MdOutlineOpenInNew,
-  MdOutlineVisibility,
-  MdOutlineVisibilityOff,
-} from "react-icons/md";
-import { RiLinkedinBoxLine } from "react-icons/ri";
+  RiAddLine, RiDeleteBinLine, RiEditLine, RiMailLine,
+  RiShieldCheckLine, RiShieldKeyholeLine, RiSmartphoneLine, RiDownloadLine, RiCheckLine, RiCloseLine,
+  RiLockPasswordLine, RiPlugLine, RiArrowLeftLine, RiArrowRightLine,
+  RiLinkedinBoxLine, RiMessage2Line, RiSettings3Line, RiFileCopyLine,
+  RiLockLine, RiLockUnlockLine, RiFlashlightLine, RiArrowDownSLine, RiCompassLine, RiGlobalLine,
+  RiExternalLinkLine, RiEyeLine, RiEyeOffLine,
+} from "react-icons/ri";
 import { ALL_TOUR_PAGES, TOUR_PAGE_LABELS, replayPageTour, type TourPage } from "@/lib/tour";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { Locale } from "@/lib/i18n/types";
@@ -126,10 +106,10 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "linkedin", label: "LinkedIn", icon: RiLinkedinBoxLine },
-  { key: "email", label: "Email", icon: MdOutlineMail },
-  { key: "templates", label: "Templates", icon: MdOutlineChatBubbleOutline },
-  { key: "integrations", label: "Integrations", icon: MdOutlinePower },
-  { key: "general", label: "General", icon: MdOutlineSettings },
+  { key: "email", label: "Email", icon: RiMailLine },
+  { key: "templates", label: "Templates", icon: RiMessage2Line },
+  { key: "integrations", label: "Integrations", icon: RiPlugLine },
+  { key: "general", label: "General", icon: RiSettings3Line },
 ];
 
 const PRESET_CONFIGS: Record<string, { smtp_host: string; smtp_port: number; smtp_secure: number; imap_host: string; imap_port: number }> = {
@@ -226,10 +206,10 @@ export default function SettingsPage({
   
   const visibleTabs = [
     { key: "linkedin" as Tab, label: t("settings.tabLinkedin"), icon: RiLinkedinBoxLine },
-    { key: "email" as Tab, label: t("settings.tabEmail"), icon: MdOutlineMail },
-    { key: "templates" as Tab, label: t("settings.tabTemplates"), icon: MdOutlineChatBubbleOutline },
-    { key: "integrations" as Tab, label: t("settings.tabIntegrations"), icon: MdOutlinePower },
-    { key: "general" as Tab, label: t("settings.tabGeneral"), icon: MdOutlineSettings },
+    { key: "email" as Tab, label: t("settings.tabEmail"), icon: RiMailLine },
+    { key: "templates" as Tab, label: t("settings.tabTemplates"), icon: RiMessage2Line },
+    { key: "integrations" as Tab, label: t("settings.tabIntegrations"), icon: RiPlugLine },
+    { key: "general" as Tab, label: t("settings.tabGeneral"), icon: RiSettings3Line },
   ];
 
   function switchTab(tKey: Tab) {
@@ -637,7 +617,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 text-white hover:bg-brand-600 transition-colors shadow-sm cursor-pointer shrink-0"
             onClick={openCreate}
           >
-            <MdOutlineAdd size={15} /> Conectar Nueva Cuenta
+            <RiAddLine size={15} /> Conectar Nueva Cuenta
           </button>
         ) : (
           <a
@@ -691,7 +671,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   </span>
                 ) : null}
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${a.is_authenticated ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-base-300 text-base-content/40"}`}>
-                  {a.is_authenticated ? <><MdOutlineCheck size={10} /> Activo</> : "Inactivo"}
+                  {a.is_authenticated ? <><RiCheckLine size={10} /> Activo</> : "Inactivo"}
                 </span>
                 {a.linkedin_connection_status === "OK" ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Cuenta de LinkedIn sincronizada y lista para prospección">
@@ -710,21 +690,21 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 transition-all cursor-pointer"
                   onClick={() => startAuthFlow(a.id)}
                 >
-                  <MdOutlineVpnKey size={13} /> {a.linkedin_connection_status === "OK" ? "Reconectar" : "Conectar LinkedIn"}
+                  <RiShieldKeyholeLine size={13} /> {a.linkedin_connection_status === "OK" ? "Reconectar" : "Conectar LinkedIn"}
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
                   onClick={() => openEdit(a)}
                   title="Edit"
                 >
-                  <MdOutlineEdit size={14} />
+                  <RiEditLine size={14} />
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
                   onClick={() => deleteAccount(a.id)}
                   title="Delete"
                 >
-                  <MdOutlineDeleteOutline size={13} />
+                  <RiDeleteBinLine size={13} />
                 </button>
               </div>
             </div>
@@ -746,7 +726,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                     className="p-1.5 -ml-1 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                     title="Volver al Paso 1"
                   >
-                    <MdOutlineArrowBack size={18} />
+                    <RiArrowLeftLine size={18} />
                   </button>
                 ) : (
                   <div className="w-9 h-9 rounded-xl bg-[#0A66C2]/10 text-[#0A66C2] flex items-center justify-center font-bold text-lg">
@@ -774,7 +754,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                   className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                   title="Cerrar"
                 >
-                  <MdOutlineClose size={20} />
+                  <RiCloseLine size={20} />
                 </button>
               </div>
             </div>
@@ -940,7 +920,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                         ) : editingAccount ? (
                           "Guardar Cambios"
                         ) : (
-                          <>Añadir y Conectar <MdOutlineArrowForward size={16} /></>
+                          <>Añadir y Conectar <RiArrowRightLine size={16} /></>
                         )}
                       </button>
                     </div>
@@ -1031,7 +1011,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors cursor-pointer"
                                   tabIndex={-1}
                                 >
-                                  {showAuthPassword ? <MdOutlineVisibilityOff size={15} /> : <MdOutlineVisibility size={15} />}
+                                  {showAuthPassword ? <RiEyeOffLine size={15} /> : <RiEyeLine size={15} />}
                                 </button>
                               </div>
                             </div>
@@ -1147,7 +1127,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                           {authLoading ? (
                             <span className="loading loading-spinner loading-xs" />
                           ) : (
-                            <>Conectar Cuenta <MdOutlineArrowForward size={16} /></>
+                            <>Conectar Cuenta <RiArrowRightLine size={16} /></>
                           )}
                         </button>
                       </div>
@@ -1219,7 +1199,7 @@ function LinkedInTab({ initialAccounts }: { initialAccounts: LiAccount[] }) {
                           {checkpointLoading ? (
                             <span className="loading loading-spinner loading-xs" />
                           ) : (
-                            <>Verificar y Conectar <MdOutlineCheck size={16} /></>
+                            <>Verificar y Conectar <RiCheckLine size={16} /></>
                           )}
                         </button>
                       </div>
@@ -1537,7 +1517,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
           onClick={openCreate}
         >
-          <MdOutlineAdd size={14} /> Add Account
+          <RiAddLine size={14} /> Add Account
         </button>
       </div>
 
@@ -1559,11 +1539,11 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
               <div className="flex items-center gap-2 shrink-0">
                 {a.is_verified ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-success/15 text-success">
-                    <MdOutlineCheck size={10} /> Verified
+                    <RiCheckLine size={10} /> Verified
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-base-300 text-base-content/40">
-                    <MdOutlineClose size={10} /> Unverified
+                    <RiCloseLine size={10} /> Unverified
                   </span>
                 )}
                 {a.active_run_count > 0 ? (
@@ -1580,7 +1560,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                   onClick={() => testConnection(a.id)}
                   disabled={testingId === a.id}
                 >
-                  {testingId === a.id ? <span className="loading loading-spinner loading-xs" /> : <MdOutlineSecurity size={12} />}
+                  {testingId === a.id ? <span className="loading loading-spinner loading-xs" /> : <RiShieldCheckLine size={12} />}
                   Test
                 </button>
                 <button
@@ -1588,19 +1568,19 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                   onClick={() => openDuplicate(a)}
                   title="Duplicate"
                 >
-                  <MdOutlineContentCopy size={14} />
+                  <RiFileCopyLine size={14} />
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
                   onClick={() => openEdit(a)}
                 >
-                  <MdOutlineEdit size={14} />
+                  <RiEditLine size={14} />
                 </button>
                 <button
                   className="inline-flex items-center p-1.5 rounded-lg bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors"
                   onClick={() => deleteAccount(a.id)}
                 >
-                  <MdOutlineDeleteOutline size={13} />
+                  <RiDeleteBinLine size={13} />
                 </button>
               </div>
             </div>
@@ -1707,7 +1687,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                     onClick={() => setSmtpUnlocked((v) => !v)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
                   >
-                    {smtpUnlocked ? <MdOutlineLockOpen size={12} /> : <MdOutlineLock size={12} />}
+                    {smtpUnlocked ? <RiLockUnlockLine size={12} /> : <RiLockLine size={12} />}
                     {smtpUnlocked ? "Lock" : "Unlock to edit"}
                   </button>
                 </div>
@@ -1767,7 +1747,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                     onClick={() => setImapUnlocked((v) => !v)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors"
                   >
-                    {imapUnlocked ? <MdOutlineLockOpen size={12} /> : <MdOutlineLock size={12} />}
+                    {imapUnlocked ? <RiLockUnlockLine size={12} /> : <RiLockLine size={12} />}
                     {imapUnlocked ? "Lock" : "Unlock to edit"}
                   </button>
                 </div>
@@ -1912,7 +1892,7 @@ function EmailTab({ initialAccounts }: { initialAccounts: EmailAccount[] }) {
                   Cancel
                 </button>
                 <button type="submit" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500 hover:bg-brand-600 !text-white transition-colors disabled:opacity-50 shadow-xs" disabled={loading}>
-                  {loading ? <span className="loading loading-spinner loading-xs" /> : editingAccount ? "Save changes" : <><MdOutlineMail size={14} /> Add Account</>}
+                  {loading ? <span className="loading loading-spinner loading-xs" /> : editingAccount ? "Save changes" : <><RiMailLine size={14} /> Add Account</>}
                 </button>
               </div>
             </form>
@@ -1971,7 +1951,7 @@ function TemplatesTab({ initialTemplates }: { initialTemplates: Template[] }) {
           Use <code className="text-primary text-xs">{"{{first_name}}"}</code>, <code className="text-primary text-xs">{"{{company}}"}</code> as variables
         </p>
         <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors" onClick={openCreate}>
-          <MdOutlineAdd size={14} /> New Template
+          <RiAddLine size={14} /> New Template
         </button>
       </div>
 
@@ -1987,10 +1967,10 @@ function TemplatesTab({ initialTemplates }: { initialTemplates: Template[] }) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button className="inline-flex items-center p-1.5 rounded-lg text-base-content/40 hover:text-base-content hover:bg-base-300/50 transition-colors" onClick={() => openEdit(t)}>
-                  <MdOutlineEdit size={14} />
+                  <RiEditLine size={14} />
                 </button>
                 <button className="inline-flex items-center p-1.5 rounded-lg bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors" onClick={() => del(t.id)}>
-                  <MdOutlineDeleteOutline size={13} />
+                  <RiDeleteBinLine size={13} />
                 </button>
               </div>
             </div>
@@ -2131,7 +2111,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
                   <p className="text-sm font-medium">{intg.name}</p>
                   {configured && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success">
-                      <MdOutlineCheck size={9} /> Connected
+                      <RiCheckLine size={9} /> Connected
                     </span>
                   )}
                 </div>
@@ -2143,7 +2123,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
                   <>
                     <span className="text-xs text-base-content/25 font-mono">{state?.masked}</span>
                     <button onClick={() => { setEditingKey(intg.key); setApiKeyInput(""); }} className="text-xs text-base-content/40 hover:text-base-content/70 transition-colors px-2 py-1">Change</button>
-                    <button onClick={() => remove(intg.key)} className="text-xs text-error/50 hover:text-error transition-colors p-1"><MdOutlineClose size={14} /></button>
+                    <button onClick={() => remove(intg.key)} className="text-xs text-error/50 hover:text-error transition-colors p-1"><RiCloseLine size={14} /></button>
                   </>
                 )}
                 {!configured && !isEditing && (
@@ -2156,7 +2136,7 @@ function IntegrationsTab({ hasPremium }: { hasPremium: boolean }) {
                 )}
                 {isEditing && (
                   <button onClick={() => { setEditingKey(null); setApiKeyInput(""); }} className="text-xs text-base-content/40 hover:text-base-content/70 transition-colors px-1 py-1">
-                    <MdOutlineClose size={14} />
+                    <RiCloseLine size={14} />
                   </button>
                 )}
               </div>
@@ -2245,7 +2225,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       {/* Language / Idioma */}
       <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-1">
-          <MdOutlineLanguage size={13} className="text-base-content/40" />
+          <RiGlobalLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">{t("settings.language")}</p>
         </div>
         <p className="text-xs text-base-content/50 mb-3">
@@ -2280,7 +2260,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       {/* Daily import limit */}
       <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-1">
-          <MdOutlineDownload size={13} className="text-base-content/40" />
+          <RiDownloadLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Daily import limit</p>
         </div>
         <p className="text-xs text-base-content/50 mb-3">
@@ -2299,7 +2279,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       {/* Product tour */}
       <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-2">
-          <MdOutlineExplore size={13} className="text-base-content/40" />
+          <RiCompassLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Product tour</p>
         </div>
         <p className="text-xs text-base-content/50 mb-3">
@@ -2329,7 +2309,7 @@ function GeneralTab({ hasPremium }: { hasPremium: boolean }) {
       {/* Change password */}
       <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-4">
         <div className="flex items-center gap-2 mb-3">
-          <MdOutlineLock size={13} className="text-base-content/40" />
+          <RiLockPasswordLine size={13} className="text-base-content/40" />
           <p className="text-xs font-medium text-base-content/40 uppercase tracking-wide">Change password</p>
         </div>
         <form onSubmit={handleChangePassword} className="flex flex-col gap-3">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MdOutlineBolt, MdOutlineAdd, MdOutlineCheck, MdOutlineKeyboardArrowRight } from "react-icons/md";
+import { RiFlashlightLine, RiAddLine, RiCheckLine, RiArrowRightSLine } from "react-icons/ri";
 
 interface InstanceSettings {
   companyName: string;
@@ -38,7 +38,7 @@ export function SlotsIndicator() {
         }`}
         title="Capacidad de Slots / Cuentas de Prospección"
       >
-        <MdOutlineBolt size={14} className={isFull ? "text-amber-600" : "text-brand-500"} />
+        <RiFlashlightLine size={14} className={isFull ? "text-amber-600" : "text-brand-500"} />
         <span>
           <strong className="font-bold">{used}</strong> / {limit} Slots
         </span>
@@ -102,7 +102,7 @@ export function SlotsIndicator() {
                 href="/settings"
                 className="flex items-center justify-center gap-1.5 w-full py-2 px-3 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl transition-colors shadow-sm"
               >
-                <MdOutlineAdd size={14} />
+                <RiAddLine size={14} />
                 <span>Conectar Cuenta</span>
               </a>
             ) : (
@@ -113,7 +113,7 @@ export function SlotsIndicator() {
                 className="flex items-center justify-center gap-1 w-full py-2 px-3 text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 rounded-xl transition-colors shadow-sm"
               >
                 <span>Mejorar Plan</span>
-                <MdOutlineKeyboardArrowRight size={14} />
+                <RiArrowRightSLine size={14} />
               </a>
             )}
           </div>

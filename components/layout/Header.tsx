@@ -4,18 +4,18 @@ import { useSession, signOut } from "next-auth/react";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { useTheme } from "@/lib/context/ThemeContext";
 import {
-  MdOutlineDarkMode,
-  MdOutlineLightMode,
-  MdOutlineLogout,
-  MdOutlinePerson,
-  MdOutlineChevronLeft,
-  MdOutlineChevronRight,
-  MdOutlineCheck,
-  MdOutlineSend,
-  MdOutlineNotifications,
-  MdOutlineVolumeUp,
-  MdOutlineVolumeOff,
-} from "react-icons/md";
+  RiMoonLine,
+  RiSunLine,
+  RiLogoutBoxRLine,
+  RiUserLine,
+  RiMenuFoldLine,
+  RiMenuUnfoldLine,
+  RiCheckLine,
+  RiSendPlaneLine,
+  RiNotification3Line,
+  RiVolumeUpLine,
+  RiVolumeMuteLine,
+} from "react-icons/ri";
 import { useNotifications } from "@/components/notifications/NotificationProvider";
 import { SlotsIndicator } from "./SlotsIndicator";
 
@@ -88,13 +88,13 @@ export default function Header({
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white shadow-2xs"
             title={isSidebarCollapsed ? t("nav.expandMenu") : t("nav.collapseMenu")}
           >
-            {isSidebarCollapsed ? <MdOutlineChevronRight size={18} /> : <MdOutlineChevronLeft size={18} />}
+            {isSidebarCollapsed ? <RiMenuUnfoldLine size={18} /> : <RiMenuFoldLine size={18} />}
           </button>
         )}
 
         <div className="hidden sm:flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-500/10 text-brand-500 text-xs font-semibold">
-            <MdOutlineSend size={13} />
+            <RiSendPlaneLine size={13} />
             <span>InHub Outreach</span>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function Header({
             title="Notificaciones"
             aria-label={`Notificaciones${unreadCount ? ` (${unreadCount} sin leer)` : ""}`}
           >
-            <MdOutlineNotifications size={19} />
+            <RiNotification3Line size={19} />
             {unreadCount > 0 && (
               <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-5 text-white">
                 {unreadCount > 99 ? "99+" : unreadCount}
@@ -139,7 +139,7 @@ export default function Header({
                     className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
                     title={soundEnabled ? "Desactivar sonido" : "Activar sonido"}
                   >
-                    {soundEnabled ? <MdOutlineVolumeUp size={16} /> : <MdOutlineVolumeOff size={16} />}
+                    {soundEnabled ? <RiVolumeUpLine size={16} /> : <RiVolumeMuteLine size={16} />}
                   </button>
                   {pushAvailable && !pushSubscribed && (
                     <button
@@ -202,9 +202,9 @@ export default function Header({
           title={theme === "dark" ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
         >
           {theme === "dark" ? (
-            <MdOutlineLightMode size={18} className="text-amber-400" />
+            <RiSunLine size={18} className="text-amber-400" />
           ) : (
-            <MdOutlineDarkMode size={18} className="text-gray-700" />
+            <RiMoonLine size={18} className="text-gray-700" />
           )}
         </button>
 
@@ -244,7 +244,7 @@ export default function Header({
                     <span className="text-sm">{l.flag}</span>
                     <span>{l.label}</span>
                   </div>
-                  {locale === l.code && <MdOutlineCheck size={14} className="text-brand-500" />}
+                  {locale === l.code && <RiCheckLine size={14} className="text-brand-500" />}
                 </button>
               ))}
             </div>
@@ -279,7 +279,7 @@ export default function Header({
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
                 onClick={() => setIsUserOpen(false)}
               >
-                <MdOutlinePerson size={15} />
+                <RiUserLine size={15} />
                 <span>{t("nav.settings")}</span>
               </Link>
 
@@ -287,7 +287,7 @@ export default function Header({
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30 transition-colors"
               >
-                <MdOutlineLogout size={15} />
+                <RiLogoutBoxRLine size={15} />
                 <span>{t("nav.logout")}</span>
               </button>
             </div>
