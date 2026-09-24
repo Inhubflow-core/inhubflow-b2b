@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
+import { isAccountAuthorized } from "@/lib/social-selling/auth";
 
 const CANDIDATE_MODELS = [
   "gemini-3.5-flash",
@@ -24,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: "No autenticado" });
   }
 
-  const { post_content, topic } = req.body;
+  const { post_content, topic, account_id } = req.body;
   if (!post_content || typeof post_content !== "string" || !post_content.trim()) {
     return res.status(400).json({ error: "El contenido del post es obligatorio para diseñar el prompt de la imagen" });
   }
@@ -35,16 +36,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const db = getDb();
+
+  // Validar autorización si se especificó cuenta
+  if (account_id && !isAccountAuthorized(db, session.user, account_id)) {
+    return res.status(403).json({ error: "No tienes autorización para acceder a la cuenta seleccionada" });
+  }
+
   let companyContext = "";
   try {
-    const ownerId = (session.user as any)?.id;
+    const user = session.user as any;
+    let targetWorkspaceOwnerId: string | null = null;
+    if (account_id) {
+      const acc = db.prepare("SELECT owner_id FROM accounts WHERE id = ?").get(account_id) as any;
+      targetWorkspaceOwnerId = acc?.owner_id || user?.owner_id || user?.id;
+    } else {
+      targetWorkspaceOwnerId = user?.owner_id || user?.id;
+    }
+
     let agent: any = null;
-    if (ownerId) {
-      agent = db.prepare("SELECT company_name, value_proposition FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(ownerId);
+    if (targetWorkspaceOwnerId) {
+      agent = db
+        .prepare("SELECT company_name, value_proposition FROM sdr_agents WHERE owner_id = ? LIMIT 1")
+        .get(targetWorkspaceOwnerId);
     }
-    if (!agent) {
-      agent = db.prepare("SELECT company_name, value_proposition FROM sdr_agents LIMIT 1").get();
-    }
+
     if (agent?.company_name) {
       companyContext = `Company: ${agent.company_name}. Value proposition: ${agent.value_proposition || ""}`;
     }

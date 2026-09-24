@@ -32,6 +32,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Debe enviar al menos un post para programar" });
   }
 
+  // Validar de antemano que todos los posts contengan texto válido antes de iniciar la transacción
+  for (let i = 0; i < posts.length; i++) {
+    const item = posts[i];
+    if (!item || typeof item.content !== "string" || !item.content.trim()) {
+      return res.status(400).json({ error: `La publicación en posición ${i + 1} no tiene contenido de texto válido` });
+    }
+  }
+
   const db = getDb();
 
   // Validar autorización de la cuenta emisora
@@ -42,7 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const [hStr, mStr] = (publishing_time || "10:00").split(":");
   const hours = parseInt(hStr, 10) || 10;
   const minutes = parseInt(mStr, 10) || 0;
-  const baseStart = start_date ? new Date(start_date) : new Date();
+  
+  let baseStart: Date;
+  if (start_date) {
+    const parsed = new Date(start_date);
+    baseStart = isNaN(parsed.getTime()) ? new Date() : parsed;
+  } else {
+    baseStart = new Date();
+  }
 
   // Obtener publicaciones existentes de la cuenta para no sobreescribir ni repetir días
   const existing = db.prepare(
@@ -65,10 +80,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     db.transaction(() => {
       posts.forEach((postItem: any, index: number) => {
         const id = randomUUID();
-        const scheduledDate = publishingDates[index] || new Date(Date.now() + 86400000 * (index + 1));
+        const candidateDate = publishingDates[index] || new Date(Date.now() + 86400000 * (index + 1));
+        const scheduledDate = isNaN(candidateDate.getTime())
+          ? new Date(Date.now() + 86400000 * (index + 1))
+          : candidateDate;
         const scheduledIso = scheduledDate.toISOString();
 
         const metricsJson = postItem.original_metrics ? JSON.stringify(postItem.original_metrics) : null;
+        const safeMediaUrl =
+          postItem.media_url && typeof postItem.media_url === "string" && !postItem.media_url.startsWith("data:")
+            ? postItem.media_url
+            : null;
 
         // Seguridad estricta: forzar siempre account_id autorizado, ignorando cualquier postItem.account_id no verificado
         insertStmt.run(
@@ -78,8 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           topic || postItem.topic || null,
           postItem.content.trim(),
           postItem.image_prompt || null,
-          postItem.media_url || null,
-          postItem.media_url ? "image" : "none",
+          safeMediaUrl,
+          safeMediaUrl ? "image" : "none",
           postItem.original_post_url || null,
           postItem.original_author || null,
           postItem.original_content || null,

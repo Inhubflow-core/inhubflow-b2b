@@ -34,6 +34,7 @@ import {
 } from "react-icons/ri";
 import { getNextAvailablePublishingSlot } from "@/lib/social-selling/slots";
 import { EditorialMonthCalendar } from "@/components/social-selling/EditorialMonthCalendar";
+import { getAuthorizedAccounts } from "@/lib/social-selling/auth";
 
 interface SocialPost {
   id: string;
@@ -93,33 +94,7 @@ export const getServerSideProps: GetServerSideProps<SocialSellingProps> = async 
   const currentUser = session.user as any;
   const db = getDb();
 
-  let accounts: AccountItem[] = [];
-
-  // 1. Si es un vendedor/miembro del equipo asignado a una cuenta específica:
-  if (currentUser?.owner_id && currentUser?.assigned_account_id) {
-    accounts = db
-      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE id = ?")
-      .all(currentUser.assigned_account_id) as AccountItem[];
-  } else if (currentUser?.owner_id) {
-    accounts = db
-      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE assigned_user_id = ?")
-      .all(currentUser.id) as AccountItem[];
-  } else {
-    // 2. Si es el Administrador/Owner del workspace (o SuperAdmin): ve todas las cuentas de su equipo
-    const isSuperAdmin =
-      currentUser?.role === "admin" ||
-      currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
-
-    if (isSuperAdmin) {
-      accounts = db
-        .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts ORDER BY name ASC")
-        .all() as AccountItem[];
-    } else {
-      accounts = db
-        .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? OR owner_id IS NULL ORDER BY name ASC")
-        .all(currentUser.id) as AccountItem[];
-    }
-  }
+  const accounts: AccountItem[] = getAuthorizedAccounts(db, currentUser);
 
   const accountIds = accounts.map((a) => a.id);
   const initialPosts =
@@ -178,6 +153,7 @@ export default function SocialSellingPage({ accounts, initialPosts }: SocialSell
   // Modals
   const [previewPost, setPreviewPost] = useState<SocialPost | null>(null);
   const [editingPost, setEditingPost] = useState<SocialPost | null>(null);
+  const [confirmDeletePost, setConfirmDeletePost] = useState<SocialPost | null>(null);
   const [publishLoadingId, setPublishLoadingId] = useState<string | null>(null);
 
   const selectedAccount = useMemo(() => {
@@ -457,9 +433,20 @@ function resolveImageUrl(url?: string | null): string {
       toast.error("Selecciona una cuenta de LinkedIn");
       return;
     }
+    if (isUploadingImage) {
+      toast.info("Por favor espera a que la imagen termine de subirse");
+      return;
+    }
+    if (modeledDraft?.media_url && modeledDraft.media_url.startsWith("data:")) {
+      toast.error("La imagen aún se está procesando. Por favor espera unos segundos.");
+      return;
+    }
 
     try {
-      const scheduledAt = dateStr || getNextAvailablePublishingSlot(posts).toISOString();
+      const scheduledAt = (dateStr && !isNaN(new Date(dateStr).getTime()))
+        ? new Date(dateStr).toISOString()
+        : getNextAvailablePublishingSlot(posts).toISOString();
+
       const res = await fetch("/api/social-selling/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -510,6 +497,7 @@ function resolveImageUrl(url?: string | null): string {
         body: JSON.stringify({
           post_content: manualContent.trim(),
           topic: topic || "Social Selling",
+          account_id: selectedAccountId || undefined,
         }),
       });
 
@@ -535,9 +523,20 @@ function resolveImageUrl(url?: string | null): string {
       toast.error("El contenido del post no puede estar vacío");
       return;
     }
+    if (isUploadingImage) {
+      toast.info("Por favor espera a que la imagen termine de subirse");
+      return;
+    }
+    if (manualMediaUrl && manualMediaUrl.startsWith("data:")) {
+      toast.error("La imagen aún se está procesando. Por favor espera unos segundos.");
+      return;
+    }
 
     try {
-      const scheduledAt = manualDate ? new Date(manualDate).toISOString() : getNextAvailablePublishingSlot(posts).toISOString();
+      const scheduledAt = (manualDate && !isNaN(new Date(manualDate).getTime()))
+        ? new Date(manualDate).toISOString()
+        : getNextAvailablePublishingSlot(posts).toISOString();
+
       const res = await fetch("/api/social-selling/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -695,6 +694,19 @@ function resolveImageUrl(url?: string | null): string {
   // Actualizar post editado
   const handleSaveEdit = async () => {
     if (!editingPost) return;
+    if (isUploadingImage) {
+      toast.info("Por favor espera a que la imagen termine de subirse");
+      return;
+    }
+    if (editingPost.media_url && editingPost.media_url.startsWith("data:")) {
+      toast.error("La imagen aún se está procesando. Por favor espera unos segundos.");
+      return;
+    }
+    if (!editingPost.scheduled_at || isNaN(new Date(editingPost.scheduled_at).getTime())) {
+      toast.error("La fecha y hora de programación es inválida");
+      return;
+    }
+
     try {
       const res = await fetch("/api/social-selling/posts", {
         method: "PUT",
@@ -702,7 +714,7 @@ function resolveImageUrl(url?: string | null): string {
         body: JSON.stringify({
           id: editingPost.id,
           content: editingPost.content,
-          scheduled_at: editingPost.scheduled_at,
+          scheduled_at: new Date(editingPost.scheduled_at).toISOString(),
           status: editingPost.status,
           image_prompt: editingPost.image_prompt || null,
           media_url: editingPost.media_url || null,
@@ -1209,43 +1221,57 @@ function resolveImageUrl(url?: string | null): string {
                         )}
                       </div>
 
-                      {/* Botones de acción */}
+                      {/* Botones de acción organizados: Ver, Editar, Publicar, Eliminar */}
                       <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-4 flex items-center justify-between">
+                        {/* 1. Ver */}
                         <button
                           onClick={() => setPreviewPost(post)}
-                          className="btn btn-xs btn-ghost gap-1 text-gray-600 hover:text-brand-600 dark:text-gray-400 text-[11px]"
+                          className="btn btn-xs btn-ghost gap-1 text-gray-700 hover:text-brand-600 dark:text-gray-300 text-xs font-medium"
+                          title="Ver vista previa"
                         >
                           <RiEyeLine className="w-3.5 h-3.5" />
-                          Vista previa
+                          <span>Ver</span>
                         </button>
                         <div className="flex items-center gap-1.5">
-                          {post.status === "scheduled" && (
+                          {/* 2. Editar */}
+                          <button
+                            onClick={() => setEditingPost(post)}
+                            title="Editar texto u horario"
+                            className="btn btn-xs btn-ghost text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
+                          >
+                            <RiEditLine className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+
+                          {/* 3. Publicar */}
+                          {(post.status === "scheduled" || post.status === "failed") && (
                             <button
                               onClick={() => handlePublishNow(post.id)}
                               disabled={publishLoadingId === post.id}
                               title="Publicar en LinkedIn de inmediato"
-                              className="btn btn-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:bg-emerald-950/40 dark:text-emerald-300 border-none rounded-lg"
+                              className="btn btn-xs text-white border-none rounded-lg flex items-center gap-1 shadow-xs hover:opacity-90 active:scale-95"
+                              style={{ backgroundColor: "#059669", color: "#ffffff", borderColor: "#059669" }}
                             >
                               {publishLoadingId === post.id ? (
                                 <span className="loading loading-spinner loading-xs" />
                               ) : (
-                                <RiSendPlaneLine className="w-3.5 h-3.5" />
+                                <>
+                                  <RiSendPlaneLine className="w-3.5 h-3.5 text-white" />
+                                  <span>Publicar</span>
+                                </>
                               )}
                             </button>
                           )}
+
+                          {/* 4. Eliminar */}
                           <button
-                            onClick={() => setEditingPost(post)}
-                            title="Editar texto u horario"
-                            className="btn btn-xs btn-ghost text-gray-500 hover:text-gray-800 dark:hover:text-white"
-                          >
-                            <RiEditLine className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePost(post.id)}
+                            onClick={() => setConfirmDeletePost(post)}
                             title="Eliminar post"
-                            className="btn btn-xs btn-ghost text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            className="btn btn-xs text-white border-none rounded-lg flex items-center gap-1 shadow-xs hover:opacity-90 active:scale-95"
+                            style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
                           >
-                            <RiDeleteBinLine className="w-3.5 h-3.5" />
+                            <RiDeleteBinLine className="w-3.5 h-3.5 text-white" />
+                            <span>Eliminar</span>
                           </button>
                         </div>
                       </div>
@@ -1401,11 +1427,11 @@ function resolveImageUrl(url?: string | null): string {
                 <button
                   type="button"
                   onClick={handleScheduleManual}
-                  disabled={!manualContent.trim()}
+                  disabled={!manualContent.trim() || isUploadingImage}
                   className="btn btn-primary bg-brand-500 hover:bg-brand-600 text-white rounded-xl px-6 flex items-center gap-2 shadow-xs font-semibold disabled:opacity-50"
                 >
                   <RiCalendarEventLine className="w-4 h-4" />
-                  Programar Publicación
+                  {isUploadingImage ? "Subiendo imagen..." : "Programar Publicación"}
                 </button>
               </div>
             </div>
@@ -1572,9 +1598,10 @@ function resolveImageUrl(url?: string | null): string {
                 </button>
                 <button
                   onClick={() => handleScheduleSingle(modeledDraft.content, modeledDraft.scheduled_at)}
-                  className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white border-none rounded-xl px-5 shadow-xs"
+                  disabled={isUploadingImage}
+                  className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white border-none rounded-xl px-5 shadow-xs disabled:opacity-50"
                 >
-                  Aprobar y Programar en Calendario
+                  {isUploadingImage ? "Subiendo imagen..." : "Aprobar y Programar en Calendario"}
                 </button>
               </div>
             </div>
@@ -1789,8 +1816,61 @@ function resolveImageUrl(url?: string | null): string {
                 <button onClick={() => setEditingPost(null)} className="btn btn-sm btn-ghost">
                   Cancelar
                 </button>
-                <button onClick={handleSaveEdit} className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl shadow-xs">
-                  Guardar Cambios
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isUploadingImage}
+                  className="btn btn-sm bg-brand-500 hover:bg-brand-600 text-white rounded-xl shadow-xs disabled:opacity-50"
+                >
+                  {isUploadingImage ? "Subiendo imagen..." : "Guardar Cambios"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE CONFIRMACIÓN: ELIMINAR POST (DESDE VISTA CARDS) */}
+        {confirmDeletePost && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-sm w-full border border-gray-200 dark:border-gray-800 shadow-2xl p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400 flex items-center justify-center shrink-0">
+                  <RiDeleteBinLine className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    ¿Quieres eliminar esta publicación?
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Esta acción no se puede deshacer y se removerá de tu calendario.
+                  </p>
+                </div>
+              </div>
+
+              {/* Extracto del post */}
+              <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 line-clamp-3 leading-relaxed">
+                {confirmDeletePost.content}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeletePost(null)}
+                  className="btn btn-sm btn-ghost text-xs text-gray-600 dark:text-gray-300 rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = confirmDeletePost.id;
+                    setConfirmDeletePost(null);
+                    await handleDeletePost(id);
+                  }}
+                  className="btn btn-sm text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shadow-xs border-none hover:opacity-90 active:scale-95"
+                  style={{ backgroundColor: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}
+                >
+                  <RiDeleteBinLine className="w-3.5 h-3.5 text-white" />
+                  Sí, eliminar
                 </button>
               </div>
             </div>

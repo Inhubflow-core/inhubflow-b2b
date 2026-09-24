@@ -19,9 +19,8 @@ export function getAuthorizedAccounts(
 ): AuthorizedAccount[] {
   if (!sessionUser) return [];
 
-  const isSuperAdmin =
-    sessionUser?.role === "admin" ||
-    sessionUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+  const email = typeof sessionUser.email === "string" ? sessionUser.email.trim().toLowerCase() : "";
+  const isSuperAdmin = email === "inhubflow@gmail.com";
 
   if (isSuperAdmin) {
     return db
@@ -29,22 +28,45 @@ export function getAuthorizedAccounts(
       .all() as AuthorizedAccount[];
   }
 
-  if (sessionUser?.owner_id && sessionUser?.assigned_account_id) {
+  const ownerId = typeof sessionUser.owner_id === "string" && sessionUser.owner_id ? sessionUser.owner_id : null;
+  const workspaceOwnerId = ownerId ?? sessionUser.id;
+  const isWorkspaceOwner = ownerId === null;
+  const role = typeof sessionUser.role === "string" ? sessionUser.role : "user";
+  const isWorkspaceAdmin = isWorkspaceOwner || role === "admin";
+  const assignedAccountId =
+    typeof sessionUser.assigned_account_id === "string" && sessionUser.assigned_account_id
+      ? sessionUser.assigned_account_id
+      : null;
+
+  if (isWorkspaceAdmin) {
+    if (isWorkspaceOwner) {
+      return db
+        .prepare(
+          "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? OR owner_id IS NULL ORDER BY name ASC"
+        )
+        .all(workspaceOwnerId) as AuthorizedAccount[];
+    }
     return db
-      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE id = ?")
-      .all(sessionUser.assigned_account_id) as AuthorizedAccount[];
+      .prepare(
+        "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? ORDER BY name ASC"
+      )
+      .all(workspaceOwnerId) as AuthorizedAccount[];
   }
 
-  if (sessionUser?.owner_id) {
+  // Miembro estándar de equipo asignado a una cuenta
+  if (assignedAccountId) {
     return db
-      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE assigned_user_id = ?")
-      .all(sessionUser.id) as AuthorizedAccount[];
+      .prepare(
+        "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE id = ? AND (owner_id = ? OR owner_id IS NULL)"
+      )
+      .all(assignedAccountId, workspaceOwnerId) as AuthorizedAccount[];
   }
 
-  // Owner del workspace o cuenta individual
   return db
-    .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? OR owner_id IS NULL ORDER BY name ASC")
-    .all(sessionUser.id) as AuthorizedAccount[];
+    .prepare(
+      "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE assigned_user_id = ? AND (owner_id = ? OR owner_id IS NULL) ORDER BY name ASC"
+    )
+    .all(sessionUser.id, workspaceOwnerId) as AuthorizedAccount[];
 }
 
 /**

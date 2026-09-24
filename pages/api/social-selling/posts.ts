@@ -90,12 +90,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(403).json({ error: "No tienes autorización para programar en esta cuenta" });
       }
 
-      if (!content || !content.trim()) {
+      if (!content || typeof content !== "string" || !content.trim()) {
         return res.status(400).json({ error: "El contenido del post es obligatorio" });
       }
 
+      if (media_url && typeof media_url === "string" && media_url.startsWith("data:")) {
+        return res.status(400).json({ error: "No se permiten imágenes en formato Base64. Debes subirlas primero al servidor." });
+      }
+
+      let scheduledTime: string;
+      if (scheduled_at) {
+        const d = new Date(scheduled_at);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ error: "La fecha y hora de programación es inválida" });
+        }
+        scheduledTime = d.toISOString();
+      } else {
+        scheduledTime = new Date(Date.now() + 3600 * 1000 * 24).toISOString();
+      }
+
+      // Estados iniciales permitidos: draft o scheduled
+      const allowedInitialStatuses = ["draft", "scheduled"];
+      const initialStatus = allowedInitialStatuses.includes(status) ? status : "scheduled";
+
       const id = randomUUID();
-      const scheduledTime = scheduled_at || new Date(Date.now() + 3600 * 1000 * 24).toISOString();
       const metricsJson = original_metrics ? JSON.stringify(original_metrics) : null;
 
       db.prepare(`
@@ -118,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         original_content || null,
         metricsJson,
         scheduledTime,
-        status
+        initialStatus
       );
 
       const created = db.prepare("SELECT * FROM social_selling_posts WHERE id = ?").get(id);
@@ -143,6 +161,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: "Publicación no encontrada o no autorizada" });
       }
 
+      // Si el post se encuentra en proceso de publicación, bloquear mutaciones concurrentes
+      if (existing.status === "publishing") {
+        return res.status(409).json({ error: "La publicación se está enviando a LinkedIn en este momento y no puede modificarse" });
+      }
+
       // Si se intenta transferir a otra cuenta, validar que la cuenta de destino esté autorizada
       if (account_id && account_id !== existing.account_id) {
         if (!isAccountAuthorized(db, currentUser, account_id)) {
@@ -150,14 +173,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // Si el post ya fue publicado, impedir reprogramar la fecha histórica
-      if (existing.status === "published" && scheduled_at && scheduled_at !== existing.scheduled_at) {
-        return res.status(400).json({ error: "No se puede reprogramar una publicación que ya fue enviada a LinkedIn" });
+      // Validar transiciones de estado
+      if (existing.status === "published") {
+        if (status && status !== "published" && status !== "archived") {
+          return res.status(400).json({ error: "Una publicación ya enviada a LinkedIn no puede regresar a estado programado o borrador" });
+        }
+        if (scheduled_at && scheduled_at !== existing.scheduled_at) {
+          return res.status(400).json({ error: "No se puede reprogramar una publicación que ya fue enviada a LinkedIn" });
+        }
+      }
+
+      // No permitir marcar como publicado directamente sin pasar por el flujo de publicación
+      if (status === "published" && existing.status !== "published") {
+        return res.status(400).json({ error: "No se puede marcar directamente como publicado sin pasar por el proceso de publicación" });
+      }
+
+      if (media_url && typeof media_url === "string" && media_url.startsWith("data:")) {
+        return res.status(400).json({ error: "No se permiten imágenes en formato Base64. Debes subirlas primero al servidor." });
+      }
+
+      if (scheduled_at !== undefined && scheduled_at !== null) {
+        const d = new Date(scheduled_at);
+        if (isNaN(d.getTime())) {
+          return res.status(400).json({ error: "La fecha y hora de programación es inválida" });
+        }
       }
 
       // Distinguir entre valor no enviado (undefined) y valor intencionalmente borrado (null)
       const nextContent = content !== undefined ? content : existing.content;
-      const nextScheduledAt = scheduled_at !== undefined ? scheduled_at : existing.scheduled_at;
+      const nextScheduledAt = scheduled_at !== undefined ? (scheduled_at ? new Date(scheduled_at).toISOString() : existing.scheduled_at) : existing.scheduled_at;
       const nextStatus = status !== undefined ? status : existing.status;
       const nextImagePrompt = image_prompt !== undefined ? image_prompt : existing.image_prompt;
       const nextMediaUrl = media_url !== undefined ? media_url : existing.media_url;

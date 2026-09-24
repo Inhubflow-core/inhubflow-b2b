@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { getDb } from "@/lib/db";
 
+import { isAccountAuthorized } from "@/lib/social-selling/auth";
+
 const CANDIDATE_MODELS = [
   // Priorizar modelos estables que no sufren spikes de demanda
   "gemini-3.5-flash",
@@ -46,22 +48,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getDb();
 
-  // 1. Obtener contexto de la empresa desde el SDR (aislado por workspace/owner)
+  // Validar autorización de la cuenta si fue especificada
+  if (account_id && !isAccountAuthorized(db, session.user, account_id)) {
+    return res.status(403).json({ error: "No tienes autorización para acceder a la cuenta seleccionada" });
+  }
+
+  // 1. Obtener contexto de la empresa desde el SDR (aislado estrictamente por workspace)
   let companyContext = "";
   try {
-    const ownerId = (session.user as any)?.id;
-    let agent: any = null;
+    const user = session.user as any;
+    let targetWorkspaceOwnerId: string | null = null;
     if (account_id) {
       const acc = db.prepare("SELECT owner_id FROM accounts WHERE id = ?").get(account_id) as any;
-      if (acc?.owner_id) {
-        agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(acc.owner_id);
-      }
+      targetWorkspaceOwnerId = acc?.owner_id || user?.owner_id || user?.id;
+    } else {
+      targetWorkspaceOwnerId = user?.owner_id || user?.id;
     }
-    if (!agent && ownerId) {
-      agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents WHERE owner_id = ? LIMIT 1").get(ownerId);
-    }
-    if (!agent) {
-      agent = db.prepare("SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents LIMIT 1").get();
+
+    let agent: any = null;
+    if (targetWorkspaceOwnerId) {
+      agent = db
+        .prepare(
+          "SELECT company_name, value_proposition, icp_summary, persona_prompt FROM sdr_agents WHERE owner_id = ? LIMIT 1"
+        )
+        .get(targetWorkspaceOwnerId);
     }
 
     if (agent) {
@@ -70,12 +80,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (agent.icp_summary) companyContext += `Cliente ideal: ${agent.icp_summary}\n`;
     }
 
-    const sources = (ownerId
-      ? db.prepare("SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' AND (owner_id = ? OR owner_id IS NULL) LIMIT 3").all(ownerId)
-      : db.prepare("SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' LIMIT 3").all()) as Array<{ title: string; content?: string }>;
+    if (targetWorkspaceOwnerId) {
+      const sources = db
+        .prepare(
+          "SELECT title, content FROM sdr_knowledge_sources WHERE status = 'active' AND owner_id = ? LIMIT 3"
+        )
+        .all(targetWorkspaceOwnerId) as Array<{ title: string; content?: string }>;
 
-    if (sources && sources.length > 0) {
-      companyContext += "\nConocimiento clave de la empresa:\n" + sources.map(s => `- ${s.title}: ${s.content?.slice(0, 300) || ""}`).join("\n");
+      if (sources && sources.length > 0) {
+        companyContext +=
+          "\nConocimiento clave de la empresa:\n" +
+          sources.map((s) => `- ${s.title}: ${s.content?.slice(0, 300) || ""}`).join("\n");
+      }
     }
   } catch (dbErr) {
     console.warn("[api/social-selling/model] Error cargando sdr context:", dbErr);
