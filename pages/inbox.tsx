@@ -24,7 +24,7 @@ import {
   RiPriceTag3Line,
   RiPulseLine,
   RiRefreshLine,
-  RiRobotLine,
+  RiRobot3Line,
   RiSearchLine,
   RiSendPlaneLine,
   RiSparklingLine,
@@ -977,7 +977,7 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
                 : "bg-base-200 border-base-300/60 text-base-content/70 hover:bg-base-300 hover:text-base-content"
             }`}
           >
-            {togglingAutopilot ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRobotLine size={14} />}
+            {togglingAutopilot ? <RiLoader4Line size={13} className="animate-spin" /> : <RiRobot3Line size={14} />}
             {autopilot ? "SDR: ACTIVO" : "SDR: OFF"}
           </button>
         </div>
@@ -1125,7 +1125,7 @@ function ChatPanel({ reply, onActionDone, onUpdateReply, onClassifiedByHuman }: 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
-                  <RiRobotLine size={15} />
+                  <RiRobot3Line size={15} />
                 </div>
                 <div>
                   <span className="text-xs font-bold text-base-content flex items-center gap-1.5">
@@ -1873,7 +1873,7 @@ export default function InboxPage() {
                 { id: "all", label: t("inbox.filterAll"), icon: null },
                 { id: "linkedin", label: t("inbox.filterLinkedin"), icon: RiLinkedinBoxLine },
                 { id: "email", label: t("inbox.filterEmail"), icon: RiMailLine },
-                { id: "autopilot", label: t("inbox.filterAutopilot"), icon: RiRobotLine },
+                { id: "autopilot", label: t("inbox.filterAutopilot"), icon: RiRobot3Line },
                 { id: "handoff", label: t("inbox.filterIntervention"), icon: RiAlertLine },
               ].map((filter) => {
                 const Icon = filter.icon;
@@ -1999,7 +1999,7 @@ export default function InboxPage() {
 
                         {reply.sdr_autopilot === 1 && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success/15 text-success">
-                            <RiRobotLine size={10} /> Autopilot
+                            <RiRobot3Line size={10} /> Autopilot
                           </span>
                         )}
 
@@ -2100,7 +2100,7 @@ export default function InboxPage() {
                 disabled={savingCheckpoint}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 font-semibold transition-colors"
               >
-                <RiRobotLine size={14} />
+                <RiRobot3Line size={14} />
                 <span>Devolver a IA para auto-clasificar</span>
               </button>
 

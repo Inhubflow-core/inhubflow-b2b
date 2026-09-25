@@ -27,7 +27,7 @@ import {
   RiMailSendLine,
   RiMailLine,
   RiEditLine,
-  RiRobot2Line,
+  RiRobot3Line,
   RiSearchLine,
   RiLoader4Line,
   RiUser3Line,
@@ -1518,7 +1518,7 @@ function Wizard({
                             <p className="text-[10px] text-base-content/25 italic">{t("campaignWizard.steps.noSubject")}</p>
                           )}
                           {ws.aiEnabled && (
-                            <p className="text-[10px] text-primary/50 flex items-center gap-0.5 mt-0.5"><RiRobot2Line size={9} /> AI</p>
+                            <p className="text-[10px] text-primary/50 flex items-center gap-0.5 mt-0.5"><RiRobot3Line size={9} /> AI</p>
                           )}
                           {(ws.attachmentUrl || ws.attachmentName) && (
                             <p className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-1 font-medium truncate mt-0.5">
@@ -1779,7 +1779,7 @@ function Wizard({
                       {/* Header strip */}
                       <div className="bg-primary/10 border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-                          <RiRobot2Line size={15} className="text-primary" />
+                          <RiRobot3Line size={15} className="text-primary" />
                         </div>
                         <div>
                           <p className="font-semibold text-sm">{workflowName}</p>
@@ -1860,7 +1860,7 @@ function Wizard({
                                       <div className="flex-1" />
                                       {ws.aiEnabled && (
                                         <span className="inline-flex items-center gap-1.5 text-xs">
-                                          <RiRobot2Line size={11} className="text-primary/50" />
+                                          <RiRobot3Line size={11} className="text-primary/50" />
                                           {cost ? <span className="text-base-content/40">${cost.cost_usd.toFixed(5)}</span> : <span className="text-base-content/25 italic">{t("campaignWizard.summary.previewToEstimate")}</span>}
                                         </span>
                                       )}
@@ -1908,7 +1908,7 @@ function Wizard({
                                       <div className="flex-1" />
                                       {ws.aiEnabled && (
                                         <span className="inline-flex items-center gap-1.5 text-xs">
-                                          <RiRobot2Line size={11} className="text-primary/50" />
+                                          <RiRobot3Line size={11} className="text-primary/50" />
                                           {cost ? <span className="text-base-content/40">${cost.cost_usd.toFixed(5)} · {(cost.input_tokens + cost.output_tokens).toLocaleString()} tok</span> : <span className="text-base-content/25 italic">{t("campaignWizard.summary.previewToEstimate")}</span>}
                                         </span>
                                       )}
@@ -1926,7 +1926,7 @@ function Wizard({
                     {aiSteps.length > 0 && (
                       <div className={`rounded-xl border overflow-hidden ${hasCostData ? "border-primary/20 bg-primary/5" : "border-base-300/50 bg-base-200"}`}>
                         <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
-                          <RiRobot2Line size={13} className={hasCostData ? "text-primary" : "text-base-content/30"} />
+                          <RiRobot3Line size={13} className={hasCostData ? "text-primary" : "text-base-content/30"} />
                           <p className="text-xs font-medium text-base-content/40 uppercase tracking-widest">{t("campaignWizard.summary.aiCostEstimate")}</p>
                         </div>
                         {!hasCostData ? (
@@ -2222,7 +2222,7 @@ function Wizard({
                       <p className="text-xs text-base-content/30 -mt-1">{t("campaignWizard.config.aiInmailNotice")}</p>
                     )}
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-base-300/40 border border-base-300/50">
-                      <RiRobot2Line size={15} className="text-base-content/40 shrink-0" />
+                      <RiRobot3Line size={15} className="text-base-content/40 shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm text-base-content/70">{t("campaignWizard.config.aiWritesTitle", { type: ws.type === "sales_inmail" ? "InMail" : t("campaignWizard.config.message") })}</p>
                         <p className="text-xs text-base-content/30 mt-0.5">{t("campaignWizard.config.aiWritesDesc", { type: ws.type === "sales_inmail" ? "InMail" : t("campaignWizard.config.message") })}</p>
@@ -2259,7 +2259,7 @@ function Wizard({
                           </select>
                         </div>
                         <button type="button" onClick={() => { setPreviewIdx(idx); setPreviewResult(null); setPreviewListId(""); setPreviewListTargets([]); setPreviewTargetId(""); setConfigIdx(null); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
-                          <RiRobot2Line size={13} /> {t("campaignWizard.config.previewAiOutput")}
+                          <RiRobot3Line size={13} /> {t("campaignWizard.config.previewAiOutput")}
                         </button>
                       </div>
                     ) : (
@@ -2321,7 +2321,7 @@ function Wizard({
                 {ws.type === "email" && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-base-300/40 border border-base-300/50">
-                      <RiRobot2Line size={15} className="text-base-content/40 shrink-0" />
+                      <RiRobot3Line size={15} className="text-base-content/40 shrink-0" />
                       <div className="flex-1">
                         <p className="text-sm text-base-content/70">{t("campaignWizard.config.aiWritesTitle", { type: "email" })}</p>
                         <p className="text-xs text-base-content/30 mt-0.5">{t("campaignWizard.config.aiWritesDesc", { type: "email" })}</p>
@@ -2354,7 +2354,7 @@ function Wizard({
                           </select>
                         </div>
                         <button type="button" onClick={() => { setPreviewIdx(idx); setPreviewResult(null); setPreviewListId(""); setPreviewListTargets([]); setPreviewTargetId(""); setConfigIdx(null); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
-                          <RiRobot2Line size={13} /> {t("campaignWizard.config.previewAiOutput")}
+                          <RiRobot3Line size={13} /> {t("campaignWizard.config.previewAiOutput")}
                         </button>
                       </div>
                     ) : (
@@ -2523,7 +2523,7 @@ function Wizard({
             <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xl shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <RiRobot2Line size={16} className="text-primary" />
+                  <RiRobot3Line size={16} className="text-primary" />
                   <h3 className="font-semibold text-base">{t("campaignWizard.config.previewAiOutput")}</h3>
                 </div>
                 <button
@@ -2580,7 +2580,7 @@ function Wizard({
               >
                 {previewLoading
                   ? <><RiLoader4Line size={14} className="animate-spin" /> {t("campaignWizard.config.generating")}</>
-                  : <><RiRobot2Line size={14} /> {t("campaignWizard.config.generate")}</>}
+                  : <><RiRobot3Line size={14} /> {t("campaignWizard.config.generate")}</>}
               </button>
 
               {!ws.aiModel && (
@@ -2846,7 +2846,7 @@ function AnalyticsPanel({ workflowId, days: initialDays }: { workflowId: string;
           <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl shadow-xs p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <RiRobot2Line size={13} className="text-base-content/30" />
+                <RiRobot3Line size={13} className="text-base-content/30" />
                 <span className="text-sm font-medium text-base-content">AI cost</span>
               </div>
               {hasAiData && (

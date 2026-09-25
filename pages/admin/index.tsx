@@ -29,7 +29,7 @@ import {
   RiCheckboxCircleLine,
   RiChat1Line,
   RiFireFill,
-  RiRobotLine,
+  RiRobot3Line,
   RiUser3Line,
   RiBrainLine,
   RiWhatsappLine,
@@ -1704,7 +1704,7 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
                 <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2">
                   <span className="text-xs font-semibold uppercase tracking-wider">Sesiones en Curso</span>
                   <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <RiRobotLine size={18} />
+                    <RiRobot3Line size={18} />
                   </span>
                 </div>
                 <div className="text-3xl font-extrabold text-gray-900 dark:text-white">
@@ -1965,7 +1965,7 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
                             onClick={() => handleLiveChatResumeAI(selectedLiveChatSession.id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer"
                           >
-                            <RiRobotLine size={14} />
+                            <RiRobot3Line size={14} />
                             <span>Reactivar IA</span>
                           </button>
                         ) : (

@@ -5,7 +5,7 @@ import {
   RiTimeLine,
   RiVideoLine,
   RiArrowRightLine,
-  RiRobotLine,
+  RiRobot3Line,
   RiUserLine,
   RiAddLine,
 } from "react-icons/ri";
@@ -137,7 +137,7 @@ export const UpcomingMeetingsWidget: React.FC = () => {
                       </p>
                       {isSdr && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
-                          <RiRobotLine size={10} /> SDR IA
+                          <RiRobot3Line size={10} /> SDR IA
                         </span>
                       )}
                     </div>

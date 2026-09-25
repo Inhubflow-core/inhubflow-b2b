@@ -8,7 +8,7 @@ import {
   RiArrowLeftLine,
   RiRefreshLine,
   RiFireFill,
-  RiRobotLine,
+  RiRobot3Line,
   RiUser3Line,
   RiShieldCheckLine,
   RiCheckboxCircleLine,
@@ -737,7 +737,7 @@ export default function LiveChatMobileAdmin() {
                               </span>
                             ) : (
                               <span className="flex items-center gap-1 text-indigo-700 dark:text-indigo-400">
-                                <RiRobotLine size={13} /> Asistente IA InHubFlow
+                                <RiRobot3Line size={13} /> Asistente IA InHubFlow
                               </span>
                             )}
                           </div>

@@ -2,7 +2,7 @@ import React from "react";
 import {
   RiLinkedinBoxFill,
   RiMailLine,
-  RiRobotLine,
+  RiRobot3Line,
   RiAlertLine,
   RiTimeLine,
   RiExternalLinkLine,
@@ -104,7 +104,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
             title="SDR IA respondiendo activamente en piloto automático"
             className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20"
           >
-            <RiRobotLine size={12} />
+            <RiRobot3Line size={12} />
             SDR
           </span>
         ) : null}
@@ -162,7 +162,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ card, onSelect, onDragSt
               color: tag.color,
             }}
           >
-            {tag.source === "ai" ? <RiRobotLine size={9} /> : null}
+            {tag.source === "ai" ? <RiRobot3Line size={9} /> : null}
             {tag.name}
           </span>
         ))}

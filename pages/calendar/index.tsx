@@ -13,7 +13,7 @@ import {
   RiShareLine,
   RiSettings4Line,
   RiCheckLine,
-  RiRobotLine,
+  RiRobot3Line,
   RiLoader4Line,
   RiFilter3Line,
 } from "react-icons/ri";
@@ -341,7 +341,7 @@ export default function CalendarPage({
           <div className="mb-5 p-4 rounded-2xl border border-purple-500/25 bg-white dark:bg-gray-900 shadow-xs">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <RiRobotLine size={16} className="text-purple-500" />
+                <RiRobot3Line size={16} className="text-purple-500" />
                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                   {t("calendar.aiRequests")}
                 </h2>

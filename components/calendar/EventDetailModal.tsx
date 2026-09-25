@@ -15,7 +15,7 @@ import {
   RiExternalLinkLine,
   RiHistoryLine,
   RiFlowChart,
-  RiRobotLine,
+  RiRobot3Line,
   RiEditLine,
   RiLoader4Line,
 } from "react-icons/ri";
@@ -181,7 +181,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               </h3>
               {event.channel === "sdr_ai" && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                  <RiRobotLine size={11} /> SDR IA
+                  <RiRobot3Line size={11} /> SDR IA
                 </span>
               )}
             </div>

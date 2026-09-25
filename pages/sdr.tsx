@@ -2,7 +2,7 @@ import Head from "next/head";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  RiRobotLine,
+  RiRobot3Line,
   RiSettings4Line,
   RiBookOpenLine,
   RiChatCheckLine,
@@ -746,7 +746,7 @@ export default function SdrPage() {
 
               <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs">
                 <div className="text-xs font-medium text-base-content/50 mb-1 flex items-center gap-1.5">
-                  <RiRobotLine className="text-emerald-400" /> {t("sdr.activeThreads")}
+                  <RiRobot3Line className="text-emerald-400" /> {t("sdr.activeThreads")}
                 </div>
                 <div className="text-2xl font-bold text-emerald-400">{data?.stats.activeThreads ?? 0}</div>
               </div>
@@ -1555,7 +1555,7 @@ export default function SdrPage() {
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-base-content/40">
-                  <RiRobotLine size={48} className="mb-3 opacity-30" />
+                  <RiRobot3Line size={48} className="mb-3 opacity-30" />
                   <p className="text-sm font-medium">{t("sdr.noRecentSims")}</p>
                   <p className="text-xs mt-1">{t("sdr.noRecentSimsHint")}</p>
                 </div>

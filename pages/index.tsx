@@ -6,7 +6,7 @@ import { FiUserPlus, FiMessageSquare, FiEye, FiRepeat, FiUsers, FiUserCheck } fr
 import {
   RiMailSendLine,
   RiReplyLine,
-  RiRobot2Line,
+  RiRobot3Line,
   RiLinkedinBoxLine,
   RiFilterLine,
   RiUserFollowLine,
@@ -342,7 +342,7 @@ function AiUsagePanel({
         <div className="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700 mb-3.5">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
-              <RiRobot2Line size={16} />
+              <RiRobot3Line size={16} />
             </div>
             <div>
               <span className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wider block">

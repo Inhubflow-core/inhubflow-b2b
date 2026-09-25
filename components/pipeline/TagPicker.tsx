@@ -1,5 +1,5 @@
 import React from "react";
-import { RiAddLine, RiCloseLine, RiRobotLine, RiPriceTag3Line } from "react-icons/ri";
+import { RiAddLine, RiCloseLine, RiRobot3Line, RiPriceTag3Line } from "react-icons/ri";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 
 export interface TagOption {
@@ -56,7 +56,7 @@ export const TagPicker: React.FC<TagPickerProps> = ({
               }}
             >
               {tag.source === "ai" ? (
-                <RiRobotLine size={11} title={t("pipeline.tagAiTooltip")} />
+                <RiRobot3Line size={11} title={t("pipeline.tagAiTooltip")} />
               ) : (
                 <RiPriceTag3Line size={11} />
               )}

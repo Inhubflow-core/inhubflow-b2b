@@ -26,7 +26,7 @@ import {
   RiCloseLine,
   RiPlayLine,
   RiFileList3Line,
-  RiRobotLine,
+  RiRobot3Line,
   RiExternalLinkLine,
   RiUserSearchLine,
   RiBuildingLine,
@@ -1487,7 +1487,7 @@ export default function SignalsPage({
               href="/sdr"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all shadow-xs"
             >
-              <RiRobotLine size={16} className="text-brand-500" /> Asistente SDR
+              <RiRobot3Line size={16} className="text-brand-500" /> Asistente SDR
             </Link>
           </div>
         </div>

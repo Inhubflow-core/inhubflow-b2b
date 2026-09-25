@@ -8,7 +8,7 @@ import {
   RiMapPinLine,
   RiBuildingLine,
   RiLinkedinBoxFill,
-  RiRobotLine,
+  RiRobot3Line,
   RiChat3Line,
   RiSaveLine,
   RiCheckLine,
@@ -308,7 +308,7 @@ export const LeadDrawer: React.FC<LeadDrawerProps> = ({
           <div className="flex items-center justify-between p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
-                <RiRobotLine size={18} />
+                <RiRobot3Line size={18} />
               </div>
               <div>
                 <p className="text-xs font-semibold text-base-content">SDR Autopilot (IA)</p>

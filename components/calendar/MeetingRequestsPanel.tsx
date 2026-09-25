@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import {
-  RiRobotLine,
+  RiRobot3Line,
   RiCalendarCheckLine,
   RiCloseCircleLine,
   RiUserLine,
@@ -113,7 +113,7 @@ export const MeetingRequestsPanel: React.FC<MeetingRequestsPanelProps> = ({
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-                  <RiRobotLine size={16} />
+                  <RiRobot3Line size={16} />
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">

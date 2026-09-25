@@ -21,7 +21,7 @@ import {
   RiCustomerService2Line,
   RiGlobalLine,
   RiUserSearchLine,
-  RiRobotLine,
+  RiRobot3Line,
   RiMenuFoldLine,
   RiMenuUnfoldLine,
   RiShieldCheckLine,
@@ -95,7 +95,7 @@ const mainNav: NavItem[] = [
     ],
   },
   { type: "link", href: "/inbox", labelKey: "nav.inbox", icon: RiInboxLine, color: "#0086c9", tour: "nav-inbox" },
-  { type: "link", href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobotLine, color: "#8b5cf6", tour: "nav-sdr" },
+  { type: "link", href: "/sdr", labelKey: "nav.sdrAgent", icon: RiRobot3Line, color: "#8b5cf6", tour: "nav-sdr" },
   { type: "link", href: "/email-health", labelKey: "nav.emailHealth", icon: RiMailCheckLine, color: "#fb6514", tour: "nav-email-health" },
 ];
 
