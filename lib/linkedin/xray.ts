@@ -84,22 +84,310 @@ export const COUNTRY_SUBDOMAINS: Record<string, { code: string; name: string }> 
 
 // Title synonyms for Google X-Ray boolean OR expansions
 export const XRAY_TITLE_SYNONYMS: Record<string, string[]> = {
+  // Executive / Leadership
   ceo: ['"CEO"', '"Chief Executive Officer"', '"Director General"', '"Gerente General"', '"Presidente Ejecutivo"', '"Founder"'],
   ceos: ['"CEO"', '"Chief Executive Officer"', '"Director General"', '"Gerente General"'],
   director: ['"Director"', '"Directora"', '"Director General"', '"Gerente General"', '"Managing Director"', '"Head"'],
   directores: ['"Director"', '"Directores"', '"Director General"', '"Gerente General"'],
+  directora: ['"Directora"', '"Director"', '"Directora General"', '"Gerente General"'],
   gerente: ['"Gerente General"', '"Gerente"', '"General Manager"', '"Managing Director"'],
+  "gerente general": ['"Gerente General"', '"General Manager"', '"Managing Director"', '"Director General"', '"CEO"'],
+  "director general": ['"Director General"', '"Directora General"', '"Gerente General"', '"Managing Director"', '"CEO"'],
   founder: ['"Founder"', '"Co-Founder"', '"Fundador"', '"CEO"'],
   fundador: ['"Fundador"', '"Co-Fundador"', '"Founder"', '"CEO"'],
+  coordinador: ['"Coordinador"', '"Coordinadora"', '"Coordinator"', '"Jefe"'],
+  jefe: ['"Jefe"', '"Jefa"', '"Líder"', '"Head"'],
+
+  // Marketing (Multi-word compound phrases)
+  "director de marketing": [
+    '"Director de Marketing"',
+    '"Directora de Marketing"',
+    '"Gerente de Marketing"',
+    '"Head of Marketing"',
+    '"CMO"',
+    '"Chief Marketing Officer"',
+    '"VP of Marketing"',
+    '"Director de Mercadotecnia"',
+    '"Gerente de Mercadotecnia"',
+    '"Director de Mercadeo"',
+  ],
+  "directora de marketing": [
+    '"Directora de Marketing"',
+    '"Director de Marketing"',
+    '"Gerente de Marketing"',
+    '"Head of Marketing"',
+    '"CMO"',
+    '"Chief Marketing Officer"',
+    '"VP of Marketing"',
+  ],
+  "gerente de marketing": [
+    '"Gerente de Marketing"',
+    '"Director de Marketing"',
+    '"Directora de Marketing"',
+    '"Head of Marketing"',
+    '"CMO"',
+    '"Chief Marketing Officer"',
+    '"Gerente de Mercadotecnia"',
+    '"Gerente de Mercadeo"',
+  ],
+  "head of marketing": [
+    '"Head of Marketing"',
+    '"Director de Marketing"',
+    '"Directora de Marketing"',
+    '"Gerente de Marketing"',
+    '"CMO"',
+    '"VP of Marketing"',
+  ],
+  cmo: ['"CMO"', '"Chief Marketing Officer"', '"Director de Marketing"', '"Head of Marketing"', '"VP of Marketing"'],
+  marketing: ['"Director de Marketing"', '"Diretor de Marketing"', '"Head of Marketing"', '"CMO"', '"Gerente de Marketing"', '"Marketing Director"'],
+
+  // Sales / Commercial
+  "director comercial": [
+    '"Director Comercial"',
+    '"Directora Comercial"',
+    '"Gerente Comercial"',
+    '"Head of Sales"',
+    '"VP of Sales"',
+    '"Chief Commercial Officer"',
+    '"CRO"',
+    '"Director de Ventas"',
+  ],
+  "directora comercial": [
+    '"Directora Comercial"',
+    '"Director Comercial"',
+    '"Gerente Comercial"',
+    '"Head of Sales"',
+    '"VP of Sales"',
+  ],
+  "director de ventas": [
+    '"Director de Ventas"',
+    '"Directora de Ventas"',
+    '"Gerente de Ventas"',
+    '"Head of Sales"',
+    '"VP of Sales"',
+    '"Director Comercial"',
+    '"Gerente Comercial"',
+  ],
+  "gerente comercial": [
+    '"Gerente Comercial"',
+    '"Director Comercial"',
+    '"Gerente de Ventas"',
+    '"Head of Sales"',
+    '"VP of Sales"',
+  ],
+  "gerente de ventas": [
+    '"Gerente de Ventas"',
+    '"Director de Ventas"',
+    '"Gerente Comercial"',
+    '"Head of Sales"',
+  ],
   comercial: ['"Director Comercial"', '"Gerente Comercial"', '"Head of Sales"', '"VP of Sales"'],
   ventas: ['"Director de Ventas"', '"Gerente de Ventas"', '"Head of Sales"'],
-  marketing: ['"Director de Marketing"', '"Diretor de Marketing"', '"Head of Marketing"', '"CMO"', '"Gerente de Marketing"'],
+
+  // Operations
+  "director de operaciones": [
+    '"Director de Operaciones"',
+    '"Directora de Operaciones"',
+    '"Gerente de Operaciones"',
+    '"COO"',
+    '"Chief Operating Officer"',
+    '"Head of Operations"',
+    '"VP of Operations"',
+  ],
+  "gerente de operaciones": [
+    '"Gerente de Operaciones"',
+    '"Director de Operaciones"',
+    '"COO"',
+    '"Head of Operations"',
+  ],
   operaciones: ['"Director de Operaciones"', '"COO"', '"Chief Operating Officer"', '"Gerente de Operaciones"'],
+
+  // Finance
+  "director financiero": [
+    '"Director Financiero"',
+    '"Directora Financiera"',
+    '"Director de Finanzas"',
+    '"Gerente de Finanzas"',
+    '"CFO"',
+    '"Chief Financial Officer"',
+    '"Head of Finance"',
+  ],
+  "director de finanzas": [
+    '"Director de Finanzas"',
+    '"Directora de Finanzas"',
+    '"Director Financiero"',
+    '"Gerente de Finanzas"',
+    '"CFO"',
+    '"Chief Financial Officer"',
+    '"Head of Finance"',
+  ],
+  "gerente de finanzas": [
+    '"Gerente de Finanzas"',
+    '"Director Financiero"',
+    '"Director de Finanzas"',
+    '"CFO"',
+    '"Head of Finance"',
+  ],
   finanzas: ['"Director Financiero"', '"CFO"', '"Chief Financial Officer"', '"Gerente de Finanzas"'],
+
+  // Technology
+  "director de tecnologia": [
+    '"Director de Tecnología"',
+    '"Director de TI"',
+    '"CTO"',
+    '"Chief Technology Officer"',
+    '"Head of Engineering"',
+    '"VP of Engineering"',
+    '"Gerente de Tecnología"',
+  ],
+  "director de tecnología": [
+    '"Director de Tecnología"',
+    '"Director de TI"',
+    '"CTO"',
+    '"Chief Technology Officer"',
+    '"Head of Engineering"',
+    '"VP of Engineering"',
+    '"Gerente de Tecnología"',
+  ],
+  "gerente de tecnologia": [
+    '"Gerente de Tecnología"',
+    '"Director de Tecnología"',
+    '"CTO"',
+    '"Head of Engineering"',
+    '"Gerente de Sistemas"',
+  ],
+  cto: ['"CTO"', '"Chief Technology Officer"', '"Director de Tecnología"', '"Head of Engineering"', '"VP of Engineering"'],
   tecnologia: ['"Director de Tecnología"', '"CTO"', '"Chief Technology Officer"', '"Head of Engineering"'],
+
+  // HR / People
+  "director de recursos humanos": [
+    '"Director de Recursos Humanos"',
+    '"Directora de Recursos Humanos"',
+    '"Gerente de Recursos Humanos"',
+    '"Gerente de RRHH"',
+    '"Director de RRHH"',
+    '"CHRO"',
+    '"Chief Human Resources Officer"',
+    '"Head of People"',
+  ],
+  "gerente de recursos humanos": [
+    '"Gerente de Recursos Humanos"',
+    '"Gerente de RRHH"',
+    '"Director de Recursos Humanos"',
+    '"Head of People"',
+    '"Chief Human Resources Officer"',
+  ],
+  "recursos humanos": ['"Director de Recursos Humanos"', '"Gerente de RRHH"', '"Head of People"', '"CHRO"'],
+  rrhh: ['"Director de RRHH"', '"Gerente de RRHH"', '"Head of People"', '"CHRO"'],
+
+  // Legal
   abogado: ['"Abogado"', '"Abogada"', '"Socio"', '"Legal Counsel"', '"Partner"'],
   dentista: ['"Dentista"', '"Odontólogo"', '"Odontóloga"', '"Cirujano Dentista"'],
 };
+
+export const DISCIPLINE_KEYWORDS: Record<string, string[]> = {
+  marketing: ["marketing", "mercadotecnia", "mercadeo", "cmo", "growth", "marcom", "brand", "branding"],
+  ventas: ["ventas", "comercial", "sales", "revenue", "cro", "bdr", "sdr", "account executive", "kam", "key account"],
+  finanzas: ["finanzas", "financiero", "financiera", "finance", "cfo", "controller", "tesoreria", "contable", "contabilidad"],
+  operaciones: ["operaciones", "operativo", "operativa", "operations", "coo", "logistica", "supply chain", "cadena de suministro"],
+  tecnologia: ["tecnologia", "technology", "ti", "it", "cto", "software", "sistemas", "engineering", "desarrollo", "tech", "cio"],
+  rrhh: ["recursos humanos", "rrhh", "human resources", "hr", "people", "talento", "talent", "cultura"],
+  legal: ["legal", "juridico", "juridica", "abogado", "abogada", "lawyer", "counsel", "socio"],
+  producto: ["producto", "product", "cpo", "product manager"],
+};
+
+export function normalizeSearchText(str: string): string {
+  return (str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Validates whether a prospect's extracted title/headline strictly matches the target search query.
+ * For example: if user searched for "Director de Marketing", a lead with title "Director de Finanzas"
+ * will return false and be filtered out.
+ */
+export function isLeadTitleRelevant(
+  leadTitle: string | null,
+  targetQuery: string,
+  snippet?: string | null,
+  strict: boolean = true
+): boolean {
+  if (!strict) return true;
+  if (!targetQuery || !targetQuery.trim()) return true;
+
+  const targetNorm = normalizeSearchText(targetQuery);
+  const titleNorm = normalizeSearchText(leadTitle || "");
+  const snippetNorm = normalizeSearchText(snippet || "");
+
+  const textToCheck = titleNorm || snippetNorm;
+  if (!textToCheck) return false;
+
+  let matchedKnownDiscipline = false;
+
+  // 1. Discipline check: if target specifies a discipline, ensure lead matches it
+  for (const [, keywords] of Object.entries(DISCIPLINE_KEYWORDS)) {
+    const targetHasDiscipline = keywords.some((kw) => {
+      const regex = new RegExp(`(^|[^a-z0-9])${kw}([^a-z0-9]|$)`, "i");
+      return regex.test(targetNorm);
+    });
+
+    if (targetHasDiscipline) {
+      matchedKnownDiscipline = true;
+      // Must match at least one keyword of this discipline in title or snippet headline
+      const leadMatches = keywords.some((kw) => {
+        const regex = new RegExp(`(^|[^a-z0-9])${kw}([^a-z0-9]|$)`, "i");
+        return regex.test(titleNorm) || (titleNorm === "" && regex.test(snippetNorm));
+      });
+
+      if (!leadMatches) {
+        // Mismatch! e.g., lead is "Director de Operaciones" but target required "marketing"
+        return false;
+      }
+    }
+  }
+
+  // 2. Executive / Seniority check: reject junior/intern roles when searching for executive/director
+  const isTargetExecutive =
+    /\b(director|directora|gerente|head|vp|cmo|cfo|coo|cto|ceo|chief|lider|líder|socio)\b/i.test(targetNorm);
+
+  if (isTargetExecutive) {
+    const isJunior = /\b(practicante|pasante|intern\b|internship|trainee|asistente de|assistant to)\b/i.test(titleNorm);
+    if (isJunior) {
+      return false;
+    }
+  }
+
+  // 3. Fallback for custom specialty words not in DISCIPLINE_KEYWORDS (e.g. "Ciberseguridad")
+  if (!matchedKnownDiscipline) {
+    const stopWords = new Set([
+      "de", "del", "en", "para", "con", "los", "las", "el", "la", "un", "una", "y", "o",
+      "the", "and", "of", "in", "at", "for", "to", "a"
+    ]);
+    const knownSeniorities = new Set([
+      "director", "directora", "gerente", "head", "vp", "chief", "manager", "lider",
+      "jefe", "jefa", "coordinador", "coordinadora", "ejecutivo", "ejecutiva", "general",
+      "founder", "fundador", "ceo"
+    ]);
+
+    const rawTokens = targetNorm.split(/[\s,;/|-]+/).filter((t) => t.length > 3 && !stopWords.has(t));
+    const specialtyTokens = rawTokens.filter((t) => !knownSeniorities.has(t));
+
+    if (specialtyTokens.length > 0) {
+      const hasSpecialtyMatch = specialtyTokens.some((st) => {
+        const stem = st.length > 5 ? st.slice(0, 5) : st;
+        return titleNorm.includes(stem) || snippetNorm.includes(stem);
+      });
+      if (!hasSpecialtyMatch) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 
 export interface XRaySearchOptions {
   title?: string;
@@ -109,6 +397,7 @@ export interface XRaySearchOptions {
   company?: string;
   keywords?: string;
   limit?: number;
+  strictTitle?: boolean;
 }
 
 /**
@@ -143,20 +432,54 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
   const rawTitleTokens = title.split(/[,;/|]+/).map((s) => s.trim()).filter(Boolean);
   const titleTerms: string[] = [];
 
-  for (const t of rawTitleTokens) {
-    const lower = t.toLowerCase();
-    const syns = XRAY_TITLE_SYNONYMS[lower];
-    if (syns && syns.length > 0) {
-      for (const s of syns) {
-        if (!titleTerms.includes(s)) titleTerms.push(s);
-      }
-    } else {
-      const quoted = t.startsWith('"') ? t : `"${t}"`;
-      if (!titleTerms.includes(quoted)) titleTerms.push(quoted);
+  const wholeNorm = normalizeSearchText(title);
+  const seniorities = ["director", "directora", "gerente", "head", "vp", "chief", "lider", "jefe", "manager", "ceo"];
+  const hasSeniority = seniorities.some((s) => wholeNorm.includes(s));
+  let matchedDisciplineKeywords: string[] | null = null;
+
+  for (const [, kws] of Object.entries(DISCIPLINE_KEYWORDS)) {
+    if (kws.some((kw) => {
+      const regex = new RegExp(`(^|[^a-z0-9])${kw}([^a-z0-9]|$)`, "i");
+      return regex.test(wholeNorm);
+    })) {
+      matchedDisciplineKeywords = kws;
+      break;
     }
   }
 
-  const titleClause = titleTerms.length > 0 ? `(${titleTerms.join(" OR ")})` : "";
+  // 1. Direct match on rich synonym dictionary (e.g. "Director de Marketing")
+  if (XRAY_TITLE_SYNONYMS[wholeNorm]) {
+    for (const s of XRAY_TITLE_SYNONYMS[wholeNorm]) {
+      if (!titleTerms.includes(s)) titleTerms.push(s);
+    }
+  } else if (rawTitleTokens.length > 1 && hasSeniority && matchedDisciplineKeywords) {
+    // 2. Compound multi-tokens (e.g. "Director, Marketing"): AND seniority with discipline
+    const seniorityTerms = ['"Director"', '"Directora"', '"Gerente"', '"Head"', '"VP"'];
+    const discTerms = matchedDisciplineKeywords.slice(0, 4).map((d) => `"${d.charAt(0).toUpperCase() + d.slice(1)}"`);
+    titleTerms.push(`(${seniorityTerms.join(" OR ")}) (${discTerms.join(" OR ")})`);
+  } else {
+    // 3. Fallback token-by-token expansion
+    for (const t of rawTitleTokens) {
+      const lower = t.toLowerCase();
+      const norm = normalizeSearchText(t);
+      const syns = XRAY_TITLE_SYNONYMS[norm] || XRAY_TITLE_SYNONYMS[lower];
+      if (syns && syns.length > 0) {
+        for (const s of syns) {
+          if (!titleTerms.includes(s)) titleTerms.push(s);
+        }
+      } else {
+        const quoted = t.startsWith('"') ? t : `"${t}"`;
+        if (!titleTerms.includes(quoted)) titleTerms.push(quoted);
+      }
+    }
+  }
+
+  const titleClause =
+    titleTerms.length > 0
+      ? titleTerms.length === 1 && titleTerms[0].startsWith("(")
+        ? titleTerms[0]
+        : `(${titleTerms.join(" OR ")})`
+      : "";
 
   // Industry / Company clause (supports multiple industries separated by commas with OR)
   let industryClause = "";
@@ -324,7 +647,8 @@ export async function searchLinkedInWithSerper(
 
   // Free accounts on Serper must use num: 10
   const pageSize = 10;
-  const maxPages = Math.min(Math.ceil(limit / pageSize), 10);
+  // Allow enough pages to fulfill the requested limit even if some irrelevant results are filtered out
+  const maxPages = Math.min(Math.max(Math.ceil((limit * 1.6) / pageSize), 3), 10);
 
   const gl = subdomain === "www" ? "us" : subdomain;
   const hl = subdomain === "br" ? "pt" : "es";
@@ -386,6 +710,15 @@ export async function searchLinkedInWithSerper(
       const effectiveLocation =
         [city, countryName].filter(Boolean).join(", ") || location || countryName;
 
+      // Strict title & discipline relevance verification
+      if (options.title && options.strictTitle !== false) {
+        const isRelevant = isLeadTitleRelevant(parsed.title, options.title, item.snippet, true);
+        if (!isRelevant) {
+          // Reject mismatched lead (e.g. "Director de Finanzas" when user searched "Director de Marketing")
+          continue;
+        }
+      }
+
       const lead: SearchLead = {
         linkedinUrl: cleanUrl,
         fullName: parsed.fullName,
@@ -402,6 +735,15 @@ export async function searchLinkedInWithSerper(
       };
 
       collectedLeads.push(lead);
+
+      onProgress?.({
+        phase: "extracting",
+        page: pageIdx,
+        totalPages: maxPages,
+        totalFound: collectedLeads.length,
+        currentLead: lead,
+        message: `Verificado prospecto: ${lead.fullName} (${lead.title || ""})...`,
+      });
     }
 
     onProgress?.({

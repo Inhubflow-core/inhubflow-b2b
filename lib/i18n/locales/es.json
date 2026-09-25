@@ -1542,5 +1542,24 @@
     "stageError": "Error al mover de etapa",
     "stageUpdated": "Etapa actualizada",
     "emptyStageHint": "Arrastra prospectos aquí"
+  },
+  "leadFinder": {
+    "title": "Lead Finder",
+    "subtitle": "Encuentra y extrae prospectos calificados B2B en LinkedIn con alta precisión y verificación de cargo.",
+    "viewLists": "Ver Listas",
+    "accounts": "Cuentas",
+    "searchCriteria": "Criterios de Búsqueda",
+    "stepIndicator": "Paso 1 de 2",
+    "jobTitleLabel": "Cargo o Especialidad",
+    "jobTitlePlaceholder": "Ej: Director de Marketing, Gerente Comercial, CEO...",
+    "strictFilterTitle": "Filtro estricto de cargo y área",
+    "strictFilterDesc": "Verifica que el titular del perfil pertenezca a la disciplina buscada (evita directores de otras áreas).",
+    "defaultListName": "Prospectos ({date})",
+    "scanningRealtime": "Buscando prospectos calificados en tiempo real...",
+    "extractionFinished": "Extracción y verificación completada",
+    "noResultsTitle": "No se encontraron prospectos",
+    "toastSuccess": "¡Lista \"{name}\" creada con {count} prospectos verificados!",
+    "toastNoResults": "No se encontraron prospectos con los filtros actuales.",
+    "toastCancelled": "Búsqueda cancelada"
   }
 }

@@ -88,6 +88,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   );
 
   const [title, setTitle] = useState("");
+  const [strictTitle, setStrictTitle] = useState(true);
   const [country, setCountry] = useState("Chile");
   const [city, setCity] = useState("");
   const [company, setCompany] = useState("");
@@ -183,6 +184,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           limit,
           listName: listName.trim() || undefined,
           stream: true,
+          strictTitle,
         }),
         signal: controller.signal,
       });
@@ -396,6 +398,36 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Filtro estricto de cargo y área */}
+                <div className="mt-3 flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/60 transition-all">
+                  <div className="flex items-start gap-2.5 pr-2">
+                    <RiShieldCheckLine className="text-brand-500 shrink-0 mt-0.5" size={17} />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                          {t("leadFinder.strictFilterTitle") || "Filtro estricto de cargo y área"}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400 border border-brand-200/60 dark:border-brand-800/40">
+                          Recomendado
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                        {t("leadFinder.strictFilterDesc") || "Verifica que el titular del perfil pertenezca a la disciplina buscada (evita directores de otras áreas)."}
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={strictTitle}
+                      onChange={(e) => setStrictTitle(e.target.checked)}
+                      disabled={isSearching}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-500"></div>
+                  </label>
                 </div>
               </div>
 

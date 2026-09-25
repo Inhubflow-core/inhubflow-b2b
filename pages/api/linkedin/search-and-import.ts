@@ -24,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     limit = 25,
     listName,
     stream = true,
+    strictTitle = true,
   } = req.body || {};
 
   const effectiveLocation = location || [city?.trim(), country?.trim()].filter(Boolean).join(", ");
@@ -84,6 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             company,
             keywords,
             limit: numericLimit,
+            strictTitle: strictTitle !== false,
           },
           (progress: SearchProgressEvent) => {
             sendEvent("progress", progress);
@@ -155,6 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         company,
         keywords,
         limit: numericLimit,
+        strictTitle: strictTitle !== false,
       });
     } catch (xrayErr: unknown) {
       console.error("[search-and-import] Google X-Ray non-streaming error:", xrayErr);

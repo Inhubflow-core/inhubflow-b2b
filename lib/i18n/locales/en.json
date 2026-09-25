@@ -1542,5 +1542,24 @@
     "stageError": "Could not move stage",
     "stageUpdated": "Stage updated",
     "emptyStageHint": "Drag prospects here"
+  },
+  "leadFinder": {
+    "title": "Lead Finder",
+    "subtitle": "Discover and extract verified B2B leads on LinkedIn with high precision and role verification.",
+    "viewLists": "View Lists",
+    "accounts": "Accounts",
+    "searchCriteria": "Search Criteria",
+    "stepIndicator": "Step 1 of 2",
+    "jobTitleLabel": "Job Title or Role",
+    "jobTitlePlaceholder": "e.g. Marketing Director, Head of Sales, CEO...",
+    "strictFilterTitle": "Strict Role & Discipline Filter",
+    "strictFilterDesc": "Ensures the profile headline strictly matches the target discipline (prevents directors from other areas).",
+    "defaultListName": "Leads ({date})",
+    "scanningRealtime": "Searching verified leads in real-time...",
+    "extractionFinished": "Extraction & verification complete",
+    "noResultsTitle": "No leads found",
+    "toastSuccess": "List \"{name}\" created with {count} verified leads!",
+    "toastNoResults": "No leads found matching current criteria.",
+    "toastCancelled": "Search cancelled"
   }
 }

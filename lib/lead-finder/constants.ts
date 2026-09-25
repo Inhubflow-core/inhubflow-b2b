@@ -21,9 +21,12 @@ export const COUNTRIES_LIST: CountryOption[] = [
 ];
 
 export const SAMPLE_TITLES = [
-  "CEO, Director",
-  "Gerente General",
   "Director de Marketing",
+  "Director Comercial",
+  "Gerente General",
+  "Director de Operaciones",
+  "Director de Finanzas",
+  "Director de Tecnología",
   "Founder",
 ];
 

@@ -26,6 +26,7 @@ const {
   buildXRayQuery,
   normalizeXRayUrl,
   parseXRaySnippet,
+  isLeadTitleRelevant,
   searchLinkedInWithSerper,
 } = require("../lib/linkedin/xray.ts");
 
@@ -136,6 +137,59 @@ assert.equal(typeof searchLinkedInWithSerper, "function");
     assert.equal(err.code, "provider_error");
     console.log("  ✔ searchLinkedInWithSerper correctly handles missing/invalid API key");
   }
+
+  console.log("▶ [Test 8] Strict Title and Discipline Relevance Filter");
+  // Exact discipline match
+  assert.equal(
+    isLeadTitleRelevant("Director de Marketing en ABC", "Director de Marketing", null, true),
+    true,
+    "Should accept Director de Marketing"
+  );
+  assert.equal(
+    isLeadTitleRelevant("Directora de Marketing y Growth", "Director de Marketing", null, true),
+    true,
+    "Should accept Directora de Marketing"
+  );
+  assert.equal(
+    isLeadTitleRelevant("CMO & VP Growth en Startup", "Director de Marketing", null, true),
+    true,
+    "Should accept CMO & VP Growth for Marketing Director query"
+  );
+  assert.equal(
+    isLeadTitleRelevant("Gerente de Mercadotecnia", "Director de Marketing", null, true),
+    true,
+    "Should accept Gerente de Mercadotecnia"
+  );
+
+  // Exact discipline rejection (the bug user reported!)
+  assert.equal(
+    isLeadTitleRelevant("Director de Operaciones en Falabella", "Director de Marketing", null, true),
+    false,
+    "Must REJECT Director de Operaciones when searching for Director de Marketing"
+  );
+  assert.equal(
+    isLeadTitleRelevant("Director de Finanzas en Codelco", "Director de Marketing", null, true),
+    false,
+    "Must REJECT Director de Finanzas when searching for Director de Marketing"
+  );
+  assert.equal(
+    isLeadTitleRelevant("Director Legal en Corporación", "Director de Marketing", null, true),
+    false,
+    "Must REJECT Director Legal when searching for Director de Marketing"
+  );
+  assert.equal(
+    isLeadTitleRelevant("Practicante de Marketing", "Director de Marketing", null, true),
+    false,
+    "Must REJECT Practicante/Intern when searching for Director"
+  );
+
+  // Compound X-Ray Query building check
+  const qMkt = buildXRayQuery({ title: "Director de Marketing", location: "Chile" });
+  assert.equal(qMkt.query.includes('"Director de Marketing"'), true);
+  assert.equal(qMkt.query.includes('"Head of Marketing"'), true);
+  assert.equal(qMkt.query.includes('"CMO"'), true);
+  assert.equal(qMkt.query.includes('"Director" OR "Directora" OR "Director General"'), false);
+  console.log("  ✔ Strict title and discipline filtering verified with 100% precision");
 
   console.log("\n✅ ALL GOOGLE X-RAY & SERPER TESTS PASSED CLEANLY!");
 })();
