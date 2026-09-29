@@ -37,6 +37,26 @@ export default function LoginPage() {
     }
   }
 
+  async function handleQuickDemoLogin() {
+    setLoading(true);
+    setError("");
+    setEmail("demo@inhubflow.com");
+    setPassword("Demo2026!");
+
+    const res = await signIn("credentials", {
+      email: "demo@inhubflow.com",
+      password: "Demo2026!",
+      redirect: false,
+    });
+    setLoading(false);
+
+    if (res?.ok) {
+      router.replace("/");
+    } else {
+      setError(t("auth.invalidCredentials"));
+    }
+  }
+
   return (
     <>
       <Head>
@@ -192,6 +212,26 @@ export default function LoginPage() {
                 ) : (
                   t("auth.signInBtn")
                 )}
+              </button>
+
+              {/* Botón de Acceso Rápido a Cuenta Demo */}
+              <div className="relative my-1 flex items-center justify-center pt-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200 dark:border-gray-800" />
+                </div>
+                <span className="relative bg-white dark:bg-gray-900 px-2 text-[10px] uppercase font-bold text-gray-400">
+                  o demostración en vivo
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleQuickDemoLogin}
+                disabled={loading}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/70 dark:bg-indigo-950/30 px-3 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all active:scale-[0.99] cursor-pointer"
+              >
+                <span>✨</span>
+                <span>Ingresar a Cuenta Demo (1-Click)</span>
               </button>
             </form>
           </div>
