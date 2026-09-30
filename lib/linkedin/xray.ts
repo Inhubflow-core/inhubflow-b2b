@@ -125,7 +125,7 @@ export async function searchLinkedInWithSerper(
   // Free accounts on Serper must use num: 10
   const pageSize = 10;
   // Allow enough pages to fulfill the requested limit even if some irrelevant results are filtered out
-  const maxPages = Math.min(Math.max(Math.ceil((limit * 1.6) / pageSize), 3), 10);
+  const maxPages = Math.min(Math.max(Math.ceil((limit * 2.0) / pageSize), 5), 25);
 
   const gl = subdomain === "www" ? "us" : subdomain;
   const hl = subdomain === "br" ? "pt" : "es";
