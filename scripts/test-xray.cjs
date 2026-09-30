@@ -42,9 +42,14 @@ console.log("  ✔ Subdomains resolved correctly");
 console.log("▶ [Test 2] Query building - national & global expansion");
 const qChile = buildXRayQuery({ title: "CEO", location: "Santiago, Chile" });
 assert.equal(
-  qChile.query.includes("(site:cl.linkedin.com/in/ OR site:linkedin.com/in/ OR site:www.linkedin.com/in/)"),
+  qChile.query.includes("site:cl.linkedin.com/in/"),
   true,
-  "Must include national subdomain AND www/global domain to capture all indexed profiles"
+  "Must use national subdomain site:cl.linkedin.com/in/ to isolate profiles to the target country"
+);
+assert.equal(
+  qChile.query.includes("site:www.linkedin.com/in/"),
+  false,
+  "Must NOT include www/global domain when a national subdomain is present to avoid city-as-name collisions"
 );
 assert.equal(
   qChile.query.includes("pub/"),

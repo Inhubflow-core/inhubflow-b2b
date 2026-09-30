@@ -664,7 +664,7 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
 
   const siteClause = subCode === "www"
     ? `(site:linkedin.com/in/ OR site:www.linkedin.com/in/)`
-    : `(site:${subCode}.linkedin.com/in/ OR site:linkedin.com/in/ OR site:www.linkedin.com/in/)`;
+    : `site:${subCode}.linkedin.com/in/`;
 
   // Build title boolean group (supports multiple titles separated by comma / OR)
   const rawTitleTokens = title.split(/[,;/|]+|\b(?:or)\b/i).map((s) => s.trim()).filter(Boolean);
