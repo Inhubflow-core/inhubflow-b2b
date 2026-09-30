@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { ensureSdrAgent } from "@/lib/sdr-agent/seed";
+import { seedDemoWorkspace } from "@/lib/demo/seed-demo";
 
 export interface AutoSeedResult {
   adminSeeded: boolean;
@@ -111,7 +112,6 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
   try {
     const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@inhubflow.com'").get();
     if (!demoUser) {
-      const { seedDemoWorkspace } = require("@/lib/demo/seed-demo");
       seedDemoWorkspace(db);
     }
   } catch (err) {

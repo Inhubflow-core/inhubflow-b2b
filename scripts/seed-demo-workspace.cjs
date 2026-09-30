@@ -237,8 +237,8 @@ db.transaction(() => {
   `);
 
   const listTargetStmt = db.prepare(`
-    INSERT INTO list_targets (list_id, target_id, created_at)
-    VALUES (?, ?, ?)
+    INSERT INTO list_targets (list_id, target_id)
+    VALUES (?, ?)
     ON CONFLICT(list_id, target_id) DO NOTHING
   `);
 
@@ -283,7 +283,7 @@ db.transaction(() => {
 
     // Asignar a listas
     const targetList = idx % 2 === 0 ? "demo_list_tech_vps" : (idx % 3 === 0 ? "demo_list_competitor_radar" : "demo_list_saas_ceos");
-    listTargetStmt.run(targetList, targetId, daysAgo(20));
+    listTargetStmt.run(targetList, targetId);
   }
   console.log(`[Demo Seed] ✅ ${sampleProspects.length} Prospectos B2B cargados en listas y pipeline.`);
 
@@ -470,18 +470,22 @@ db.transaction(() => {
   ];
 
   for (const sl of signalLeadsData) {
+    const slug = sl.name.toLowerCase().replace(/[^a-z0-9]/g, "-");
+    const linkedinUrl = `https://www.linkedin.com/in/${slug}/`;
+    const identityKey = linkedinUrl.toLowerCase();
+
     db.prepare(`
       INSERT INTO signal_leads (
-        id, workspace_owner_id, monitor_id, full_name, headline, company,
+        id, workspace_owner_id, monitor_id, linkedin_url, identity_key, full_name, headline, company,
         signal_type, signal_snippet, icebreaker_preview, status, score,
         signal_count, first_detected_at, last_detected_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         score = excluded.score,
         status = excluded.status,
         signal_snippet = excluded.signal_snippet
     `).run(
-      sl.id, DEMO_USER_ID, sl.mon_id, sl.name, sl.headline, sl.company,
+      sl.id, DEMO_USER_ID, sl.mon_id, linkedinUrl, identityKey, sl.name, sl.headline, sl.company,
       sl.type, sl.snippet, sl.icebreaker, sl.status, sl.score,
       daysAgo(4), daysAgo(1), daysAgo(4), daysAgo(1)
     );
@@ -491,6 +495,62 @@ db.transaction(() => {
   // =========================================================================
   // 7. SOCIAL SELLING CON IA (30 Publicaciones: 10 Publicadas + 20 Programadas)
   // =========================================================================
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS social_selling_posts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      account_id TEXT NOT NULL,
+      topic TEXT,
+      content TEXT NOT NULL,
+      image_prompt TEXT,
+      media_url TEXT,
+      media_type TEXT NOT NULL DEFAULT 'none',
+      original_post_url TEXT,
+      original_author TEXT,
+      original_content TEXT,
+      original_metrics_json TEXT,
+      scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled',
+      linkedin_post_urn TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      published_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sdr_meeting_bookings (
+      id TEXT PRIMARY KEY,
+      thread_id TEXT,
+      target_id TEXT,
+      account_id TEXT,
+      booked_at TEXT,
+      meeting_time TEXT,
+      status TEXT DEFAULT 'confirmed',
+      title TEXT,
+      meeting_url TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      target_id TEXT,
+      meeting_link TEXT,
+      location TEXT,
+      status TEXT NOT NULL DEFAULT 'confirmed',
+      channel TEXT NOT NULL DEFAULT 'sdr_ai',
+      created_by TEXT,
+      workspace_owner_id TEXT,
+      run_id TEXT,
+      list_id TEXT,
+      thread_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   const socialPosts = [
     // Publicados recientemente
     { topic: "Reflexión Comercial", content: "El mayor error que cometen los equipos de ventas B2B es confundir actividad con productividad.\n\nEnviar 200 mensajes genéricos al día destruye la reputación de tu dominio y de tu perfil de LinkedIn.\n\nLa verdadera prospección moderna combina señales de intención activa con personalización contextual. Calidad sobre volumen siempre.", status: "published", days: -7 },
@@ -542,9 +602,9 @@ db.transaction(() => {
     // 1. Mensaje saliente de conexión/valor
     db.prepare(`
       INSERT INTO linkedin_inbox_messages (
-        id, account_id, target_id, external_thread_id, external_message_id,
-        direction, sender_name, body, sent_at, captured_at
-      ) VALUES (?, ?, ?, ?, ?, 'outbound', 'Carlos Mendonça', ?, ?, ?)
+        id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+        direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+      ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'outbound', 'Carlos Mendonça', ?, ?, ?, 'profile_url', '{}')
       ON CONFLICT(id) DO NOTHING
     `).run(
       `demo_msg_${ct.targetId}_1`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_1`,
@@ -555,9 +615,9 @@ db.transaction(() => {
     // 2. Respuesta positiva del prospecto
     db.prepare(`
       INSERT INTO linkedin_inbox_messages (
-        id, account_id, target_id, external_thread_id, external_message_id,
-        direction, sender_name, body, sent_at, captured_at
-      ) VALUES (?, ?, ?, ?, ?, 'inbound', ?, ?, ?, ?)
+        id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+        direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+      ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'inbound', ?, ?, ?, ?, 'profile_url', '{}')
       ON CONFLICT(id) DO NOTHING
     `).run(
       `demo_msg_${ct.targetId}_2`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_2`,
@@ -569,9 +629,9 @@ db.transaction(() => {
     // 3. Respuesta automática del SDR IA confirmando la cita
     db.prepare(`
       INSERT INTO linkedin_inbox_messages (
-        id, account_id, target_id, external_thread_id, external_message_id,
-        direction, sender_name, body, sent_at, captured_at
-      ) VALUES (?, ?, ?, ?, ?, 'outbound', 'InHubFlow SDR IA', ?, ?, ?)
+        id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+        direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+      ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'outbound', 'InHubFlow SDR IA', ?, ?, ?, 'profile_url', '{}')
       ON CONFLICT(id) DO NOTHING
     `).run(
       `demo_msg_${ct.targetId}_3`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_3`,
@@ -579,18 +639,34 @@ db.transaction(() => {
       daysAgo(2, -1), daysAgo(2, -1)
     );
 
-    // Cita en sdr_meeting_bookings
-    db.prepare(`
-      INSERT INTO sdr_meeting_bookings (
-        id, thread_id, target_id, account_id, booked_at, meeting_time, status, title, meeting_url, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, 'https://meet.google.com/abc-demo-meet', ?)
-      ON CONFLICT(id) DO NOTHING
-    `).run(
-      `demo_book_${ct.targetId}`, ct.threadId, ct.targetId, "demo_acc_carlos",
-      daysAgo(2), daysAhead(2, 11),
-      `Demo InHubFlow <> ${ct.name} (${ct.company})`,
-      daysAgo(2)
-    );
+    // Cita agendada sincronizada en el Calendario de InHubFlow
+    try {
+      db.prepare(`
+        INSERT INTO calendar_events (
+          id, title, description, start_time, end_time, target_id,
+          meeting_link, location, status, channel, created_by, workspace_owner_id,
+          run_id, list_id, thread_id, created_at, updated_at
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          'https://meet.google.com/abc-demo-meet', 'Google Meet', 'confirmed', 'sdr_ai', ?, ?,
+          'demo_run_vps', 'demo_list_tech_vps', ?, ?, ?
+        ) ON CONFLICT(id) DO NOTHING
+      `).run(
+        `demo_cal_${ct.targetId}`,
+        `Demo InHubFlow <> ${ct.name} (${ct.company})`,
+        `Reunión demostrativa agendada por SDR IA con ${ct.name}, decisor en ${ct.company}.`,
+        daysAhead(2, 11),
+        daysAhead(2, 12),
+        ct.targetId,
+        DEMO_USER_ID,
+        DEMO_USER_ID,
+        ct.threadId,
+        daysAgo(2),
+        daysAgo(2)
+      );
+    } catch (e) {
+      // Ignorar si la tabla de calendario no está migrada aún
+    }
   }
   console.log(`[Demo Seed] ✅ Mensajes de Smart Inbox y Reuniones Comerciales Agendadas.`);
 
@@ -598,10 +674,12 @@ db.transaction(() => {
   // 9. LOGS DE ACTIVIDAD (Curva de actividad de los últimos 30 días para los gráficos)
   // =========================================================================
   const logStmt = db.prepare(`
-    INSERT INTO logs (account_id, run_id, message, created_at)
-    VALUES (?, 'demo_run_vps', ?, ?)
+    INSERT INTO logs (id, run_id, target_id, level, message, created_at)
+    VALUES (?, 'demo_run_vps', ?, 'info', ?, ?)
+    ON CONFLICT(id) DO NOTHING
   `);
 
+  let logCounter = 0;
   // Simular actividad diaria constante (Lunes a Viernes) en los últimos 30 días
   for (let i = 28; i >= 0; i--) {
     const d = new Date();
@@ -611,16 +689,33 @@ db.transaction(() => {
 
     const logDate = daysAgo(i, 10);
     // 18-20 visitas
-    for (let v = 0; v < 18; v++) logStmt.run("demo_acc_carlos", `Visited profile in LinkedIn`, logDate);
-    // 15-18 conexiones
-    for (let c = 0; c < 16; c++) logStmt.run("demo_acc_carlos", `Connection request sent successfully`, logDate);
+    for (let v = 0; v < 18; v++) {
+      logCounter++;
+      const targetId = `demo_target_${String((v % 35) + 1).padStart(3, "0")}`;
+      logStmt.run(`demo_log_${logCounter}`, targetId, `Visitó perfil en LinkedIn`, logDate);
+    }
+    // 15-18 solicitudes de conexion
+    for (let c = 0; c < 16; c++) {
+      logCounter++;
+      const targetId = `demo_target_${String((c % 35) + 1).padStart(3, "0")}`;
+      logStmt.run(`demo_log_${logCounter}`, targetId, `Solicitud de conexión enviada`, logDate);
+    }
     // 12-15 mensajes
-    for (let m = 0; m < 14; m++) logStmt.run("demo_acc_carlos", `Message sent to target profile`, logDate);
+    for (let m = 0; m < 14; m++) {
+      logCounter++;
+      const targetId = `demo_target_${String((m % 35) + 1).padStart(3, "0")}`;
+      logStmt.run(`demo_log_${logCounter}`, targetId, `Mensaje enviado al contacto`, logDate);
+    }
     // 4-6 emails
-    for (let e = 0; e < 5; e++) logStmt.run("demo_acc_carlos", `Email sent to commercial contact`, logDate);
+    for (let e = 0; e < 5; e++) {
+      logCounter++;
+      const targetId = `demo_target_${String((e % 35) + 1).padStart(3, "0")}`;
+      logStmt.run(`demo_log_${logCounter}`, targetId, `Email sent to commercial contact`, logDate);
+    }
   }
-  console.log(`[Demo Seed] ✅ Historial de actividad diaria cargado para gráficos.`);
-});
+  console.log(`[Demo Seed] ✅ Historial de actividad diaria cargado para gráficos (${logCounter} registros).`);
+})();
+
 
 console.log("\n========================================================");
 console.log("🎉 SEED DE CUENTA DEMO COMPLETADO CON ÉXITO");

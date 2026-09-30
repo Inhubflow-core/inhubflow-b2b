@@ -205,8 +205,8 @@ export function seedDemoWorkspace(db: Database.Database) {
       `);
 
       const listTargetStmt = db.prepare(`
-        INSERT INTO list_targets (list_id, target_id, created_at)
-        VALUES (?, ?, ?)
+        INSERT INTO list_targets (list_id, target_id)
+        VALUES (?, ?)
         ON CONFLICT(list_id, target_id) DO NOTHING
       `);
 
@@ -250,7 +250,7 @@ export function seedDemoWorkspace(db: Database.Database) {
         );
 
         const targetList = idx % 2 === 0 ? "demo_list_tech_vps" : (idx % 3 === 0 ? "demo_list_competitor_radar" : "demo_list_saas_ceos");
-        listTargetStmt.run(targetList, targetId, daysAgo(20));
+        listTargetStmt.run(targetList, targetId);
       }
 
       // 5. WORKFLOWS Y RUNS
@@ -429,18 +429,22 @@ export function seedDemoWorkspace(db: Database.Database) {
       ];
 
       for (const sl of signalLeadsData) {
+        const slug = sl.name.toLowerCase().replace(/[^a-z0-9]/g, "-");
+        const linkedinUrl = `https://www.linkedin.com/in/${slug}/`;
+        const identityKey = linkedinUrl.toLowerCase();
+
         db.prepare(`
           INSERT INTO signal_leads (
-            id, workspace_owner_id, monitor_id, full_name, headline, company,
+            id, workspace_owner_id, monitor_id, linkedin_url, identity_key, full_name, headline, company,
             signal_type, signal_snippet, icebreaker_preview, status, score,
             signal_count, first_detected_at, last_detected_at, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             score = excluded.score,
             status = excluded.status,
             signal_snippet = excluded.signal_snippet
         `).run(
-          sl.id, DEMO_USER_ID, sl.mon_id, sl.name, sl.headline, sl.company,
+          sl.id, DEMO_USER_ID, sl.mon_id, linkedinUrl, identityKey, sl.name, sl.headline, sl.company,
           sl.type, sl.snippet, sl.icebreaker, sl.status, sl.score,
           daysAgo(4), daysAgo(1), daysAgo(4), daysAgo(1)
         );
@@ -459,6 +463,50 @@ export function seedDemoWorkspace(db: Database.Database) {
         { topic: "Estrategia Multicanal", content: "Por qué combinar LinkedIn con Cold Email triplica tus conversiones: el efecto de omnipresencia comercial bien ejecutado.", status: "scheduled", days: 9 },
         { topic: "Pregunta de Debate", content: "¿Qué métrica comercial consideras más importante en 2026? A) Tasa de respuesta, B) Reuniones agendadas, C) Tasa de cierre.", status: "scheduled", days: 11 },
       ];
+
+      // 7. SOCIAL SELLING CON IA
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS social_selling_posts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          account_id TEXT NOT NULL,
+          topic TEXT,
+          content TEXT NOT NULL,
+          image_prompt TEXT,
+          media_url TEXT,
+          media_type TEXT NOT NULL DEFAULT 'none',
+          original_post_url TEXT,
+          original_author TEXT,
+          original_content TEXT,
+          original_metrics_json TEXT,
+          scheduled_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'scheduled',
+          linkedin_post_urn TEXT,
+          error_message TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          published_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS calendar_events (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          description TEXT,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          target_id TEXT,
+          meeting_link TEXT,
+          location TEXT,
+          status TEXT NOT NULL DEFAULT 'confirmed',
+          channel TEXT NOT NULL DEFAULT 'sdr_ai',
+          created_by TEXT,
+          workspace_owner_id TEXT,
+          run_id TEXT,
+          list_id TEXT,
+          thread_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
 
       let postIdx = 0;
       for (const sp of socialPosts) {
@@ -491,9 +539,9 @@ export function seedDemoWorkspace(db: Database.Database) {
       for (const ct of conversationTargets) {
         db.prepare(`
           INSERT INTO linkedin_inbox_messages (
-            id, account_id, target_id, external_thread_id, external_message_id,
-            direction, sender_name, body, sent_at, captured_at
-          ) VALUES (?, ?, ?, ?, ?, 'outbound', 'Carlos Mendonça', ?, ?, ?)
+            id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+            direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+          ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'outbound', 'Carlos Mendonça', ?, ?, ?, 'profile_url', '{}')
           ON CONFLICT(id) DO NOTHING
         `).run(
           `demo_msg_${ct.targetId}_1`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_1`,
@@ -503,9 +551,9 @@ export function seedDemoWorkspace(db: Database.Database) {
 
         db.prepare(`
           INSERT INTO linkedin_inbox_messages (
-            id, account_id, target_id, external_thread_id, external_message_id,
-            direction, sender_name, body, sent_at, captured_at
-          ) VALUES (?, ?, ?, ?, ?, 'inbound', ?, ?, ?, ?)
+            id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+            direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+          ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'inbound', ?, ?, ?, ?, 'profile_url', '{}')
           ON CONFLICT(id) DO NOTHING
         `).run(
           `demo_msg_${ct.targetId}_2`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_2`,
@@ -516,9 +564,9 @@ export function seedDemoWorkspace(db: Database.Database) {
 
         db.prepare(`
           INSERT INTO linkedin_inbox_messages (
-            id, account_id, target_id, external_thread_id, external_message_id,
-            direction, sender_name, body, sent_at, captured_at
-          ) VALUES (?, ?, ?, ?, ?, 'outbound', 'InHubFlow SDR IA', ?, ?, ?)
+            id, account_id, target_id, run_id, workflow_id, external_thread_id, external_message_id,
+            direction, sender_name, body, sent_at, captured_at, identity_mode, metadata_json
+          ) VALUES (?, ?, ?, 'demo_run_vps', 'demo_wf_vps', ?, ?, 'outbound', 'InHubFlow SDR IA', ?, ?, ?, 'profile_url', '{}')
           ON CONFLICT(id) DO NOTHING
         `).run(
           `demo_msg_${ct.targetId}_3`, "demo_acc_carlos", ct.targetId, ct.threadId, `ext_${ct.targetId}_3`,
@@ -526,25 +574,44 @@ export function seedDemoWorkspace(db: Database.Database) {
           daysAgo(2, -1), daysAgo(2, -1)
         );
 
-        db.prepare(`
-          INSERT INTO sdr_meeting_bookings (
-            id, thread_id, target_id, account_id, booked_at, meeting_time, status, title, meeting_url, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, 'https://meet.google.com/abc-demo-meet', ?)
-          ON CONFLICT(id) DO NOTHING
-        `).run(
-          `demo_book_${ct.targetId}`, ct.threadId, ct.targetId, "demo_acc_carlos",
-          daysAgo(2), daysAhead(2, 11),
-          `Demo InHubFlow <> ${ct.name} (${ct.company})`,
-          daysAgo(2)
-        );
+        // Cita agendada sincronizada en el Calendario de InHubFlow
+        try {
+          db.prepare(`
+            INSERT INTO calendar_events (
+              id, title, description, start_time, end_time, target_id,
+              meeting_link, location, status, channel, created_by, workspace_owner_id,
+              run_id, list_id, thread_id, created_at, updated_at
+            ) VALUES (
+              ?, ?, ?, ?, ?, ?,
+              'https://meet.google.com/abc-demo-meet', 'Google Meet', 'confirmed', 'sdr_ai', ?, ?,
+              'demo_run_vps', 'demo_list_tech_vps', ?, ?, ?
+            ) ON CONFLICT(id) DO NOTHING
+          `).run(
+            `demo_cal_${ct.targetId}`,
+            `Demo InHubFlow <> ${ct.name} (${ct.company})`,
+            `Reunión demostrativa agendada por SDR IA con ${ct.name}, decisor en ${ct.company}.`,
+            daysAhead(2, 11),
+            daysAhead(2, 12),
+            ct.targetId,
+            DEMO_USER_ID,
+            DEMO_USER_ID,
+            ct.threadId,
+            daysAgo(2),
+            daysAgo(2)
+          );
+        } catch (e) {
+          // Calendario opcional
+        }
       }
 
       // 9. LOGS DE ACTIVIDAD
       const logStmt = db.prepare(`
-        INSERT INTO logs (account_id, run_id, message, created_at)
-        VALUES (?, 'demo_run_vps', ?, ?)
+        INSERT INTO logs (id, run_id, target_id, level, message, created_at)
+        VALUES (?, 'demo_run_vps', ?, 'info', ?, ?)
+        ON CONFLICT(id) DO NOTHING
       `);
 
+      let logCounter = 0;
       for (let i = 28; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
@@ -552,10 +619,26 @@ export function seedDemoWorkspace(db: Database.Database) {
         if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
         const logDate = daysAgo(i, 10);
-        for (let v = 0; v < 18; v++) logStmt.run("demo_acc_carlos", `Visited profile in LinkedIn`, logDate);
-        for (let c = 0; c < 16; c++) logStmt.run("demo_acc_carlos", `Connection request sent successfully`, logDate);
-        for (let m = 0; m < 14; m++) logStmt.run("demo_acc_carlos", `Message sent to target profile`, logDate);
-        for (let e = 0; e < 5; e++) logStmt.run("demo_acc_carlos", `Email sent to commercial contact`, logDate);
+        for (let v = 0; v < 18; v++) {
+          logCounter++;
+          const targetId = `demo_target_${String((v % 35) + 1).padStart(3, "0")}`;
+          logStmt.run(`demo_log_${logCounter}`, targetId, `Visitó perfil en LinkedIn`, logDate);
+        }
+        for (let c = 0; c < 16; c++) {
+          logCounter++;
+          const targetId = `demo_target_${String((c % 35) + 1).padStart(3, "0")}`;
+          logStmt.run(`demo_log_${logCounter}`, targetId, `Solicitud de conexión enviada`, logDate);
+        }
+        for (let m = 0; m < 14; m++) {
+          logCounter++;
+          const targetId = `demo_target_${String((m % 35) + 1).padStart(3, "0")}`;
+          logStmt.run(`demo_log_${logCounter}`, targetId, `Mensaje enviado al contacto`, logDate);
+        }
+        for (let e = 0; e < 5; e++) {
+          logCounter++;
+          const targetId = `demo_target_${String((e % 35) + 1).padStart(3, "0")}`;
+          logStmt.run(`demo_log_${logCounter}`, targetId, `Email sent to commercial contact`, logDate);
+        }
       }
     })();
 
