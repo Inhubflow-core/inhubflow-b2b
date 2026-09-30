@@ -6,6 +6,8 @@ import {
   XRaySearchError,
   buildXRayQuery,
   isLeadTitleRelevant,
+  normalizeSearchText,
+  XRAY_TITLE_SYNONYMS,
   XRaySearchOptions,
 } from "../lead-finder/query";
 
@@ -129,12 +131,36 @@ export async function searchLinkedInWithSerper(
   const uniqueRoles = [...new Set(rawTitleTokens)];
   const roleBatches: string[] = [];
 
-  if (uniqueRoles.length > 3) {
-    for (let i = 0; i < uniqueRoles.length; i += 3) {
-      roleBatches.push(uniqueRoles.slice(i, i + 3).join(", "));
+  if (uniqueRoles.length > 2) {
+    for (let i = 0; i < uniqueRoles.length; i += 2) {
+      roleBatches.push(uniqueRoles.slice(i, i + 2).join(", "));
     }
   } else {
     roleBatches.push(options.title || "");
+  }
+
+  // When high volume (limit > 100) is requested, append synonym batches to ensure reaching up to 250 leads
+  if (limit > 100 && options.showSimilarJobs !== false) {
+    const existingNorms = new Set(uniqueRoles.map((r) => normalizeSearchText(r)));
+    const extraSynonyms: string[] = [];
+    for (const r of uniqueRoles) {
+      const syns = XRAY_TITLE_SYNONYMS[normalizeSearchText(r)] || XRAY_TITLE_SYNONYMS[r.toLowerCase()];
+      if (syns) {
+        for (const s of syns) {
+          const clean = s.replace(/"/g, "").trim();
+          const norm = normalizeSearchText(clean);
+          if (!existingNorms.has(norm) && !extraSynonyms.includes(clean)) {
+            existingNorms.add(norm);
+            extraSynonyms.push(clean);
+          }
+        }
+      }
+    }
+    if (extraSynonyms.length > 0) {
+      for (let i = 0; i < extraSynonyms.length; i += 2) {
+        roleBatches.push(extraSynonyms.slice(i, i + 2).join(", "));
+      }
+    }
   }
 
   const webClient = new WebSearchClient({ apiKey: serperKey });
@@ -157,7 +183,8 @@ export async function searchLinkedInWithSerper(
     });
 
     const remaining = limit - collectedLeads.length;
-    const maxPagesForBatch = Math.min(Math.max(Math.ceil((remaining * 2.0) / pageSize), 3), 20);
+    // Allow up to 35 pages per batch to give ample headroom for 250 leads even with deduplication
+    const maxPagesForBatch = Math.min(Math.max(Math.ceil((remaining * 1.5) / pageSize), 3), 35);
     const gl = subdomain === "www" ? "us" : subdomain;
     const hl = subdomain === "br" ? "pt" : "es";
 
