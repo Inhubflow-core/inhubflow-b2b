@@ -1,11 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") return res.status(405).end();
 
   try {
-    const db = getDb();
+    const session = await getServerSession(req, res, authOptions);
+    const userEmail = (session?.user as any)?.email?.trim().toLowerCase();
+    const isDemo = userEmail === "demo@inhubflow.com";
+    const db = isDemo ? getDemoDb() : getDb();
 
     const listId = req.query.list_id as string | undefined;
     const workflowId = req.query.workflow_id as string | undefined;

@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const actor: ApiActor | null = await requireApiActor(req, res);
   if (!actor) return;
 
-  const db = getDb();
+  const db = actor.db;
   applyCalendarSchema(db);
 
   if (req.method === "GET") {

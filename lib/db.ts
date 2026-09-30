@@ -35,9 +35,39 @@ function resolveDbPath(): string {
 
 const DB_PATH = resolveDbPath();
 
-let db: Database.Database;
+function resolveDemoDbPath(): string {
+  const customPath = process.env.INHUBFLOW_DEMO_DB_PATH;
+  if (customPath) return customPath;
+  return path.join(path.dirname(DB_PATH), "inhubflow_demo.db");
+}
 
-export function getDb(): Database.Database {
+const DEMO_DB_PATH = resolveDemoDbPath();
+
+let db: Database.Database;
+let demoDb: Database.Database;
+
+export function getDemoDb(): Database.Database {
+  if (!demoDb) {
+    demoDb = new Database(DEMO_DB_PATH);
+    demoDb.pragma("journal_mode = WAL");
+    demoDb.pragma("foreign_keys = ON");
+    initDb(demoDb);
+    runMigrations(demoDb);
+    try {
+      const { seedDemoWorkspace } = require("@/lib/demo/seed-demo");
+      seedDemoWorkspace(demoDb);
+    } catch (e) {
+      console.error("[getDemoDb] Error inicializando workspace demo:", e);
+    }
+  }
+  return demoDb;
+}
+
+export function getDb(userEmail?: string | null): Database.Database {
+  if (userEmail && userEmail.trim().toLowerCase() === "demo@inhubflow.com") {
+    return getDemoDb();
+  }
+
   if (!db) {
     db = new Database(DB_PATH);
     db.pragma("journal_mode = WAL");
@@ -49,6 +79,10 @@ export function getDb(): Database.Database {
     schedulePhotoSyncCheck(db);
   }
   return db;
+}
+
+export function getDbForUser(userEmail?: string | null): Database.Database {
+  return getDb(userEmail);
 }
 
 function runParallelTracksMigration(db: Database.Database) {

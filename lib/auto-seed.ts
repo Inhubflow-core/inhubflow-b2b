@@ -101,14 +101,32 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
     console.warn("[InHubFlow AutoSeed] Accounts limits clamp warning:", err);
   }
 
-  // 6. Ensure Demo Workspace exists (for sales meetings & live demonstrations)
+  // 6. Ensure Demo Workspace exists in its dedicated database (inhubflow_demo.db)
+  // and ensure the main database (inhubflow.db) remains clean for SuperAdmin and real users.
   try {
-    const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@inhubflow.com'").get();
-    if (!demoUser) {
-      seedDemoWorkspace(db);
-    }
+    const { getDemoDb } = require("@/lib/db");
+    getDemoDb();
+
+    // Clean any demo mock data from main production database
+    db.prepare(`DELETE FROM sdr_threads WHERE id LIKE 'demo_th_%' OR target_id LIKE 'demo_target_%'`).run();
+    db.prepare(`DELETE FROM run_profiles WHERE run_id LIKE 'demo_run_%'`).run();
+    db.prepare(`DELETE FROM runs WHERE id LIKE 'demo_run_%'`).run();
+    db.prepare(`DELETE FROM workflow_steps WHERE id LIKE 'demo_step_%'`).run();
+    db.prepare(`DELETE FROM workflows WHERE id LIKE 'demo_wf_%'`).run();
+    db.prepare(`DELETE FROM list_targets WHERE list_id LIKE 'demo_list_%' OR target_id LIKE 'demo_target_%'`).run();
+    db.prepare(`DELETE FROM lists WHERE id LIKE 'demo_list_%'`).run();
+    db.prepare(`DELETE FROM targets WHERE id LIKE 'demo_target_%'`).run();
+    db.prepare(`DELETE FROM signal_leads WHERE id LIKE 'demo_sig_%'`).run();
+    db.prepare(`DELETE FROM signal_monitors WHERE id LIKE 'demo_mon_%'`).run();
+    db.prepare(`DELETE FROM social_selling_posts WHERE id LIKE 'demo_sp_%'`).run();
+    db.prepare(`DELETE FROM linkedin_inbox_messages WHERE id LIKE 'demo_msg_%'`).run();
+    db.prepare(`DELETE FROM calendar_events WHERE id LIKE 'demo_cal_%'`).run();
+    db.prepare(`DELETE FROM email_accounts WHERE id LIKE 'demo_email_%'`).run();
+    db.prepare(`DELETE FROM accounts WHERE id LIKE 'demo_acc_%'`).run();
+    db.prepare(`DELETE FROM logs WHERE run_id LIKE 'demo_run_%' OR message LIKE '%[Demo]%' OR id LIKE 'demo_log_%'`).run();
+    db.prepare(`DELETE FROM users WHERE email = 'demo@inhubflow.com'`).run();
   } catch (err) {
-    console.error("[InHubFlow AutoSeed] Demo workspace seeding error:", err);
+    console.error("[InHubFlow AutoSeed] Demo workspace isolation error:", err);
   }
 
   console.log(`[InHubFlow AutoSeed] 🚀 Instance initialized with ${slotsLimit} slots limit${companyName ? ` for '${companyName}'` : ""}.`);

@@ -1,14 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { encryptSecret } from "@/lib/crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const db = getDb();
   const session = await getServerSession(req, res, authOptions);
   const currentUser = session?.user as any;
+  const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
+  const db = isDemo ? getDemoDb() : getDb();
   const isSuperAdmin =
     currentUser?.role === "admin" ||
     currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";

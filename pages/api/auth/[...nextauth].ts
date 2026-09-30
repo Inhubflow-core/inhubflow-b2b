@@ -1,7 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { isRateLimited } from "@/lib/rate-limit";
 import { seedDemoWorkspace } from "@/lib/demo/seed-demo";
 
@@ -34,8 +34,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Too many attempts. Try again later.");
         }
 
-        const db = getDb();
         const cleanEmail = credentials.email.trim().toLowerCase();
+        const isDemo = cleanEmail === "demo@inhubflow.com";
+        const db = isDemo ? getDemoDb() : getDb();
+
         let user = db
           .prepare(
             "SELECT id, name, email, password_hash, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?"
@@ -43,7 +45,7 @@ export const authOptions: NextAuthOptions = {
           .get(cleanEmail) as UserRow | undefined;
 
         // Auto-seed or verify demo workspace on-demand if logging into demo account
-        if (cleanEmail === "demo@inhubflow.com" && credentials.password === "Demo2026!") {
+        if (isDemo && credentials.password === "Demo2026!") {
           const passMatches = user ? bcrypt.compareSync("Demo2026!", user.password_hash) : false;
           if (!user || !passMatches) {
             try {
@@ -105,7 +107,8 @@ export const authOptions: NextAuthOptions = {
       // Auto-heal existing sessions: query DB to ensure role and slots are always up to date
       if (token.email) {
         try {
-          const db = getDb();
+          const isDemo = token.email.trim().toLowerCase() === "demo@inhubflow.com";
+          const db = isDemo ? getDemoDb() : getDb();
           const userRow = db
             .prepare("SELECT id, name, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?")
             .get(token.email) as UserRow | undefined;

@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import { getDb, getDemoDb } from "@/lib/db";
 
 export interface ApiActor {
   id: string;
@@ -13,6 +14,8 @@ export interface ApiActor {
   isWorkspaceOwner: boolean;
   isWorkspaceAdmin: boolean;
   isSuperAdmin: boolean;
+  isDemo: boolean;
+  db: Database.Database;
 }
 
 type SessionUser = {
@@ -37,8 +40,10 @@ export async function requireApiActor(
   const ownerId = typeof user.owner_id === "string" && user.owner_id ? user.owner_id : null;
   const role = typeof user.role === "string" ? user.role : "user";
   const email = user.email.trim().toLowerCase();
+  const isDemo = email === "demo@inhubflow.com";
   const isSuperAdmin = email === "inhubflow@gmail.com";
   const isWorkspaceOwner = ownerId === null;
+  const db = isDemo ? getDemoDb() : getDb();
 
   return {
     id: user.id,
@@ -53,11 +58,19 @@ export async function requireApiActor(
     isWorkspaceOwner,
     isWorkspaceAdmin: isWorkspaceOwner || role === "admin" || isSuperAdmin,
     isSuperAdmin,
+    isDemo,
+    db,
   };
 }
 
 export function actorCanAccessWorkspace(actor: ApiActor, workspaceOwnerId: string | null): boolean {
-  if (actor.isSuperAdmin) return true;
+  if (actor.isDemo) {
+    return workspaceOwnerId === actor.workspaceOwnerId || workspaceOwnerId === "demo_user_workspace_01" || workspaceOwnerId === "workspace_demo_01";
+  }
+  if (actor.isSuperAdmin) {
+    // SuperAdmin only accesses real workspaces, never demo mock data
+    return workspaceOwnerId !== "demo_user_workspace_01" && workspaceOwnerId !== "workspace_demo_01";
+  }
   return Boolean(workspaceOwnerId && workspaceOwnerId === actor.workspaceOwnerId);
 }
 

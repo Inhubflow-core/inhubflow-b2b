@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const actor = await requireApiActor(req, res);
   if (!actor) return;
 
-  const db = getDb();
+  const db = actor.db;
 
   try {
     const { targetId, stageId, note } = req.body ?? {};

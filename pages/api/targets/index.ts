@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -115,8 +115,12 @@ function buildFilterClause(filters: ActiveFilter[]): { sql: string; params: unkn
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getServerSession(req, res, authOptions);
+  const currentUser = session?.user as any;
+  const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
+  const db = isDemo ? getDemoDb() : getDb();
+
   if (req.method === "POST") {
-    const db = getDb();
     const { full_name, linkedin_url, title, company, location, email, phone, list_id } = req.body;
     if (!full_name || !linkedin_url) {
       return res.status(400).json({ error: "full_name and linkedin_url are required" });
@@ -182,10 +186,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Allow", ["GET", "POST", "DELETE"]);
     return res.status(405).end();
   }
-
-  const db = getDb();
-  const session = await getServerSession(req, res, authOptions);
-  const currentUser = session?.user as any;
 
   const { list_id, page = "0", limit = "50", search } = req.query;
   const offset = Number(page) * Number(limit);
