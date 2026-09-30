@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { getDb } from "@/lib/db";
@@ -27,6 +27,8 @@ import {
   RiSettings4Line,
   RiMailLine,
   RiPhoneLine,
+  RiFileCopyLine,
+  RiCloseLine,
 } from "react-icons/ri";
 
 interface Account {
@@ -73,6 +75,7 @@ import {
   toggleOrAppendPill,
   isPillActive,
 } from "@/lib/lead-finder/constants";
+import { buildXRayQuery } from "@/lib/lead-finder/query";
 
 export type { CountryOption };
 export { COUNTRIES_LIST, SAMPLE_TITLES, SAMPLE_INDUSTRIES, toggleOrAppendPill, isPillActive };
@@ -110,10 +113,37 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     updatedCount: number;
   } | null>(null);
 
+  const [showQueryModal, setShowQueryModal] = useState(false);
+  const [copiedQuery, setCopiedQuery] = useState(false);
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
   const selectedCountryOption = COUNTRIES_LIST.find((c) => c.name === country) || COUNTRIES_LIST[0];
+
+  const effectiveLoc = useMemo(
+    () => [city.trim(), country !== "Global / Todos" ? country : ""].filter(Boolean).join(", "),
+    [city, country]
+  );
+
+  const currentQueryObj = useMemo(() => {
+    return buildXRayQuery({
+      title: title.trim(),
+      country: country !== "Global / Todos" ? country : "",
+      city: city.trim(),
+      location: effectiveLoc,
+      company: company.trim(),
+      strictTitle,
+    });
+  }, [title, country, city, effectiveLoc, company, strictTitle]);
+
+  const googleSearchUrl = useMemo(() => {
+    return `https://www.google.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
+  }, [currentQueryObj]);
+
+  const bingSearchUrl = useMemo(() => {
+    return `https://www.bing.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
+  }, [currentQueryObj]);
 
   // Auto-generate a list name based on filters if user hasn't explicitly customized it
   useEffect(() => {
@@ -503,9 +533,12 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
               {/* Company / Industry (Optional) */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                   {t("leadFinder.companyLabel")} <span className="text-gray-400 font-normal">{t("leadFinder.optional")}</span>
                 </label>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1.5">
+                  Empresa específica donde trabajan (ej. Falabella, Codelco, Google) o déjalo vacío para prospectar en cualquier empresa.
+                </p>
                 <div className="relative">
                   <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                   <input
@@ -513,7 +546,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
                     disabled={isSearching}
-                    placeholder={t("leadFinder.companyPlaceholder")}
+                    placeholder="Ej: Falabella, CODELCO, Banco de Chile..."
                     className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                 </div>
@@ -586,15 +619,25 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 {!isSearching ? (
-                  <button
-                    type="submit"
-                    disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
-                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
-                  >
-                    <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
-                  </button>
+                  <>
+                    <button
+                      type="submit"
+                      disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
+                    >
+                      <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowQueryModal(true)}
+                      disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RiExternalLinkLine size={15} /> Ver Query / Abrir en Google Search
+                    </button>
+                  </>
                 ) : (
                   <div className="flex items-center gap-2">
                     <button
@@ -836,6 +879,96 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           </div>
         </div>
       </div>
+
+      {/* Modal Consulta Google X-Ray (Inspirado en RecruitEm) */}
+      {showQueryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  Consulta de Búsqueda Google X-Ray
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Copia o abre directamente la consulta en Google para ver los resultados en vivo en LinkedIn.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQueryModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                <RiCloseLine size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                URL generada de Google Search
+              </label>
+              <div className="relative">
+                <textarea
+                  readOnly
+                  rows={3}
+                  value={googleSearchUrl}
+                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 p-3 text-xs font-mono text-gray-800 dark:text-gray-200 focus:outline-none select-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Operador Booleano de Búsqueda
+              </label>
+              <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-xs font-mono text-gray-700 dark:text-gray-300 break-words">
+                {currentQueryObj.query}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(googleSearchUrl);
+                  setCopiedQuery(true);
+                  toast.success("URL de Google copiada al portapapeles");
+                  setTimeout(() => setCopiedQuery(false), 2000);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all"
+              >
+                {copiedQuery ? (
+                  <>
+                    <RiCheckLine size={16} className="text-emerald-500" /> Copiado
+                  </>
+                ) : (
+                  <>
+                    <RiFileCopyLine size={16} /> Copiar URL
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={bingSearchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 transition-all"
+                >
+                  <RiExternalLinkLine size={14} /> Abrir en Bing
+                </a>
+                <a
+                  href={googleSearchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all"
+                >
+                  <RiExternalLinkLine size={14} /> Abrir en Google
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

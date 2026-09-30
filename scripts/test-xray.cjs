@@ -189,7 +189,25 @@ assert.equal(typeof searchLinkedInWithSerper, "function");
   assert.equal(qMkt.query.includes('"Head of Marketing"'), true);
   assert.equal(qMkt.query.includes('"CMO"'), true);
   assert.equal(qMkt.query.includes('"Director" OR "Directora" OR "Director General"'), false);
-  console.log("  ✔ Strict title and discipline filtering verified with 100% precision");
+  console.log("▶ [Test 9] Multi-role search with comma-separated titles (RecruitEm / Boolean OR pattern)");
+  const multiQuery = "Director de Marketing, Director Comercial, Gerente General, Director de Operaciones, Founder";
+  const qMulti = buildXRayQuery({ title: multiQuery, location: "Santiago, Chile" });
+  assert.equal(qMulti.query.includes('"Director de Marketing"'), true);
+  assert.equal(qMulti.query.includes('"Director Comercial"'), true);
+  assert.equal(qMulti.query.includes('"Gerente General"'), true);
+  assert.equal(qMulti.query.includes('"Director de Operaciones"'), true);
+  assert.equal(qMulti.query.includes('"Founder"'), true);
+
+  // Multi-role relevance acceptance
+  assert.equal(isLeadTitleRelevant("Marketing Manager | CMO", multiQuery, null, true), true);
+  assert.equal(isLeadTitleRelevant("Commercial Director", multiQuery, null, true), true);
+  assert.equal(isLeadTitleRelevant("Gerente General", multiQuery, null, true), true);
+  assert.equal(isLeadTitleRelevant("COO & Director de Operaciones", multiQuery, null, true), true);
+  assert.equal(isLeadTitleRelevant("Founder & CEO", multiQuery, null, true), true);
+  // Irrelevant roles must still be rejected
+  assert.equal(isLeadTitleRelevant("Dentista Odontólogo", multiQuery, null, true), false);
+  assert.equal(isLeadTitleRelevant("Practicante de Marketing", multiQuery, null, true), false);
+  console.log("  ✔ Multi-role query building and OR relevance matching verified");
 
   console.log("\n✅ ALL GOOGLE X-RAY & SERPER TESTS PASSED CLEANLY!");
 })();
