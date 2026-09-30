@@ -15,8 +15,21 @@ import { applySocialSellingSchema } from "@/lib/social-selling/schema";
 import { backfillLinkedInConnectionAttempts } from "@/lib/linkedin/connection-attempts";
 
 function resolveDbPath(): string {
-  if (process.env.INHUBFLOW_DB_PATH) return process.env.INHUBFLOW_DB_PATH;
-  if (process.env.LINKI_DB_PATH) return process.env.LINKI_DB_PATH;
+  const customPath = process.env.INHUBFLOW_DB_PATH || process.env.LINKI_DB_PATH;
+  if (customPath) {
+    if (customPath.endsWith("inhubflow.db")) {
+      const legacyPath = customPath.replace("inhubflow.db", "linki.db");
+      if (fs.existsSync(legacyPath) && !fs.existsSync(customPath)) {
+        try {
+          fs.copyFileSync(legacyPath, customPath);
+          console.log(`[Database Migration] 📦 Migrada base de datos heredada de ${legacyPath} a ${customPath}`);
+        } catch (e) {
+          console.warn("[Database Migration] No se pudo copiar legacy DB:", e);
+        }
+      }
+    }
+    return customPath;
+  }
   return path.join(process.cwd(), "inhubflow.db");
 }
 
