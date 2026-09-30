@@ -111,14 +111,6 @@ export const authOptions: NextAuthOptions = {
             .get(token.email) as UserRow | undefined;
 
           if (userRow) {
-            // If user is first in DB, ensure they are promoted to admin
-            const firstUser = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string } | undefined;
-            if (firstUser && firstUser.id === userRow.id && userRow.role !== "admin") {
-              db.prepare("UPDATE users SET role = 'admin', slots_limit = 999, plan_tier = 'custom' WHERE id = ?").run(userRow.id);
-              userRow.role = "admin";
-              userRow.slots_limit = 999;
-            }
-
             // Auto-heal scale to business in database
             if (userRow.plan_tier === "scale") {
               try {

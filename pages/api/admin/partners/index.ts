@@ -28,16 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     userRole = "admin";
   }
 
-  if (userRole !== "admin" && userEmail) {
-    try {
-      const userRow = db.prepare("SELECT id, role FROM users WHERE email = ?").get(userEmail) as { id: string; role?: string } | undefined;
-      const firstUser = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string } | undefined;
-      if (userRow && (userRow.role === "admin" || (firstUser && firstUser.id === userRow.id))) {
-        userRole = "admin";
-      }
-    } catch {}
-  }
-
   if (userRole !== "admin") {
     return res.status(403).json({ error: "Acceso denegado. Se requieren privilegios de SuperAdmin." });
   }

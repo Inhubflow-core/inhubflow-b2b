@@ -1,5 +1,8 @@
 import { useState, useEffect, useId, useRef } from "react";
 import Head from "next/head";
+import type { GetServerSideProps } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 
@@ -3001,3 +3004,20 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
     </>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+  const session = await getServerSession(req, res, authOptions);
+  const email = (session?.user as { email?: string })?.email?.trim().toLowerCase();
+
+  // Strict: None of the client plans (Starter, Growth, Business) can access SuperAdmin. Only the master platform owner.
+  if (email !== "inhubflow@gmail.com") {
+    return {
+      redirect: {
+        destination: "/",
+        permanent: false,
+      },
+    };
+  }
+
+  return { props: {} };
+};

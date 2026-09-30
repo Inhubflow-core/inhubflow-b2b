@@ -75,13 +75,6 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
       db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(existingUser.id);
       console.log(`[InHubFlow AutoSeed] ℹ️ Admin user verified and updated to role 'admin': ${adminEmail}`);
     }
-  } else {
-    // If no adminEmail was set in env, ensure at least the first user in DB is marked as admin
-    const firstUser = db.prepare("SELECT id, email, role FROM users ORDER BY created_at ASC LIMIT 1").get() as { id: string; email: string; role?: string } | undefined;
-    if (firstUser && firstUser.role !== "admin") {
-      db.prepare("UPDATE users SET role = 'admin', slots_limit = 999 WHERE id = ?").run(firstUser.id);
-      console.log(`[InHubFlow AutoSeed] 👑 Promoted first user to SuperAdmin: ${firstUser.email}`);
-    }
   }
 
   // 4. Ensure the default workspace SDR Agent exists but remains fail-closed.
