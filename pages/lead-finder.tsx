@@ -29,6 +29,7 @@ import {
   RiPhoneLine,
   RiFileCopyLine,
   RiCloseLine,
+  RiInformationLine,
 } from "react-icons/ri";
 
 interface Account {
@@ -155,6 +156,23 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     return `https://www.bing.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
   }, [currentQueryObj]);
 
+  const titleTokens = useMemo(() => {
+    return title
+      .split(/[,;/|]+|\b(?:or|o)\b/i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }, [title]);
+  const titleCount = titleTokens.length;
+
+  function handlePillClick(st: string) {
+    const active = isPillActive(title, st);
+    if (!active && titleCount >= 4) {
+      toast.error("Máximo 4 cargos recomendados por búsqueda. Deselecciona uno antes de agregar otro.");
+      return;
+    }
+    setTitle(toggleOrAppendPill(title, st));
+  }
+
   function handleOpenSynonymsModal() {
     if (!title.trim()) {
       toast.error("Ingresa primero un cargo en el campo para sugerir sinónimos.");
@@ -162,19 +180,28 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     }
     const data = getJobTitleSuggestions(title);
     setSuggestionsData(data);
-    const currentTokens = title.split(/[,;/|]+/).map((s) => s.trim().toLowerCase());
+    const currentTokens = title.split(/[,;/|]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const availableSlots = Math.max(4 - currentTokens.length, 1);
     const toSelect = data.suggestions
       .filter((s) => !currentTokens.includes(s.term.toLowerCase()))
-      .slice(0, 4)
+      .slice(0, availableSlots)
       .map((s) => s.term);
     setSelectedSynonyms(toSelect);
     setShowSynonymsModal(true);
   }
 
   function handleToggleSynonym(term: string) {
-    setSelectedSynonyms((prev) =>
-      prev.includes(term) ? prev.filter((t) => t !== term) : [...prev, term]
-    );
+    setSelectedSynonyms((prev) => {
+      if (prev.includes(term)) {
+        return prev.filter((t) => t !== term);
+      }
+      const currentTokens = title.split(/[,;/|]+/).map((s) => s.trim()).filter(Boolean);
+      if (currentTokens.length + prev.length >= 4) {
+        toast.info("Máximo 4 cargos recomendados por búsqueda.");
+        return prev;
+      }
+      return [...prev, term];
+    });
   }
 
   function handleAddSelectedSynonyms() {
@@ -191,12 +218,13 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     const newTokens = [...currentTokens];
     for (const term of selectedSynonyms) {
       if (!newTokens.some((t) => t.toLowerCase() === term.toLowerCase())) {
+        if (newTokens.length >= 4) break;
         newTokens.push(term);
       }
     }
 
     setTitle(newTokens.join(", "));
-    toast.success(`${selectedSynonyms.length} sinónimos agregados a la búsqueda.`);
+    toast.success(`${newTokens.length - currentTokens.length} sinónimos agregados (máximo 4 cargos).`);
     setShowSynonymsModal(false);
   }
 
@@ -449,9 +477,22 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
               {/* Title / Cargo */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                  {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
+                  </label>
+                  <span
+                    className={`text-[11px] font-medium px-2 py-0.5 rounded-full border transition-all ${
+                      titleCount > 4
+                        ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800"
+                        : titleCount > 0
+                        ? "bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-800"
+                        : "bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                    }`}
+                  >
+                    {titleCount > 0 ? `${titleCount}/4 cargos` : "Máx. 4 cargos"}
+                  </span>
+                </div>
                 <div className="relative flex items-center">
                   <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                   <input
@@ -459,7 +500,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isSearching}
-                    placeholder={t("leadFinder.jobTitlePlaceholder")}
+                    placeholder="Ej: Director de Marketing, Director Comercial (máx. 4)"
                     className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-11 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
                   <button
@@ -476,6 +517,17 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     <RiSparklingLine size={18} />
                   </button>
                 </div>
+
+                {/* Ventanita de aclaratoria / recomendación de límite si se ingresan más de 4 cargos */}
+                {titleCount > 4 && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in">
+                    <RiInformationLine className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" size={16} />
+                    <div className="leading-snug">
+                      <span className="font-semibold">Aclaratoria de precisión:</span> Has ingresado{" "}
+                      <strong>{titleCount} cargos</strong>. Para evitar dispersar la búsqueda en LinkedIn y asegurar resultados al 100%, recomendamos un <strong>máximo de 4 cargos</strong> por consulta.
+                    </div>
+                  </div>
+                )}
 
                 {/* Show similar jobs checkbox toggle */}
                 <div className="mt-2 flex items-center justify-between gap-2">
@@ -513,7 +565,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       <button
                         key={st}
                         type="button"
-                        onClick={() => setTitle(toggleOrAppendPill(title, st))}
+                        onClick={() => handlePillClick(st)}
                         disabled={isSearching}
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                           active
@@ -1103,10 +1155,18 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedSynonyms(suggestionsData.suggestions.map((s) => s.term))}
+                  onClick={() => {
+                    const currentTokens = title.split(/[,;/|]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+                    const availableSlots = Math.max(4 - currentTokens.length, 1);
+                    const toSelect = suggestionsData.suggestions
+                      .filter((s) => !currentTokens.includes(s.term.toLowerCase()))
+                      .slice(0, availableSlots)
+                      .map((s) => s.term);
+                    setSelectedSynonyms(toSelect);
+                  }}
                   className="text-brand-600 hover:underline font-medium"
                 >
-                  Seleccionar todos
+                  Sugerir mejores ({Math.max(4 - titleTokens.length, 1)} máx)
                 </button>
                 <span>•</span>
                 <button
@@ -1118,6 +1178,10 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 </button>
               </div>
             </div>
+
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/40 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700/60">
+              💡 <strong>Límite recomendado:</strong> Máximo 4 cargos en total para asegurar que la búsqueda en LinkedIn no se diluya y obtengas los 100 leads completos.
+            </p>
 
             <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
               {suggestionsData.suggestions.map((suggestion) => {
