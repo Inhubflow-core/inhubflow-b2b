@@ -63,6 +63,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`[LemonSqueezy Webhook] 🔔 Received event: ${eventName}`);
 
+    // Prevent test-mode orders from creating real active accounts in production
+    const isTestMode = Boolean(body?.meta?.test_mode);
+    if (isTestMode && process.env.NODE_ENV === "production" && process.env.ALLOW_LEMON_TEST_MODE !== "true") {
+      console.warn(`[LemonSqueezy Webhook] ⚠️ Evento '${eventName}' ignorado: emitido en Test Mode.`);
+      return res.status(200).json({ received: true, ignored: true, reason: "test_mode_in_production" });
+    }
+
     const db = getDb();
 
     // Extract customer details
