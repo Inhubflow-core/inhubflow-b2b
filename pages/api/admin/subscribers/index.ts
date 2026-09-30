@@ -222,5 +222,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  if (req.method === "DELETE") {
+    try {
+      const id = ((req.query.id as string) || req.body?.id || "").trim();
+      if (!id) {
+        return res.status(400).json({ error: "ID de usuario requerido" });
+      }
+
+      const userToDelete = db.prepare("SELECT id, email, role FROM users WHERE id = ?").get(id) as any;
+      if (!userToDelete) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      // Safeguard: Never delete superadmin or own account
+      const sessionUserId = (session.user as { id?: string })?.id;
+      if (userToDelete.email === "inhubflow@gmail.com" || userToDelete.email === userEmail || (sessionUserId && userToDelete.id === sessionUserId)) {
+        return res.status(400).json({ error: "No se puede eliminar la cuenta principal de SuperAdmin." });
+      }
+
+      db.transaction(() => {
+        // Clean related tables
+        try { db.prepare("DELETE FROM accounts WHERE user_id = ? OR owner_id = ? OR assigned_user_id = ?").run(id, id, id); } catch {}
+        try { db.prepare("DELETE FROM email_accounts WHERE user_id = ? OR owner_id = ?").run(id, id); } catch {}
+        try { db.prepare("DELETE FROM team_invitations WHERE owner_id = ?").run(id); } catch {}
+        try { db.prepare("DELETE FROM subscription_logs WHERE user_id = ?").run(id); } catch {}
+        try { db.prepare("DELETE FROM partner_referrals WHERE customer_email = ?").run(userToDelete.email); } catch {}
+        try { db.prepare("DELETE FROM support_messages WHERE sender_id = ?").run(id); } catch {}
+        try { db.prepare("DELETE FROM support_tickets WHERE user_id = ?").run(id); } catch {}
+        try { db.prepare("DELETE FROM users WHERE owner_id = ?").run(id); } catch {}
+        db.prepare("DELETE FROM users WHERE id = ?").run(id);
+      })();
+
+      console.log(`[admin/subscribers] 🗑️ Usuario eliminado por admin: ${userToDelete.email} (ID: ${id})`);
+      return res.status(200).json({ ok: true, message: `Usuario ${userToDelete.email} eliminado exitosamente.` });
+    } catch (err: unknown) {
+      console.error("[admin/subscribers] DELETE Error:", err);
+      return res.status(500).json({ error: (err as Error)?.message || "Error al eliminar usuario" });
+    }
+  }
+
   return res.status(405).json({ error: "Método no permitido" });
 }
+

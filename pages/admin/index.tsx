@@ -33,6 +33,7 @@ import {
   RiUser3Line,
   RiBrainLine,
   RiWhatsappLine,
+  RiDeleteBinLine,
 } from "react-icons/ri";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
@@ -171,6 +172,7 @@ export default function AdminSubscribersPage() {
   const [editStatus, setEditStatus] = useState<"active" | "trial" | "past_due" | "canceled">("active");
   const [editCompany, setEditCompany] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingSub, setDeletingSub] = useState(false);
 
   // Create Form State
   const [newEmail, setNewEmail] = useState("");
@@ -668,6 +670,37 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
       alert("Error de red al actualizar");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteSub() {
+    if (!selectedSub) return;
+    if (selectedSub.email === "inhubflow@gmail.com") {
+      alert("No se puede eliminar la cuenta principal de SuperAdmin.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `¿Estás seguro de que deseas eliminar permanentemente a ${selectedSub.email}?\nEsta acción es irreversible y liberará los slots y recursos asociados.`
+    );
+    if (!confirmed) return;
+
+    setDeletingSub(true);
+    try {
+      const res = await fetch(`/api/admin/subscribers?id=${selectedSub.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Usuario ${selectedSub.email} eliminado correctamente.`);
+        setIsEditModalOpen(false);
+        loadData();
+      } else {
+        toast.error(data.error || "Error al eliminar usuario");
+      }
+    } catch {
+      toast.error("Error de conexión al eliminar usuario");
+    } finally {
+      setDeletingSub(false);
     }
   }
 
@@ -2216,6 +2249,19 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
                   <RiMailSendLine size={15} />
                   <span>{sendingEmail ? t("admin.sending") : t("admin.sendAccessEmail")}</span>
                 </button>
+
+                {selectedSub.email !== "inhubflow@gmail.com" && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteSub}
+                    disabled={deletingSub}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-medium text-xs hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer disabled:opacity-40"
+                    title="Eliminar permanentemente este suscriptor no autorizado o inactivo"
+                  >
+                    <RiDeleteBinLine size={15} />
+                    <span>{deletingSub ? "Eliminando..." : "Eliminar"}</span>
+                  </button>
+                )}
 
                 <div className="flex items-center gap-2">
                   <button

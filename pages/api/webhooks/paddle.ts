@@ -1,20 +1,82 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { IncomingMessage } from "node:http";
+import crypto, { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+
+async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<Buffer> {
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === "string") return Buffer.from(req.body, "utf8");
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+function verifyPaddleSignature(rawBody: string, signatureHeader: string, secretKey: string): boolean {
+  try {
+    const parts = signatureHeader.split(";").reduce<Record<string, string>>((acc, part) => {
+      const [key, value] = part.split("=");
+      if (key && value) acc[key.trim()] = value.trim();
+      return acc;
+    }, {});
+
+    const ts = parts["ts"];
+    const h1 = parts["h1"];
+    if (!ts || !h1) return false;
+
+    // Tolerance window: 5 minutes (300 seconds)
+    const timestamp = parseInt(ts, 10);
+    const now = Math.floor(Date.now() / 1000);
+    if (isNaN(timestamp) || Math.abs(now - timestamp) > 300) {
+      console.warn("[Paddle Webhook] ⚠️ Timestamp fuera de tolerancia.");
+      return false;
+    }
+
+    const payload = `${ts}:${rawBody}`;
+    const hmac = crypto.createHmac("sha256", secretKey).update(payload).digest("hex");
+    const hmacBuf = Buffer.from(hmac, "utf8");
+    const h1Buf = Buffer.from(h1, "utf8");
+
+    return hmacBuf.length === h1Buf.length && crypto.timingSafeEqual(hmacBuf, h1Buf);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Webhook handler for Paddle Billing.
  * Automatically provisions and manages subscriber slots and statuses.
+ * Cryptographically verifies Paddle-Signature before taking any action.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
+  const paddleSecret = (process.env.PADDLE_WEBHOOK_SECRET_KEY || process.env.PADDLE_WEBHOOK_SECRET)?.trim();
+  if (!paddleSecret) {
+    console.error("[Paddle Webhook] ❌ PADDLE_WEBHOOK_SECRET_KEY no configurado en variables de entorno.");
+    return res.status(503).json({ error: "Paddle webhook secret no configurado en el servidor." });
+  }
+
+  let rawBodyBuffer: Buffer;
   try {
-    const rawBody = req.body;
-    const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
+    rawBodyBuffer = await readRawBody(req as unknown as IncomingMessage & { body?: unknown });
+  } catch (readErr) {
+    return res.status(400).json({ error: "Error leyendo payload del webhook" });
+  }
+
+  const rawBodyString = rawBodyBuffer.toString("utf8");
+  const signatureHeader = req.headers["paddle-signature"];
+  const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+
+  if (!signature || !verifyPaddleSignature(rawBodyString, signature, paddleSecret)) {
+    console.warn("[Paddle Webhook] 🛑 Intento rechazado: Firma Paddle-Signature inválida o ausente.");
+    return res.status(401).json({ error: "Firma Paddle-Signature inválida o ausente." });
+  }
+
+  try {
+    const body = JSON.parse(rawBodyString);
 
     const eventType = body?.event_type || body?.alert_name || "unknown";
     const data = body?.data || body;
@@ -222,3 +284,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Error interno procesando webhook" });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+

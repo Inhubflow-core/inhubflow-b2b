@@ -1,20 +1,60 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { IncomingMessage } from "node:http";
+import crypto, { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+
+async function readRawBody(req: IncomingMessage & { body?: unknown }): Promise<Buffer> {
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === "string") return Buffer.from(req.body, "utf8");
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
 
 /**
  * Webhook handler for Lemon Squeezy Billing & InHubFlow Partner Attribution.
  * Automatically provisions subscriber slots and attributes recurring 25% commissions to InHubFlow Partners.
+ * Cryptographically verifies Lemon Squeezy HMAC-SHA256 signature before taking any action.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
+  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
+  if (!secret) {
+    console.error("[LemonSqueezy Webhook] ❌ LEMONSQUEEZY_WEBHOOK_SECRET no está configurado en las variables de entorno.");
+    return res.status(503).json({ error: "Webhook secret no configurado en el servidor." });
+  }
+
+  let rawBodyBuffer: Buffer;
   try {
-    const rawBody = req.body;
-    const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
+    rawBodyBuffer = await readRawBody(req as unknown as IncomingMessage & { body?: unknown });
+  } catch (readErr) {
+    return res.status(400).json({ error: "Error leyendo payload del webhook" });
+  }
+
+  const signatureHeader = req.headers["x-signature"];
+  const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+
+  if (!signature) {
+    console.warn("[LemonSqueezy Webhook] 🛑 Intento rechazado: Falta cabecera x-signature obligatoria.");
+    return res.status(401).json({ error: "Falta la firma criptográfica x-signature" });
+  }
+
+  const hmac = crypto.createHmac("sha256", secret).update(rawBodyBuffer).digest("hex");
+  const hmacBuf = Buffer.from(hmac, "utf8");
+  const sigBuf = Buffer.from(signature, "utf8");
+
+  if (hmacBuf.length !== sigBuf.length || !crypto.timingSafeEqual(hmacBuf, sigBuf)) {
+    console.warn("[LemonSqueezy Webhook] 🛑 Intento rechazado: Firma x-signature inválida.");
+    return res.status(401).json({ error: "Firma criptográfica inválida" });
+  }
+
+  try {
+    const rawBodyString = rawBodyBuffer.toString("utf8");
+    const body = JSON.parse(rawBodyString);
 
     const eventName = body?.meta?.event_name || req.headers["x-event-name"] || "unknown";
     const customData = body?.meta?.custom_data || {};
@@ -237,3 +277,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Error procesando webhook: " + err.message });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
