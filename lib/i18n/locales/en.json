@@ -1554,6 +1554,8 @@
     "jobTitlePlaceholder": "e.g. Marketing Director, Head of Sales, CEO...",
     "strictFilterTitle": "Strict Role & Discipline Filter",
     "strictFilterDesc": "Ensures the profile headline strictly matches the target discipline (prevents directors from other areas).",
+    "antiCollisionTitle": "Team Anti-Collision Protection",
+    "antiCollisionDesc": "Automatically skips leads already saved or contacted by your team across other lists and campaigns.",
     "companyLabel": "Company or Industry",
     "optional": "(Optional)",
     "companyPlaceholder": "e.g. Mining, SaaS, Acme Corp...",

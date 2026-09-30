@@ -673,6 +673,7 @@ export async function scanRealSignals(
   context: SignalScannerContext,
   webClient?: WebSearchClient,
 ): Promise<SignalScanResult> {
+  if (context.shouldAbort?.()) throw new SignalScanError("Investigación cancelada", "provider_error", false);
   const webTypes = ["funding_round", "company_news", "acquisition_event", "industry_event"];
   if (webTypes.includes(context.monitor.type)) {
     if (!webClient) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);

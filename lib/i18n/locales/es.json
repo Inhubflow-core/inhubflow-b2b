@@ -1554,6 +1554,8 @@
     "jobTitlePlaceholder": "Ej: Director de Marketing, Gerente Comercial, CEO...",
     "strictFilterTitle": "Filtro estricto de cargo y área",
     "strictFilterDesc": "Verifica que el titular del perfil pertenezca a la disciplina buscada (evita directores de otras áreas).",
+    "antiCollisionTitle": "Protección Anti-Colisión de Equipo",
+    "antiCollisionDesc": "Omite automáticamente prospectos ya guardados o contactados por tu equipo en otras listas y campañas.",
     "companyLabel": "Empresa o Industria",
     "optional": "(Opcional)",
     "companyPlaceholder": "Ej: Minería, SaaS, Falabella, CODELCO...",

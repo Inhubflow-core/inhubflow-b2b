@@ -231,6 +231,14 @@ export async function searchLinkedInWithSerper(
         if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
         seenUrls.add(cleanUrl);
 
+        // Anti-collision: Skip leads that already exist in the team's database or campaigns
+        if (options.excludeExisting && options.existingUrls) {
+          const normUrl = cleanUrl.toLowerCase().replace(/\/+$/, "");
+          if (options.existingUrls.has(normUrl)) {
+            continue;
+          }
+        }
+
         const parsed = parseXRaySnippet(item.title || "", item.snippet || "", company);
         const effectiveLocation =
           [city, countryName].filter(Boolean).join(", ") || location || countryName;

@@ -44,6 +44,8 @@ export interface SignalScannerContext {
   cursor: SignalScanCursor | null;
   limit: number;
   hasSalesNavigator: boolean;
+  /** Cooperative cancellation for one-off Ask AI research. */
+  shouldAbort?: () => boolean;
 }
 
 export class SignalScanError extends Error {

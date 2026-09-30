@@ -83,7 +83,7 @@ function mockClient(overrides = {}) {
         items: [{
           type: "POST", id: "post-1", social_id: "urn:li:activity:12345",
           share_url: "https://www.linkedin.com/posts/example-activity-12345",
-          parsed_datetime: "2026-09-16T10:00:00.000Z", text: "Busco mejorar la prospección B2B",
+          parsed_datetime: new Date(Date.now() - 60 * 60 * 1000).toISOString(), text: "Busco mejorar la prospección B2B",
           author: { id: "provider-1", public_identifier: "ana-real", name: "Ana Real", headline: "VP Sales" },
         }],
         cursor: null,

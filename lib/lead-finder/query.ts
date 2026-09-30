@@ -627,6 +627,8 @@ export interface XRaySearchOptions {
   limit?: number;
   strictTitle?: boolean;
   showSimilarJobs?: boolean;
+  excludeExisting?: boolean;
+  existingUrls?: Set<string>;
 }
 
 /**

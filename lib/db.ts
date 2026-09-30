@@ -293,6 +293,8 @@ function runMigrations(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_targets_last_replied_account_id ON targets(last_replied_account_id)",
     "ALTER TABLE targets ADD COLUMN linkedin_member_urn TEXT",
     "ALTER TABLE targets ADD COLUMN sales_nav_url TEXT",
+    "ALTER TABLE lists ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
+    "ALTER TABLE workflows ADD COLUMN owner_id TEXT REFERENCES users(id) ON DELETE SET NULL",
     "ALTER TABLE lists ADD COLUMN sales_nav_url TEXT",
     "ALTER TABLE accounts ADD COLUMN inbox_synced_at TEXT",
     "ALTER TABLE accounts ADD COLUMN active_hours_start INTEGER DEFAULT 9",

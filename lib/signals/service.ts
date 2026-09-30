@@ -350,7 +350,7 @@ export class SignalRadarService {
     return result.changes === 1 ? owner : null;
   }
 
-  async scanMonitor(monitorId: string, trigger: "manual" | "scheduled" | "initial" = "manual", actor?: ApiActor | SignalActorScope) {
+  async scanMonitor(monitorId: string, trigger: "manual" | "scheduled" | "initial" = "manual", actor?: ApiActor | SignalActorScope, options?: { shouldAbort?: () => boolean }) {
     const db = this.database();
     const monitor = this.getMonitor(monitorId, actor);
     if (!monitor) throw new Error("Monitor no encontrado");
@@ -384,6 +384,7 @@ export class SignalRadarService {
         cursor,
         limit: requestedLimit,
         hasSalesNavigator: capabilities.salesNavigator,
+        shouldAbort: options?.shouldAbort,
       }, this.webClient);
       const profileCache = new Map<string, UnipileProfile>();
       for (const candidate of raw.leads) {
@@ -626,8 +627,10 @@ export class SignalRadarService {
     listId?: string | null;
     workflowId?: string | null;
     isSuperAdmin?: boolean;
+    shouldAbort?: () => boolean;
   }) {
     const plan = await planSignalResearch(query);
+    if (input.shouldAbort?.()) throw new SignalScanError("Investigación cancelada", "provider_error", false);
     const monitor = this.createMonitor({
       name: `Ask AI · ${plan.monitorName}`,
       kind: "ask",
@@ -657,7 +660,7 @@ export class SignalRadarService {
       actorId: input.actorId,
       workspaceOwnerId: input.workspaceOwnerId,
       isSuperAdmin: Boolean(input.isSuperAdmin),
-    });
+    }, { shouldAbort: input.shouldAbort });
     this.database().prepare("UPDATE signal_monitors SET status = 'completed', next_scan_at = NULL, updated_at = datetime('now') WHERE id = ?")
       .run(monitor.id);
     const leads = this.listLeads({ monitor_id: monitor.id, limit: 100 }, {

@@ -16,6 +16,7 @@ import {
   RiExternalLinkLine,
   RiArrowRightLine,
   RiShieldCheckLine,
+  RiTeamLine,
   RiAlertLine,
   RiFlashlightLine,
   RiCheckboxCircleLine,
@@ -94,6 +95,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
 
   const [title, setTitle] = useState("");
   const [strictTitle, setStrictTitle] = useState(true);
+  const [excludeExisting, setExcludeExisting] = useState(true);
   const [country, setCountry] = useState("Chile");
   const [city, setCity] = useState("");
   const [company, setCompany] = useState("");
@@ -287,6 +289,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           listName: listName.trim() || undefined,
           stream: true,
           strictTitle,
+          excludeExisting,
         }),
         signal: controller.signal,
       });
@@ -595,6 +598,36 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-500"></div>
+                  </label>
+                </div>
+
+                {/* Filtro Anti-Colisión para Equipos */}
+                <div className="mt-2.5 flex items-center justify-between p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 transition-all">
+                  <div className="flex items-start gap-2.5 pr-2">
+                    <RiTeamLine className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" size={17} />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                          {t("leadFinder.antiCollisionTitle") || "Protección Anti-Colisión de Equipo"}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400 border border-emerald-300/70 dark:border-emerald-700/50">
+                          Recomendado
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">
+                        {t("leadFinder.antiCollisionDesc") || "Omite automáticamente prospectos ya guardados o contactados por tu equipo en otras listas y campañas."}
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={excludeExisting}
+                      onChange={(e) => setExcludeExisting(e.target.checked)}
+                      disabled={isSearching}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                   </label>
                 </div>
               </div>

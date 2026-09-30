@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     listName,
     stream = true,
     strictTitle = true,
+    excludeExisting = true,
   } = req.body || {};
 
   const effectiveLocation = location || [city?.trim(), country?.trim()].filter(Boolean).join(", ");
@@ -43,6 +44,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       month: "short",
       year: "numeric",
     })})`.trim();
+
+  // Helper to query already saved LinkedIn URLs for team anti-collision
+  function getExistingUrlsSet(dbInstance: ReturnType<typeof getDb>): Set<string> | undefined {
+    if (excludeExisting === false) return undefined;
+    try {
+      const rows = dbInstance
+        .prepare("SELECT linkedin_url FROM targets WHERE linkedin_url IS NOT NULL")
+        .all() as Array<{ linkedin_url: string }>;
+      const set = new Set<string>();
+      for (const row of rows) {
+        if (!row.linkedin_url) continue;
+        const clean = row.linkedin_url.toLowerCase().replace(/\/+$/, "");
+        set.add(clean);
+        const match = clean.match(/linkedin\.com\/in\/([^/?#&]+)/i);
+        if (match) {
+          set.add(`https://www.linkedin.com/in/${match[1]}`.toLowerCase());
+        }
+      }
+      return set;
+    } catch (err) {
+      console.error("[search-and-import] Error fetching existing targets for anti-collision:", err);
+      return undefined;
+    }
+  }
 
   // If streaming is requested (via body or Accept header)
   if (stream || req.headers.accept?.includes("text/event-stream")) {
@@ -72,6 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const db = getDb();
+      const existingUrls = getExistingUrlsSet(db);
       let profiles: SearchLead[] = [];
 
       // ─── TIER 1: High-Precision X-Ray LinkedIn Search ───────────────────────
@@ -86,6 +112,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             keywords,
             limit: numericLimit,
             strictTitle: strictTitle !== false,
+            excludeExisting: excludeExisting !== false,
+            existingUrls,
           },
           (progress: SearchProgressEvent) => {
             sendEvent("progress", progress);
@@ -146,6 +174,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Non-streaming JSON response
   try {
     const db = getDb();
+    const existingUrls = getExistingUrlsSet(db);
     let profiles: SearchLead[] = [];
 
     try {
@@ -158,6 +187,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         keywords,
         limit: numericLimit,
         strictTitle: strictTitle !== false,
+        excludeExisting: excludeExisting !== false,
+        existingUrls,
       });
     } catch (xrayErr: unknown) {
       console.error("[search-and-import] X-Ray LinkedIn Search non-streaming error:", xrayErr);

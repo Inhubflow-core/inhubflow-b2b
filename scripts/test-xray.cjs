@@ -212,7 +212,18 @@ assert.equal(typeof searchLinkedInWithSerper, "function");
   // Irrelevant roles must still be rejected
   assert.equal(isLeadTitleRelevant("Dentista Odontólogo", multiQuery, null, true), false);
   assert.equal(isLeadTitleRelevant("Practicante de Marketing", multiQuery, null, true), false);
-  console.log("  ✔ Multi-role query building and OR relevance matching verified");
+  console.log("▶ [Test 10] Team Anti-Collision deduplication matching");
+  const existingSet = new Set([
+    "https://www.linkedin.com/in/existing-lead-1",
+    "https://www.linkedin.com/in/existing-lead-2",
+  ]);
+  const newCandidateUrl = "https://cl.linkedin.com/in/existing-lead-1/";
+  const normalizedCandidate = normalizeXRayUrl(newCandidateUrl);
+  assert.equal(normalizedCandidate, "https://www.linkedin.com/in/existing-lead-1/");
+  const cleanKey = normalizedCandidate.toLowerCase().replace(/\/+$/, "");
+  assert.equal(existingSet.has(cleanKey), true);
+  assert.equal(existingSet.has("https://www.linkedin.com/in/fresh-lead-3"), false);
+  console.log("  ✔ Anti-collision URL matching and exclusion verified");
 
   console.log("\n✅ ALL GOOGLE X-RAY & SERPER TESTS PASSED CLEANLY!");
 })();
