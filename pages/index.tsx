@@ -126,36 +126,38 @@ function MetricTile({
   pulse?: boolean;
 }) {
   return (
-    <div className="p-4 rounded-xl bg-gray-50/70 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-white dark:hover:bg-gray-850 hover:shadow-xs transition-all group flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-2.5">
-        <span
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 transition-transform group-hover:scale-105"
-          style={{ background: `${color}18`, color }}
-        >
-          {icon}
-        </span>
-        {pulse && (
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
-          </span>
-        )}
-      </div>
+    <div className="p-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 shadow-xs hover:border-brand-500/50 hover:shadow-sm transition-all group flex flex-col justify-between min-h-[128px]">
       <div>
-        <div className="tabular-nums font-extrabold text-2xl sm:text-3xl text-gray-900 dark:text-white leading-tight tracking-tight">
+        <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 mb-2 gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider truncate" title={label}>
+            {label}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {pulse && (
+              <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+            )}
+            <span
+              className="p-2 rounded-xl flex items-center justify-center text-base shrink-0 transition-transform group-hover:scale-105"
+              style={{ background: `${color}18`, color }}
+            >
+              {icon}
+            </span>
+          </div>
+        </div>
+        <div className="tabular-nums font-extrabold text-2xl sm:text-3xl text-gray-900 dark:text-white leading-tight tracking-tight mt-1">
           <Counter value={value} />
         </div>
-        <div className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 truncate">
-          {label}
-        </div>
-        {sub && (
-          <div
-            className="text-[10px] font-bold mt-1.5 inline-block px-2 py-0.5 rounded-md"
-            style={{ background: `${color}15`, color }}
+      </div>
+      {sub && (
+        <div className="mt-2.5">
+          <span
+            className="text-[11px] font-bold inline-flex items-center gap-1 px-2.5 py-1 rounded-md"
+            style={{ background: `${color}18`, color }}
           >
             {sub}
-          </div>
-        )}
-      </div>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

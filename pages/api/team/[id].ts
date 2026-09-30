@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -10,7 +10,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const currentUser = session.user as any;
-  const db = getDb();
+  const isDemo = currentUser.email?.trim().toLowerCase() === "demo@inhubflow.com";
+  const db = isDemo ? getDemoDb() : getDb();
 
   if (currentUser.owner_id) {
     return res.status(403).json({ error: "Solo el Administrador del equipo puede modificar miembros." });

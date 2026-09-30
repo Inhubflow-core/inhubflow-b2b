@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 
 function generateInviteCode(length = 8): string {
@@ -20,7 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const currentUser = session.user as any;
-  const db = getDb();
+  const isDemo = currentUser.email?.trim().toLowerCase() === "demo@inhubflow.com";
+  const db = isDemo ? getDemoDb() : getDb();
 
   // Only Workspace Owners / Admins can manage the team
   if (currentUser.owner_id) {
