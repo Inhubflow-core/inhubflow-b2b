@@ -173,6 +173,7 @@ export default function AdminSubscribersPage() {
   const [editCompany, setEditCompany] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingSub, setDeletingSub] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
 
   // Create Form State
   const [newEmail, setNewEmail] = useState("");
@@ -704,6 +705,24 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
     }
   }
 
+  async function handleSeedDemoWorkspace() {
+    setSeedingDemo(true);
+    try {
+      const res = await fetch("/api/admin/seed-demo", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("¡Cuenta demo lista! Credenciales: demo@inhubflow.com / Demo2026!");
+        loadData();
+      } else {
+        toast.error(data.error || "Error al sembrar cuenta demo");
+      }
+    } catch {
+      toast.error("Error de conexión al sembrar cuenta demo");
+    } finally {
+      setSeedingDemo(false);
+    }
+  }
+
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
@@ -933,13 +952,24 @@ Debes responder SIEMPRE un JSON válido con esta estructura exacta:
               <RiRefreshLine className={loading || partnersLoading || adminTicketsLoading || adminLiveChatLoading ? "animate-spin" : ""} size={18} />
             </button>
             {adminSection === "subscribers" ? (
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm shadow-xs transition-all cursor-pointer"
-              >
-                <RiUserAddLine size={18} />
-                <span>{t("admin.newManualClient")}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSeedDemoWorkspace}
+                  disabled={seedingDemo}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold text-xs hover:bg-indigo-100 dark:hover:bg-indigo-900/50 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  title="Sembrar o restaurar la cuenta demo funcional para presentaciones comerciales"
+                >
+                  <span>✨</span>
+                  <span>{seedingDemo ? "Sembrando..." : "Sembrar Cuenta Demo"}</span>
+                </button>
+                <button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm shadow-xs transition-all cursor-pointer"
+                >
+                  <RiUserAddLine size={18} />
+                  <span>{t("admin.newManualClient")}</span>
+                </button>
+              </div>
             ) : adminSection === "partners" ? (
               <button
                 onClick={() => setIsCreatePartnerModalOpen(true)}

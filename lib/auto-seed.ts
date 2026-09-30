@@ -107,6 +107,17 @@ export function autoSeedInstance(db: Database.Database): AutoSeedResult {
     console.warn("[InHubFlow AutoSeed] Accounts limits clamp warning:", err);
   }
 
+  // 6. Ensure Demo Workspace exists (for sales meetings & live demonstrations)
+  try {
+    const demoUser = db.prepare("SELECT id FROM users WHERE email = 'demo@inhubflow.com'").get();
+    if (!demoUser) {
+      const { seedDemoWorkspace } = require("@/lib/demo/seed-demo");
+      seedDemoWorkspace(db);
+    }
+  } catch (err) {
+    console.error("[InHubFlow AutoSeed] Demo workspace seeding error:", err);
+  }
+
   console.log(`[InHubFlow AutoSeed] 🚀 Instance initialized with ${slotsLimit} slots limit${companyName ? ` for '${companyName}'` : ""}.`);
 
   return {
