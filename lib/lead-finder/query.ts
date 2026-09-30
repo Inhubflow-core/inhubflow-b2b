@@ -691,21 +691,23 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
       if (!titleTerms.includes(primary)) titleTerms.push(primary);
     }
 
-    // Second pass adds top secondary synonyms per role until limit is reached
-    for (const token of rawTitleTokens) {
-      const norm = normalizeSearchText(token);
-      const syns = XRAY_TITLE_SYNONYMS[norm] || XRAY_TITLE_SYNONYMS[token.toLowerCase()];
-      if (syns && syns.length > 1) {
-        for (const s of syns.slice(1, 3)) {
-          if (titleTerms.length >= 18) break;
-          if (!titleTerms.includes(s)) titleTerms.push(s);
+    // Only add top synonyms if under safe Google limit (8 terms max per query)
+    if (titleTerms.length < 8) {
+      for (const token of rawTitleTokens) {
+        const norm = normalizeSearchText(token);
+        const syns = XRAY_TITLE_SYNONYMS[norm] || XRAY_TITLE_SYNONYMS[token.toLowerCase()];
+        if (syns && syns.length > 1) {
+          for (const s of syns.slice(1, 2)) {
+            if (titleTerms.length >= 8) break;
+            if (!titleTerms.includes(s)) titleTerms.push(s);
+          }
         }
       }
     }
   }
 
-  // Cap total title terms to 16 to avoid Google query overflow
-  const cappedTerms = titleTerms.slice(0, 16);
+  // Cap total title terms to 8 to prevent exceeding Google's 32-word limit
+  const cappedTerms = titleTerms.slice(0, 8);
   const titleClause =
     cappedTerms.length > 0
       ? cappedTerms.length === 1 && cappedTerms[0].startsWith("(")

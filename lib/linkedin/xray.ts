@@ -117,123 +117,144 @@ export async function searchLinkedInWithSerper(
   }
 
   const { limit = 25, location = "", company = "", country = "", city = "" } = options;
-  const { query, subdomain, countryName } = buildXRayQuery(options);
-
   const collectedLeads: SearchLead[] = [];
   const seenUrls = new Set<string>();
-
-  // Free accounts on Serper must use num: 10
   const pageSize = 10;
-  // Allow enough pages to fulfill the requested limit even if some irrelevant results are filtered out
-  const maxPages = Math.min(Math.max(Math.ceil((limit * 2.0) / pageSize), 5), 25);
 
-  const gl = subdomain === "www" ? "us" : subdomain;
-  const hl = subdomain === "br" ? "pt" : "es";
+  // Split multiple roles into batches of 3 max to keep Google queries concise and within the 32-word limit
+  const rawTitleTokens = (options.title || "")
+    .split(/[,;/|]+|\b(?:or)\b/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const uniqueRoles = [...new Set(rawTitleTokens)];
+  const roleBatches: string[] = [];
+
+  if (uniqueRoles.length > 3) {
+    for (let i = 0; i < uniqueRoles.length; i += 3) {
+      roleBatches.push(uniqueRoles.slice(i, i + 3).join(", "));
+    }
+  } else {
+    roleBatches.push(options.title || "");
+  }
+
+  const webClient = new WebSearchClient({ apiKey: serperKey });
 
   onProgress?.({
     phase: "starting",
     page: 1,
-    totalPages: maxPages,
+    totalPages: Math.ceil(limit / pageSize),
     totalFound: 0,
-    message: `Iniciando Google X-Ray con Serper.dev para ${countryName}...`,
+    message: `Iniciando Google X-Ray Search con Serper...`,
   });
 
-  const webClient = new WebSearchClient({ apiKey: serperKey });
-
-  for (let pageIdx = 1; pageIdx <= maxPages; pageIdx++) {
+  for (let batchIdx = 0; batchIdx < roleBatches.length; batchIdx++) {
     if (collectedLeads.length >= limit) break;
 
-    onProgress?.({
-      phase: "navigating",
-      page: pageIdx,
-      totalPages: maxPages,
-      totalFound: collectedLeads.length,
-      message: `Consultando prospectos en Google X-Ray (Página ${pageIdx} de ${maxPages})...`,
+    const currentBatchTitle = roleBatches[batchIdx];
+    const { query, subdomain, countryName } = buildXRayQuery({
+      ...options,
+      title: currentBatchTitle,
     });
 
-    let organic: Array<{ title: string; link: string; snippet: string | null }>;
-    try {
-      const result = await webClient.search({
-        query,
-        country: gl,
-        language: hl,
-        limit: pageSize,
-        page: pageIdx,
-      });
-      organic = result.items;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "error de red";
-      if (error instanceof WebSearchProviderError && error.code === "invalid_credentials") {
-        throw new XRaySearchError("La credencial del buscador web no es válida o fue revocada.", "provider_error");
-      }
-      if (error instanceof WebSearchProviderError && error.code === "rate_limited") {
-        throw new XRaySearchError("El buscador web alcanzó temporalmente su límite de consultas.", "provider_error");
-      }
-      throw new XRaySearchError(`Fallo al consultar el buscador web: ${message}`, "provider_error");
-    }
+    const remaining = limit - collectedLeads.length;
+    const maxPagesForBatch = Math.min(Math.max(Math.ceil((remaining * 2.0) / pageSize), 3), 12);
+    const gl = subdomain === "www" ? "us" : subdomain;
+    const hl = subdomain === "br" ? "pt" : "es";
 
-    if (organic.length === 0 && pageIdx === 1) {
-      break;
-    }
-
-    for (let idx = 0; idx < organic.length; idx++) {
+    for (let pageIdx = 1; pageIdx <= maxPagesForBatch; pageIdx++) {
       if (collectedLeads.length >= limit) break;
-      const item = organic[idx];
-      const cleanUrl = normalizeXRayUrl(item.link || "");
-      if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
-      seenUrls.add(cleanUrl);
 
-      const parsed = parseXRaySnippet(item.title || "", item.snippet || "", company);
-      const effectiveLocation =
-        [city, countryName].filter(Boolean).join(", ") || location || countryName;
+      onProgress?.({
+        phase: "navigating",
+        page: pageIdx,
+        totalPages: Math.ceil(limit / pageSize),
+        totalFound: collectedLeads.length,
+        message: `Consultando prospectos en Google X-Ray (${collectedLeads.length}/${limit})...`,
+      });
 
-      // Strict title & discipline relevance verification
-      if (options.title && options.strictTitle !== false) {
-        const isRelevant = isLeadTitleRelevant(parsed.title, options.title, item.snippet, true);
-        if (!isRelevant) {
-          // Reject mismatched lead (e.g. "Director de Finanzas" when user searched "Director de Marketing")
-          continue;
+      let organic: Array<{ title: string; link: string; snippet: string | null }>;
+      try {
+        const result = await webClient.search({
+          query,
+          country: gl,
+          language: hl,
+          limit: pageSize,
+          page: pageIdx,
+        });
+        organic = result.items;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "error de red";
+        if (error instanceof WebSearchProviderError && error.code === "invalid_credentials") {
+          throw new XRaySearchError("La credencial del buscador web no es válida o fue revocada.", "provider_error");
         }
+        if (error instanceof WebSearchProviderError && error.code === "rate_limited") {
+          throw new XRaySearchError("El buscador web alcanzó temporalmente su límite de consultas.", "provider_error");
+        }
+        throw new XRaySearchError(`Fallo al consultar el buscador web: ${message}`, "provider_error");
       }
 
-      const lead: SearchLead = {
-        linkedinUrl: cleanUrl,
-        fullName: parsed.fullName,
-        firstName: parsed.firstName,
-        lastName: parsed.lastName,
-        title: parsed.title || options.title || null,
-        company: parsed.company || company || null,
-        location: effectiveLocation,
-        profileImageUrl: (item as unknown as { imageUrl?: string }).imageUrl || null,
-        degree: null,
-        email: parsed.email,
-        phone: parsed.phone,
-        summary: item.snippet || null,
-      };
+      if (organic.length === 0 && pageIdx === 1) {
+        break;
+      }
 
-      collectedLeads.push(lead);
+      for (let idx = 0; idx < organic.length; idx++) {
+        if (collectedLeads.length >= limit) break;
+        const item = organic[idx];
+        const cleanUrl = normalizeXRayUrl(item.link || "");
+        if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
+        seenUrls.add(cleanUrl);
+
+        const parsed = parseXRaySnippet(item.title || "", item.snippet || "", company);
+        const effectiveLocation =
+          [city, countryName].filter(Boolean).join(", ") || location || countryName;
+
+        // Strict title & discipline relevance verification against the full user target query
+        if (options.title && options.strictTitle !== false) {
+          const isRelevant = isLeadTitleRelevant(parsed.title, options.title, item.snippet, true);
+          if (!isRelevant) {
+            continue;
+          }
+        }
+
+        const lead: SearchLead = {
+          linkedinUrl: cleanUrl,
+          fullName: parsed.fullName,
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          title: parsed.title || currentBatchTitle || null,
+          company: parsed.company || company || null,
+          location: effectiveLocation,
+          profileImageUrl: (item as unknown as { imageUrl?: string }).imageUrl || null,
+          degree: null,
+          email: parsed.email,
+          phone: parsed.phone,
+          summary: item.snippet || null,
+        };
+
+        collectedLeads.push(lead);
+
+        onProgress?.({
+          phase: "extracting",
+          page: pageIdx,
+          totalPages: Math.ceil(limit / pageSize),
+          totalFound: collectedLeads.length,
+          currentLead: lead,
+          message: `Verificado prospecto: ${lead.fullName} (${lead.title || ""})...`,
+        });
+      }
 
       onProgress?.({
         phase: "extracting",
         page: pageIdx,
-        totalPages: maxPages,
+        totalPages: Math.ceil(limit / pageSize),
         totalFound: collectedLeads.length,
-        currentLead: lead,
-        message: `Verificado prospecto: ${lead.fullName} (${lead.title || ""})...`,
+        message: `Encontrados ${collectedLeads.length} de ${limit} prospectos verificados...`,
       });
-    }
 
-    onProgress?.({
-      phase: "extracting",
-      page: pageIdx,
-      totalPages: maxPages,
-      totalFound: collectedLeads.length,
-      message: `Encontrados ${collectedLeads.length} de ${limit} prospectos verificados...`,
-    });
-
-    if (organic.length < pageSize) {
-      // Reached the end of available Google results
-      break;
+      if (organic.length < pageSize) {
+        // Reached the end of available Google results for this batch, proceed to next batch if needed
+        break;
+      }
     }
   }
 
