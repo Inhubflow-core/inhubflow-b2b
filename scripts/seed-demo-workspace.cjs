@@ -134,7 +134,10 @@ db.transaction(() => {
 
   try {
     db.prepare(`DELETE FROM runs WHERE id LIKE 'tagtest_%'`).run();
+    db.prepare(`DELETE FROM list_targets WHERE target_id LIKE 'tagtest_%' OR list_id LIKE 'tagtest_%'`).run();
+    db.prepare(`DELETE FROM targets WHERE id LIKE 'tagtest_%'`).run();
     db.prepare(`DELETE FROM lists WHERE id LIKE 'tagtest_%'`).run();
+    db.prepare(`UPDATE targets SET connected_at = NULL, last_replied_at = NULL, connection_requested_at = NULL, message_sent_at = NULL, inmail_sent_at = NULL, email_replied_at = NULL WHERE id NOT LIKE 'demo_target_%'`).run();
   } catch {}
 
   // 1. USUARIO DEMO (Registrado hace 180 días = 6 meses de antigüedad)
@@ -314,7 +317,7 @@ db.transaction(() => {
     const email = `${fn.toLowerCase()}.${ln.toLowerCase()}@${emailDomain}`;
     const phone = `+34 6${Math.floor(10000000 + ((idx * 987654) % 89999999))}`;
 
-    // Distribución lógica de etapas del pipeline a lo largo de 6 meses
+    // Distribución lógica del Funnel Comercial a lo largo de 6 meses
     let stageId = "stage_contacted";
     let daysConnected = null;
     let daysReplied = null;
@@ -324,65 +327,59 @@ db.transaction(() => {
     let emailRepliedAt = null;
 
     if (idx <= 18) {
-      // 18 Cerrados / Ganados (Deals cerrados entre hace 20 y 160 días)
+      // 18 Cerrados / Ganados (Deals de $10k-$50k cerrados en los últimos meses)
       stageId = "stage_won";
-      daysRequested = 30 + (idx * 7);
+      daysRequested = 30 + (idx * 6);
       daysConnected = daysRequested - 4;
       daysMessaged = daysConnected - 2;
       daysReplied = daysMessaged - 3;
     } else if (idx <= 46) {
-      // 28 Reuniones Agendadas (agendamientos activos y recientes)
+      // 28 Reuniones Agendadas (agendamientos confirmados y recientes)
       stageId = "stage_meeting";
-      daysRequested = 15 + ((idx - 18) * 4);
+      daysRequested = 15 + ((idx - 18) * 3);
       daysConnected = daysRequested - 3;
       daysMessaged = daysConnected - 2;
       daysReplied = daysMessaged - 1;
-    } else if (idx <= 92) {
-      // 46 Interesados calificados
+    } else if (idx <= 64) {
+      // 18 Interesados calificados con respuesta positiva en inbox
       stageId = "stage_interested";
-      daysRequested = 12 + ((idx - 46) * 3);
+      daysRequested = 10 + ((idx - 46) * 3);
       daysConnected = daysRequested - 3;
       daysMessaged = daysConnected - 2;
-      daysReplied = daysMessaged - 2;
-    } else if (idx <= 160) {
-      // 68 En Conversación / Respuestas recibidas
+      daysReplied = daysMessaged - 1;
+    } else if (idx <= 110) {
+      // 46 En Conversación / Respuestas recibidas
       stageId = "stage_replied";
-      daysRequested = 10 + ((idx - 92) * 2);
+      daysRequested = 8 + ((idx - 64) * 2);
       daysConnected = daysRequested - 2;
       daysMessaged = daysConnected - 1;
-      daysReplied = daysMessaged - 1;
-    } else if (idx <= 272) {
-      // 112 Conexiones aceptadas (muchos con mensaje enviado esperando respuesta)
+      // Los primeros para sumar exactamente 64 respuestas (18 won + 28 meeting + 18 interested = 64)
+    } else if (idx <= 182) {
+      // 72 Conexiones Aceptadas con mensaje de secuencia enviado
       stageId = "stage_connected";
-      daysRequested = 8 + ((idx - 160) % 80);
+      daysRequested = 6 + ((idx - 110) % 50);
       daysConnected = daysRequested - 2;
-      if (idx <= 210) {
-        daysMessaged = daysConnected - 1;
-      }
-    } else if (idx <= 390) {
-      // 118 Contactados (solicitud de conexión reciente o en cadencia)
+      daysMessaged = daysConnected - 1;
+    } else if (idx <= 227) {
+      // 45 Contactados con solicitud de conexión enviada (total solicitudes = 182 + 45 = 227)
       stageId = "stage_contacted";
-      // Seleccionar 38 de ellos con conexión solicitada para dar exactamente 310 conexiones solicitadas
-      if (idx <= 310) {
-        daysRequested = 1 + ((idx - 272) % 25);
-      }
+      daysRequested = 2 + ((idx - 182) % 30);
+    } else if (idx <= 390) {
+      // 163 Contactados en fase de preparación y calentamiento
+      stageId = "stage_contacted";
     } else {
-      // 25 No interesados
+      // 25 No interesados (descartados sin outreach)
       stageId = "stage_not_interested";
-      daysRequested = 40 + (idx % 50);
-      daysConnected = daysRequested - 3;
-      daysMessaged = daysConnected - 2;
-      daysReplied = daysMessaged - 1;
     }
 
-    // InMails para 28 prospectos VIP
-    if (idx >= 30 && idx <= 57) {
-      inmailSentAt = daysAgo(daysRequested ? Math.max(1, daysRequested - 2) : 10);
+    // Exactamente 76 InMails para cuentas VIP (76 / 378 = 20.1%)
+    if (idx >= 228 && idx <= 303) {
+      inmailSentAt = daysAgo(5 + (idx % 60));
     }
 
-    // Email replies para 42 prospectos
+    // Exactamente 42 Respuestas de Email
     if (idx <= 42) {
-      emailRepliedAt = daysAgo(daysReplied ? Math.max(1, daysReplied) : 5);
+      emailRepliedAt = daysAgo(daysReplied ? Math.max(1, daysReplied) : 6);
     }
 
     const reqAt = daysRequested ? daysAgo(daysRequested) : null;
@@ -793,33 +790,37 @@ db.transaction(() => {
     }
   }
 
-  // 342 históricos + 8 de hoy = EXACTAMENTE 350 Visitas
-  insertDistributedLogs(342, "Visitó perfil en LinkedIn", 175);
+  // 370 históricos + 8 de hoy = EXACTAMENTE 378 Visitas
+  insertDistributedLogs(370, "Visitó perfil en LinkedIn", 175);
 
-  // 342 históricos + 8 de hoy = EXACTAMENTE 350 Seguidos
-  insertDistributedLogs(342, "Perfil seguido en LinkedIn", 175);
+  // 370 históricos + 8 de hoy = EXACTAMENTE 378 Seguidos
+  insertDistributedLogs(370, "Perfil seguido en LinkedIn", 175);
 
-  // 304 históricos + 6 de hoy = EXACTAMENTE 310 Solicitudes de conexión
-  insertDistributedLogs(304, "Solicitud de conexión enviada", 170);
+  // 280 históricos + 5 de hoy = EXACTAMENTE 285 Likes y Comentarios
+  insertDistributedLogs(280, "Like y comentario en publicación", 170);
 
-  // Exactamente 258 Conexiones aceptadas
-  insertDistributedLogs(258, "El contacto aceptó la solicitud de conexión", 165);
+  // 221 históricos + 6 de hoy = EXACTAMENTE 227 Solicitudes de conexión (60% de 378)
+  insertDistributedLogs(221, "Solicitud de conexión enviada", 170);
 
-  // 205 históricos + 5 de hoy = EXACTAMENTE 210 Mensajes enviados
-  insertDistributedLogs(205, "Mensaje enviado al contacto", 160);
+  // 178 históricos + 4 de hoy = EXACTAMENTE 182 Conexiones aceptadas (80% tasa de aceptación)
+  insertDistributedLogs(178, "El contacto aceptó la solicitud de conexión", 165);
 
-  // 27 históricos + 1 de hoy = EXACTAMENTE 28 InMails enviados
-  insertDistributedLogs(27, "InMail enviado al contacto", 120);
+  // 177 históricos + 5 de hoy = EXACTAMENTE 182 Mensajes enviados (igual a conexiones exitosas)
+  insertDistributedLogs(177, "Mensaje enviado al contacto", 160);
+
+  // 74 históricos + 2 de hoy = EXACTAMENTE 76 InMails enviados (20% de 378)
+  insertDistributedLogs(74, "InMail enviado al contacto", 120);
 
   // 336 históricos + 4 de hoy = EXACTAMENTE 340 Emails enviados
   insertDistributedLogs(336, "Email sent to commercial contact", 150);
 
-  // Actividad fresca de HOY para que las tarjetas de "Hoy" muestren actividad viva
+  // Actividad viva de HOY
   const todayVisits = 8;
   const todayFollows = 8;
+  const todayLikes = 5;
   const todayConns = 6;
   const todayMsgs = 5;
-  const todayInmails = 1;
+  const todayInmails = 2;
   const todayEmails = 4;
 
   for (let tv = 0; tv < todayVisits; tv++) {
@@ -830,6 +831,10 @@ db.transaction(() => {
     logCounter++;
     logStmt.run(`demo_log_today_f_${tf}`, `demo_target_00${tf + 1}`, "Perfil seguido en LinkedIn", daysAgo(0, 1 + tf));
   }
+  for (let tl = 0; tl < todayLikes; tl++) {
+    logCounter++;
+    logStmt.run(`demo_log_today_l_${tl}`, `demo_target_00${tl + 1}`, "Like y comentario en publicación", daysAgo(0, 1 + tl));
+  }
   for (let tc = 0; tc < todayConns; tc++) {
     logCounter++;
     logStmt.run(`demo_log_today_c_${tc}`, `demo_target_00${tc + 1}`, "Solicitud de conexión enviada", daysAgo(0, 2 + tc));
@@ -838,8 +843,10 @@ db.transaction(() => {
     logCounter++;
     logStmt.run(`demo_log_today_m_${tm}`, `demo_target_00${tm + 1}`, "Mensaje enviado al contacto", daysAgo(0, 2 + tm));
   }
-  logCounter++;
-  logStmt.run(`demo_log_today_inmail`, `demo_target_005`, "InMail enviado al contacto", daysAgo(0, 3));
+  for (let ti = 0; ti < todayInmails; ti++) {
+    logCounter++;
+    logStmt.run(`demo_log_today_inmail_${ti}`, `demo_target_00${ti + 5}`, "InMail enviado al contacto", daysAgo(0, 3));
+  }
   for (let te = 0; te < todayEmails; te++) {
     logCounter++;
     logStmt.run(`demo_log_today_e_${te}`, `demo_target_00${te + 1}`, "Email sent to commercial contact", daysAgo(0, 2 + te));

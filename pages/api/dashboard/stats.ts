@@ -20,6 +20,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT
         COUNT(CASE WHEN (message LIKE 'Visited%' OR message LIKE '%Visitó perfil%') AND date(created_at) = date('now') THEN 1 END) AS visits_today,
         COUNT(CASE WHEN (message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') AND date(created_at) = date('now') THEN 1 END) AS follows_today,
+        COUNT(CASE WHEN (message LIKE '%Like%' OR message LIKE '%comentario%') AND date(created_at) = date('now') THEN 1 END) AS likes_today,
         COUNT(CASE WHEN (message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%') AND date(created_at) = date('now') THEN 1 END) AS connections_today,
         COUNT(CASE WHEN (message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%') AND date(created_at) = date('now') THEN 1 END) AS messages_today,
         COUNT(CASE WHEN (message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%') AND date(created_at) = date('now') THEN 1 END) AS inmails_today,
@@ -90,6 +91,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND connected_at IS NOT NULL) AS connected,
           (SELECT COUNT(*) FROM logs WHERE message LIKE '%Visitó perfil%' OR message LIKE 'Visited%') AS visits,
           (SELECT COUNT(*) FROM logs WHERE message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') AS follows,
+          (SELECT COUNT(*) FROM logs WHERE message LIKE '%Like%' OR message LIKE '%comentario%') AS social_interactions,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND message_sent_at IS NOT NULL) AS messages_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND inmail_sent_at IS NOT NULL) AS inmails_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND last_replied_at IS NOT NULL) AS replies_received,
@@ -105,6 +107,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           date(created_at) AS day,
           COUNT(CASE WHEN message LIKE 'Visited%' OR message LIKE '%Visitó perfil%' THEN 1 END) AS visits,
           COUNT(CASE WHEN message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%' THEN 1 END) AS follows,
+          COUNT(CASE WHEN message LIKE '%Like%' OR message LIKE '%comentario%' THEN 1 END) AS social_interactions,
           COUNT(CASE WHEN message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%' THEN 1 END) AS connections,
           COUNT(CASE WHEN message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%' THEN 1 END) AS messages,
           COUNT(CASE WHEN message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%' THEN 1 END) AS inmails,
@@ -147,6 +150,10 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
           WHERE run_id IN (${runsSubquery})
+            AND (message LIKE '%Like%' OR message LIKE '%comentario%')) AS social_interactions,
+
+        (SELECT COUNT(DISTINCT target_id) FROM logs
+          WHERE run_id IN (${runsSubquery})
             AND (message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%')) AS connections_requested,
 
         (SELECT COUNT(DISTINCT l.target_id) FROM logs l
@@ -186,6 +193,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       runsArg,  // SCOPED_TARGETS
       runsArg,  // visits
       runsArg,  // follows
+      runsArg,  // social_interactions
       runsArg,  // connections_requested
       runsArg,  // connected
       runsArg,  // messages_sent
@@ -200,6 +208,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         date(created_at) AS day,
         COUNT(CASE WHEN message LIKE 'Visited%' OR message LIKE '%Visitó perfil%' THEN 1 END) AS visits,
         COUNT(CASE WHEN message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%' THEN 1 END) AS follows,
+        COUNT(CASE WHEN message LIKE '%Like%' OR message LIKE '%comentario%' THEN 1 END) AS social_interactions,
         COUNT(CASE WHEN message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%' THEN 1 END) AS connections,
         COUNT(CASE WHEN message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%' THEN 1 END) AS messages,
         COUNT(CASE WHEN message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%' THEN 1 END) AS inmails,

@@ -127,6 +127,8 @@ export function seedDemoWorkspace(db: Database.Database) {
       // Limpiar datos huérfanos de pruebas antiguas
       try {
         db.prepare(`DELETE FROM runs WHERE id LIKE 'tagtest_%'`).run();
+        db.prepare(`DELETE FROM list_targets WHERE target_id LIKE 'tagtest_%' OR list_id LIKE 'tagtest_%'`).run();
+        db.prepare(`DELETE FROM targets WHERE id LIKE 'tagtest_%'`).run();
         db.prepare(`DELETE FROM lists WHERE id LIKE 'tagtest_%'`).run();
       } catch {}
 
@@ -314,60 +316,56 @@ export function seedDemoWorkspace(db: Database.Database) {
         if (idx <= 18) {
           // 18 Cerrados / Ganados
           stageId = "stage_won";
-          daysRequested = 30 + (idx * 7);
+          daysRequested = 30 + (idx * 6);
           daysConnected = daysRequested - 4;
           daysMessaged = daysConnected - 2;
           daysReplied = daysMessaged - 3;
         } else if (idx <= 46) {
           // 28 Reuniones Agendadas
           stageId = "stage_meeting";
-          daysRequested = 15 + ((idx - 18) * 4);
+          daysRequested = 15 + ((idx - 18) * 3);
           daysConnected = daysRequested - 3;
           daysMessaged = daysConnected - 2;
           daysReplied = daysMessaged - 1;
-        } else if (idx <= 92) {
-          // 46 Interesados calificados
+        } else if (idx <= 64) {
+          // 18 Interesados calificados con respuesta en inbox
           stageId = "stage_interested";
-          daysRequested = 12 + ((idx - 46) * 3);
+          daysRequested = 10 + ((idx - 46) * 3);
           daysConnected = daysRequested - 3;
           daysMessaged = daysConnected - 2;
-          daysReplied = daysMessaged - 2;
-        } else if (idx <= 160) {
-          // 68 En Conversación / Respuestas recibidas
+          daysReplied = daysMessaged - 1;
+        } else if (idx <= 110) {
+          // 46 En Conversación / Respuestas recibidas
           stageId = "stage_replied";
-          daysRequested = 10 + ((idx - 92) * 2);
+          daysRequested = 8 + ((idx - 64) * 2);
           daysConnected = daysRequested - 2;
           daysMessaged = daysConnected - 1;
-          daysReplied = daysMessaged - 1;
-        } else if (idx <= 272) {
-          // 112 Conexiones aceptadas
+        } else if (idx <= 182) {
+          // 72 Conexiones Aceptadas con mensaje de secuencia enviado
           stageId = "stage_connected";
-          daysRequested = 8 + ((idx - 160) % 80);
+          daysRequested = 6 + ((idx - 110) % 50);
           daysConnected = daysRequested - 2;
-          if (idx <= 210) {
-            daysMessaged = daysConnected - 1;
-          }
-        } else if (idx <= 390) {
-          // 118 Contactados
+          daysMessaged = daysConnected - 1;
+        } else if (idx <= 227) {
+          // 45 Contactados con solicitud de conexión enviada (total solicitudes = 182 + 45 = 227)
           stageId = "stage_contacted";
-          if (idx <= 310) {
-            daysRequested = 1 + ((idx - 272) % 25);
-          }
+          daysRequested = 2 + ((idx - 182) % 30);
+        } else if (idx <= 390) {
+          // 163 Contactados
+          stageId = "stage_contacted";
         } else {
-          // 25 No interesados
+          // 25 No interesados (descartados sin outreach)
           stageId = "stage_not_interested";
-          daysRequested = 40 + (idx % 50);
-          daysConnected = daysRequested - 3;
-          daysMessaged = daysConnected - 2;
-          daysReplied = daysMessaged - 1;
         }
 
-        if (idx >= 30 && idx <= 57) {
-          inmailSentAt = daysAgo(daysRequested ? Math.max(1, daysRequested - 2) : 10);
+        // Exactamente 76 InMails para cuentas VIP (76 / 378 = 20.1%)
+        if (idx >= 228 && idx <= 303) {
+          inmailSentAt = daysAgo(5 + (idx % 60));
         }
 
+        // Exactamente 42 Respuestas de Email
         if (idx <= 42) {
-          emailRepliedAt = daysAgo(daysReplied ? Math.max(1, daysReplied) : 5);
+          emailRepliedAt = daysAgo(daysReplied ? Math.max(1, daysReplied) : 6);
         }
 
         const reqAt = daysRequested ? daysAgo(daysRequested) : null;
@@ -759,47 +757,64 @@ export function seedDemoWorkspace(db: Database.Database) {
         }
       }
 
-      // 342 históricos + 8 de hoy = EXACTAMENTE 350 Visitas
-      insertDistributedLogs(342, "Visitó perfil en LinkedIn", 175);
+      // 370 históricos + 8 de hoy = EXACTAMENTE 378 Visitas
+      insertDistributedLogs(370, "Visitó perfil en LinkedIn", 175);
 
-      // 342 históricos + 8 de hoy = EXACTAMENTE 350 Seguidos
-      insertDistributedLogs(342, "Perfil seguido en LinkedIn", 175);
+      // 370 históricos + 8 de hoy = EXACTAMENTE 378 Seguidos
+      insertDistributedLogs(370, "Perfil seguido en LinkedIn", 175);
 
-      // Solicitudes de conexión
-      insertDistributedLogs(304, "Solicitud de conexión enviada", 170);
+      // 280 históricos + 5 de hoy = EXACTAMENTE 285 Likes y Comentarios
+      insertDistributedLogs(280, "Like y comentario en publicación", 170);
 
-      // Conexiones aceptadas
-      insertDistributedLogs(258, "El contacto aceptó la solicitud de conexión", 165);
+      // 221 históricos + 6 de hoy = EXACTAMENTE 227 Solicitudes de conexión (60% de 378)
+      insertDistributedLogs(221, "Solicitud de conexión enviada", 170);
 
-      // Mensajes enviados
-      insertDistributedLogs(205, "Mensaje enviado al contacto", 160);
+      // 178 históricos + 4 de hoy = EXACTAMENTE 182 Conexiones aceptadas (80% tasa de aceptación)
+      insertDistributedLogs(178, "El contacto aceptó la solicitud de conexión", 165);
 
-      // InMails enviados
-      insertDistributedLogs(27, "InMail enviado al contacto", 120);
+      // 177 históricos + 5 de hoy = EXACTAMENTE 182 Mensajes enviados (igual a conexiones exitosas)
+      insertDistributedLogs(177, "Mensaje enviado al contacto", 160);
 
-      // Emails enviados
+      // 74 históricos + 2 de hoy = EXACTAMENTE 76 InMails enviados (20% de 378)
+      insertDistributedLogs(74, "InMail enviado al contacto", 120);
+
+      // 336 históricos + 4 de hoy = EXACTAMENTE 340 Emails enviados
       insertDistributedLogs(336, "Email sent to commercial contact", 150);
 
       // Actividad viva de HOY
-      for (let tv = 0; tv < 8; tv++) {
+      const todayVisits = 8;
+      const todayFollows = 8;
+      const todayLikes = 5;
+      const todayConns = 6;
+      const todayMsgs = 5;
+      const todayInmails = 2;
+      const todayEmails = 4;
+
+      for (let tv = 0; tv < todayVisits; tv++) {
         logCounter++;
         logStmt.run(`demo_log_today_${tv}`, `demo_target_00${tv + 1}`, "Visitó perfil en LinkedIn", daysAgo(0, 1 + tv));
       }
-      for (let tf = 0; tf < 8; tf++) {
+      for (let tf = 0; tf < todayFollows; tf++) {
         logCounter++;
         logStmt.run(`demo_log_today_f_${tf}`, `demo_target_00${tf + 1}`, "Perfil seguido en LinkedIn", daysAgo(0, 1 + tf));
       }
-      for (let tc = 0; tc < 6; tc++) {
+      for (let tl = 0; tl < todayLikes; tl++) {
+        logCounter++;
+        logStmt.run(`demo_log_today_l_${tl}`, `demo_target_00${tl + 1}`, "Like y comentario en publicación", daysAgo(0, 1 + tl));
+      }
+      for (let tc = 0; tc < todayConns; tc++) {
         logCounter++;
         logStmt.run(`demo_log_today_c_${tc}`, `demo_target_00${tc + 1}`, "Solicitud de conexión enviada", daysAgo(0, 2 + tc));
       }
-      for (let tm = 0; tm < 5; tm++) {
+      for (let tm = 0; tm < todayMsgs; tm++) {
         logCounter++;
         logStmt.run(`demo_log_today_m_${tm}`, `demo_target_00${tm + 1}`, "Mensaje enviado al contacto", daysAgo(0, 2 + tm));
       }
-      logCounter++;
-      logStmt.run(`demo_log_today_inmail`, `demo_target_005`, "InMail enviado al contacto", daysAgo(0, 3));
-      for (let te = 0; te < 4; te++) {
+      for (let ti = 0; ti < todayInmails; ti++) {
+        logCounter++;
+        logStmt.run(`demo_log_today_inmail_${ti}`, `demo_target_00${ti + 5}`, "InMail enviado al contacto", daysAgo(0, 3));
+      }
+      for (let te = 0; te < todayEmails; te++) {
         logCounter++;
         logStmt.run(`demo_log_today_e_${te}`, `demo_target_00${te + 1}`, "Email sent to commercial contact", daysAgo(0, 2 + te));
       }

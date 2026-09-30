@@ -179,7 +179,7 @@ const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
   follow: "Follow Profile",
   like_comment: "Like + Comment",
-  connect: "Connect + Follow",
+  connect: "Connect on LinkedIn",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
   email: "Cold Email",
@@ -1603,13 +1603,17 @@ function Wizard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-base-content/30 mr-1">{t("campaignWizard.steps.addStep")}</span>
                       {track === "linkedin"
-                        ? (["visit", "like_comment", "connect", "message", "sales_inmail"] as const)
+                        ? (["visit", "follow", "like_comment", "connect", "message", "sales_inmail"] as const)
                             // Sales Nav InMail is a premium feature — hide from the picker in the public build.
                             .filter((type) => type !== "sales_inmail" || hasPremium)
                             .map((type) => {
-                            const disabled = (type === "connect" && hasConnect) || (type === "like_comment" && hasLikeComment);
+                            const disabled = (type === "connect" && hasConnect) || (type === "follow" && hasFollow) || (type === "like_comment" && hasLikeComment);
                             const title = disabled
-                              ? (type === "connect" ? t("campaignWizard.steps.connectOnce") : (t("campaignWizard.steps.likeCommentOnce") || "Solo se puede agregar un paso de Like + Comentario por campaña"))
+                              ? (type === "connect"
+                                  ? t("campaignWizard.steps.connectOnce")
+                                  : type === "follow"
+                                  ? (t("campaignWizard.steps.followOnce") || "Solo se puede agregar un paso de Seguir por campaña")
+                                  : (t("campaignWizard.steps.likeCommentOnce") || "Solo se puede agregar un paso de Like + Comentario por campaña"))
                               : undefined;
                             return (
                               <button key={type} onClick={() => !disabled && addWizardStep(type)} title={title}
