@@ -76,6 +76,7 @@ import {
   isPillActive,
 } from "@/lib/lead-finder/constants";
 import { buildXRayQuery } from "@/lib/lead-finder/query";
+import { getJobTitleSuggestions, TitleSuggestion } from "@/lib/lead-finder/suggestions";
 
 export type { CountryOption };
 export { COUNTRIES_LIST, SAMPLE_TITLES, SAMPLE_INDUSTRIES, toggleOrAppendPill, isPillActive };
@@ -116,6 +117,14 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   const [showQueryModal, setShowQueryModal] = useState(false);
   const [copiedQuery, setCopiedQuery] = useState(false);
 
+  const [showSimilarJobs, setShowSimilarJobs] = useState(true);
+  const [showSynonymsModal, setShowSynonymsModal] = useState(false);
+  const [suggestionsData, setSuggestionsData] = useState<{ primary: string; suggestions: TitleSuggestion[] }>({
+    primary: "",
+    suggestions: [],
+  });
+  const [selectedSynonyms, setSelectedSynonyms] = useState<string[]>([]);
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
@@ -134,8 +143,9 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
       location: effectiveLoc,
       company: company.trim(),
       strictTitle,
+      showSimilarJobs,
     });
-  }, [title, country, city, effectiveLoc, company, strictTitle]);
+  }, [title, country, city, effectiveLoc, company, strictTitle, showSimilarJobs]);
 
   const googleSearchUrl = useMemo(() => {
     return `https://www.google.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
@@ -144,6 +154,51 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
   const bingSearchUrl = useMemo(() => {
     return `https://www.bing.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
   }, [currentQueryObj]);
+
+  function handleOpenSynonymsModal() {
+    if (!title.trim()) {
+      toast.error("Ingresa primero un cargo en el campo para sugerir sinónimos.");
+      return;
+    }
+    const data = getJobTitleSuggestions(title);
+    setSuggestionsData(data);
+    const currentTokens = title.split(/[,;/|]+/).map((s) => s.trim().toLowerCase());
+    const toSelect = data.suggestions
+      .filter((s) => !currentTokens.includes(s.term.toLowerCase()))
+      .slice(0, 4)
+      .map((s) => s.term);
+    setSelectedSynonyms(toSelect);
+    setShowSynonymsModal(true);
+  }
+
+  function handleToggleSynonym(term: string) {
+    setSelectedSynonyms((prev) =>
+      prev.includes(term) ? prev.filter((t) => t !== term) : [...prev, term]
+    );
+  }
+
+  function handleAddSelectedSynonyms() {
+    if (selectedSynonyms.length === 0) {
+      toast.error("Selecciona al menos una sugerencia.");
+      return;
+    }
+
+    const currentTokens = title
+      .split(/[,;/|]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const newTokens = [...currentTokens];
+    for (const term of selectedSynonyms) {
+      if (!newTokens.some((t) => t.toLowerCase() === term.toLowerCase())) {
+        newTokens.push(term);
+      }
+    }
+
+    setTitle(newTokens.join(", "));
+    toast.success(`${selectedSynonyms.length} sinónimos agregados a la búsqueda.`);
+    setShowSynonymsModal(false);
+  }
 
   // Auto-generate a list name based on filters if user hasn't explicitly customized it
   useEffect(() => {
@@ -397,7 +452,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
                   {t("leadFinder.jobTitleLabel")} <span className="text-brand-500">*</span>
                 </label>
-                <div className="relative">
+                <div className="relative flex items-center">
                   <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                   <input
                     type="text"
@@ -405,8 +460,50 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                     onChange={(e) => setTitle(e.target.value)}
                     disabled={isSearching}
                     placeholder={t("leadFinder.jobTitlePlaceholder")}
-                    className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                    className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-11 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                   />
+                  <button
+                    type="button"
+                    onClick={handleOpenSynonymsModal}
+                    disabled={isSearching || title.trim().length < 2}
+                    title="Buscar cargos similares y sinónimos (Find related job titles)"
+                    className={`absolute right-2 top-2 p-1.5 rounded-lg transition-all ${
+                      title.trim().length >= 2
+                        ? "text-brand-500 hover:bg-brand-50 hover:scale-110 dark:hover:bg-brand-950/50 cursor-pointer"
+                        : "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                    }`}
+                  >
+                    <RiSparklingLine size={18} />
+                  </button>
+                </div>
+
+                {/* Show similar jobs checkbox toggle */}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showSimilarJobs}
+                      onChange={(e) => setShowSimilarJobs(e.target.checked)}
+                      disabled={isSearching}
+                      className="w-4 h-4 rounded text-brand-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                      ¿Incluir cargos similares automáticamente? <span className="text-gray-400 text-[10px]">(Show similar jobs)</span>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleOpenSynonymsModal}
+                    disabled={isSearching || title.trim().length < 2}
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 shrink-0 ${
+                      title.trim().length >= 2
+                        ? "border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400 bg-brand-50/60 dark:bg-brand-950/40 hover:bg-brand-100"
+                        : "border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800/40 cursor-not-allowed opacity-60"
+                    }`}
+                  >
+                    <RiSparklingLine size={13} className={title.trim().length >= 2 ? "text-brand-500" : ""} />
+                    Sugerir sinónimos
+                  </button>
                 </div>
                 {/* Suggestions (Max 4, Multi-select) */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -965,6 +1062,116 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   <RiExternalLinkLine size={14} /> Abrir en Google
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Sugerencias de Cargos y Sinónimos (Inspirado en RecruitEm Show Similar Jobs) */}
+      {showSynonymsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-brand-50 dark:bg-brand-950/60 text-brand-500">
+                  <RiSparklingLine size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Sugerencias de Cargos y Sinónimos
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Selecciona sinónimos o cargos afines para expandir tu búsqueda con operadores OR.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSynonymsModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                <RiCloseLine size={20} />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800/60 p-3 rounded-xl border border-gray-200 dark:border-gray-700/60 text-xs">
+              <span className="text-gray-500 dark:text-gray-400">Buscando variantes para: </span>
+              <strong className="text-brand-600 dark:text-brand-400 font-bold">{suggestionsData.primary}</strong>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+              <span>{suggestionsData.suggestions.length} cargos encontrados</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSynonyms(suggestionsData.suggestions.map((s) => s.term))}
+                  className="text-brand-600 hover:underline font-medium"
+                >
+                  Seleccionar todos
+                </button>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedSynonyms([])}
+                  className="text-gray-500 hover:underline"
+                >
+                  Deseleccionar
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {suggestionsData.suggestions.map((suggestion) => {
+                const isSelected = selectedSynonyms.includes(suggestion.term);
+                return (
+                  <label
+                    key={suggestion.term}
+                    className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-brand-50/70 border-brand-300 dark:bg-brand-950/40 dark:border-brand-800"
+                        : "bg-white dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSynonym(suggestion.term)}
+                        className="w-4 h-4 rounded text-brand-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800"
+                      />
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {suggestion.term}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${
+                        suggestion.relation === "synonym"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      {suggestion.relation === "synonym" ? "Sinónimo" : "Relacionado"}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setShowSynonymsModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAddSelectedSynonyms}
+                disabled={selectedSynonyms.length === 0}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all"
+              >
+                <RiCheckLine size={15} /> Añadir seleccionados ({selectedSynonyms.length})
+              </button>
             </div>
           </div>
         </div>

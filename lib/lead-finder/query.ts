@@ -19,67 +19,261 @@ export class XRaySearchError extends Error {
 
 // Country code mapping to LinkedIn national subdomains
 export const COUNTRY_SUBDOMAINS: Record<string, { code: string; name: string }> = {
+  // Chile
   chile: { code: "cl", name: "Chile" },
+  cl: { code: "cl", name: "Chile" },
   santiago: { code: "cl", name: "Chile" },
   valparaiso: { code: "cl", name: "Chile" },
   concepcion: { code: "cl", name: "Chile" },
 
+  // Brasil
   brasil: { code: "br", name: "Brasil" },
   brazil: { code: "br", name: "Brasil" },
+  br: { code: "br", name: "Brasil" },
   "sao paulo": { code: "br", name: "Brasil" },
   "são paulo": { code: "br", name: "Brasil" },
   "rio de janeiro": { code: "br", name: "Brasil" },
   "belo horizonte": { code: "br", name: "Brasil" },
   curitiba: { code: "br", name: "Brasil" },
 
-  peru: { code: "pe", name: "Perú" },
-  perú: { code: "pe", name: "Perú" },
-  lima: { code: "pe", name: "Perú" },
-
-  colombia: { code: "co", name: "Colombia" },
-  bogota: { code: "co", name: "Colombia" },
-  bogotá: { code: "co", name: "Colombia" },
-  medellin: { code: "co", name: "Colombia" },
-  medellín: { code: "co", name: "Colombia" },
-  cali: { code: "co", name: "Colombia" },
-
-  espana: { code: "es", name: "España" },
-  españa: { code: "es", name: "España" },
-  spain: { code: "es", name: "España" },
-  madrid: { code: "es", name: "España" },
-  barcelona: { code: "es", name: "España" },
-  valencia: { code: "es", name: "España" },
-
+  // México
   mexico: { code: "mx", name: "México" },
   méxico: { code: "mx", name: "México" },
+  mx: { code: "mx", name: "México" },
   "ciudad de mexico": { code: "mx", name: "México" },
   "ciudad de méxico": { code: "mx", name: "México" },
   cdmx: { code: "mx", name: "México" },
   monterrey: { code: "mx", name: "México" },
   guadalajara: { code: "mx", name: "México" },
 
+  // Colombia
+  colombia: { code: "co", name: "Colombia" },
+  co: { code: "co", name: "Colombia" },
+  bogota: { code: "co", name: "Colombia" },
+  bogotá: { code: "co", name: "Colombia" },
+  medellin: { code: "co", name: "Colombia" },
+  medellín: { code: "co", name: "Colombia" },
+  cali: { code: "co", name: "Colombia" },
+
+  // España
+  espana: { code: "es", name: "España" },
+  españa: { code: "es", name: "España" },
+  spain: { code: "es", name: "España" },
+  es: { code: "es", name: "España" },
+  madrid: { code: "es", name: "España" },
+  barcelona: { code: "es", name: "España" },
+  valencia: { code: "es", name: "España" },
+
+  // Perú
+  peru: { code: "pe", name: "Perú" },
+  perú: { code: "pe", name: "Perú" },
+  pe: { code: "pe", name: "Perú" },
+  lima: { code: "pe", name: "Perú" },
+
+  // Argentina
   argentina: { code: "ar", name: "Argentina" },
+  ar: { code: "ar", name: "Argentina" },
   "buenos aires": { code: "ar", name: "Argentina" },
   cordoba: { code: "ar", name: "Argentina" },
 
-  venezuela: { code: "ve", name: "Venezuela" },
-  caracas: { code: "ve", name: "Venezuela" },
-
+  // Uruguay
   uruguay: { code: "uy", name: "Uruguay" },
+  uy: { code: "uy", name: "Uruguay" },
   montevideo: { code: "uy", name: "Uruguay" },
 
+  // Ecuador
   ecuador: { code: "ec", name: "Ecuador" },
+  ec: { code: "ec", name: "Ecuador" },
   quito: { code: "ec", name: "Ecuador" },
   guayaquil: { code: "ec", name: "Ecuador" },
 
+  // Panamá
   panama: { code: "pa", name: "Panamá" },
   panamá: { code: "pa", name: "Panamá" },
+  pa: { code: "pa", name: "Panamá" },
 
+  // Costa Rica
+  "costa rica": { code: "cr", name: "Costa Rica" },
+  cr: { code: "cr", name: "Costa Rica" },
+
+  // Rep Dominicana
+  "republica dominicana": { code: "do", name: "República Dominicana" },
+  "república dominicana": { code: "do", name: "República Dominicana" },
+  do: { code: "do", name: "República Dominicana" },
+
+  // Guatemala
+  guatemala: { code: "gt", name: "Guatemala" },
+  gt: { code: "gt", name: "Guatemala" },
+
+  // El Salvador
+  "el salvador": { code: "sv", name: "El Salvador" },
+  sv: { code: "sv", name: "El Salvador" },
+
+  // Bolivia
+  bolivia: { code: "bo", name: "Bolivia" },
+  bo: { code: "bo", name: "Bolivia" },
+
+  // Paraguay
+  paraguay: { code: "py", name: "Paraguay" },
+  py: { code: "py", name: "Paraguay" },
+
+  // Venezuela
+  venezuela: { code: "ve", name: "Venezuela" },
+  ve: { code: "ve", name: "Venezuela" },
+  caracas: { code: "ve", name: "Venezuela" },
+
+  // Puerto Rico
+  "puerto rico": { code: "pr", name: "Puerto Rico" },
+  pr: { code: "pr", name: "Puerto Rico" },
+
+  // USA
   usa: { code: "www", name: "Estados Unidos" },
   "estados unidos": { code: "www", name: "Estados Unidos" },
   "united states": { code: "www", name: "Estados Unidos" },
+  us: { code: "www", name: "Estados Unidos" },
   miami: { code: "www", name: "Estados Unidos" },
   florida: { code: "www", name: "Estados Unidos" },
+
+  // Canadá
+  canada: { code: "ca", name: "Canadá" },
+  canadá: { code: "ca", name: "Canadá" },
+  ca: { code: "ca", name: "Canadá" },
+
+  // Reino Unido
+  "reino unido": { code: "uk", name: "Reino Unido" },
+  uk: { code: "uk", name: "Reino Unido" },
+  "united kingdom": { code: "uk", name: "Reino Unido" },
+  london: { code: "uk", name: "Reino Unido" },
+
+  // Alemania
+  alemania: { code: "de", name: "Alemania" },
+  germany: { code: "de", name: "Alemania" },
+  de: { code: "de", name: "Alemania" },
+  berlin: { code: "de", name: "Alemania" },
+
+  // Francia
+  francia: { code: "fr", name: "Francia" },
+  france: { code: "fr", name: "Francia" },
+  fr: { code: "fr", name: "Francia" },
+  paris: { code: "fr", name: "Francia" },
+
+  // Italia
+  italia: { code: "it", name: "Italia" },
+  italy: { code: "it", name: "Italia" },
+  it: { code: "it", name: "Italia" },
+  milano: { code: "it", name: "Italia" },
+
+  // Portugal
+  portugal: { code: "pt", name: "Portugal" },
+  pt: { code: "pt", name: "Portugal" },
+
+  // Países Bajos
+  "paises bajos": { code: "nl", name: "Países Bajos" },
+  "países bajos": { code: "nl", name: "Países Bajos" },
+  netherlands: { code: "nl", name: "Países Bajos" },
+  holanda: { code: "nl", name: "Países Bajos" },
+  nl: { code: "nl", name: "Países Bajos" },
+
+  // Suiza
+  suiza: { code: "ch", name: "Suiza" },
+  switzerland: { code: "ch", name: "Suiza" },
+  ch: { code: "ch", name: "Suiza" },
+
+  // Suecia, Noruega, Dinamarca, Finlandia
+  suecia: { code: "se", name: "Suecia" },
+  sweden: { code: "se", name: "Suecia" },
+  se: { code: "se", name: "Suecia" },
+  noruega: { code: "no", name: "Noruega" },
+  norway: { code: "no", name: "Noruega" },
+  no: { code: "no", name: "Noruega" },
+  dinamarca: { code: "dk", name: "Dinamarca" },
+  denmark: { code: "dk", name: "Dinamarca" },
+  dk: { code: "dk", name: "Dinamarca" },
+  finlandia: { code: "fi", name: "Finlandia" },
+  finland: { code: "fi", name: "Finlandia" },
+  fi: { code: "fi", name: "Finlandia" },
+
+  // Polonia, Irlanda, Bélgica, Austria
+  polonia: { code: "pl", name: "Polonia" },
+  poland: { code: "pl", name: "Polonia" },
+  pl: { code: "pl", name: "Polonia" },
+  irlanda: { code: "ie", name: "Irlanda" },
+  ireland: { code: "ie", name: "Irlanda" },
+  ie: { code: "ie", name: "Irlanda" },
+  belgica: { code: "be", name: "Bélgica" },
+  bélgica: { code: "be", name: "Bélgica" },
+  belgium: { code: "be", name: "Bélgica" },
+  be: { code: "be", name: "Bélgica" },
+  austria: { code: "at", name: "Austria" },
+  at: { code: "at", name: "Austria" },
+
+  // Australia & Nueva Zelanda
+  australia: { code: "au", name: "Australia" },
+  au: { code: "au", name: "Australia" },
+  sydney: { code: "au", name: "Australia" },
+  "nueva zelanda": { code: "nz", name: "Nueva Zelanda" },
+  "new zealand": { code: "nz", name: "Nueva Zelanda" },
+  nz: { code: "nz", name: "Nueva Zelanda" },
+
+  // Asia
+  "emiratos arabes unidos": { code: "ae", name: "Emiratos Árabes Unidos" },
+  "emiratos árabes unidos": { code: "ae", name: "Emiratos Árabes Unidos" },
+  ae: { code: "ae", name: "Emiratos Árabes Unidos" },
+  dubai: { code: "ae", name: "Emiratos Árabes Unidos" },
+  "arabia saudita": { code: "sa", name: "Arabia Saudita" },
+  sa: { code: "sa", name: "Arabia Saudita" },
+  israel: { code: "il", name: "Israel" },
+  il: { code: "il", name: "Israel" },
+  singapur: { code: "sg", name: "Singapur" },
+  singapore: { code: "sg", name: "Singapur" },
+  sg: { code: "sg", name: "Singapur" },
+  india: { code: "in", name: "India" },
+  in: { code: "in", name: "India" },
+  japon: { code: "jp", name: "Japón" },
+  japón: { code: "jp", name: "Japón" },
+  japan: { code: "jp", name: "Japón" },
+  jp: { code: "jp", name: "Japón" },
+  corea: { code: "kr", name: "Corea del Sur" },
+  kr: { code: "kr", name: "Corea del Sur" },
+  "hong kong": { code: "hk", name: "Hong Kong" },
+  hk: { code: "hk", name: "Hong Kong" },
+  taiwan: { code: "tw", name: "Taiwán" },
+  taiwán: { code: "tw", name: "Taiwán" },
+  tw: { code: "tw", name: "Taiwán" },
+  malasia: { code: "my", name: "Malasia" },
+  my: { code: "my", name: "Malasia" },
+  filipinas: { code: "ph", name: "Filipinas" },
+  philippines: { code: "ph", name: "Filipinas" },
+  ph: { code: "ph", name: "Filipinas" },
+  tailandia: { code: "th", name: "Tailandia" },
+  th: { code: "th", name: "Tailandia" },
+  indonesia: { code: "id", name: "Indonesia" },
+  id: { code: "id", name: "Indonesia" },
+  vietnam: { code: "vn", name: "Vietnam" },
+  vn: { code: "vn", name: "Vietnam" },
+  turquia: { code: "tr", name: "Turquía" },
+  turquía: { code: "tr", name: "Turquía" },
+  turkey: { code: "tr", name: "Turquía" },
+  tr: { code: "tr", name: "Turquía" },
+  qatar: { code: "qa", name: "Qatar" },
+  qa: { code: "qa", name: "Qatar" },
+
+  // África
+  sudafrica: { code: "za", name: "Sudáfrica" },
+  sudáfrica: { code: "za", name: "Sudáfrica" },
+  "south africa": { code: "za", name: "Sudáfrica" },
+  za: { code: "za", name: "Sudáfrica" },
+  egipto: { code: "eg", name: "Egipto" },
+  egypt: { code: "eg", name: "Egipto" },
+  eg: { code: "eg", name: "Egipto" },
+  marruecos: { code: "ma", name: "Marruecos" },
+  morocco: { code: "ma", name: "Marruecos" },
+  ma: { code: "ma", name: "Marruecos" },
+  nigeria: { code: "ng", name: "Nigeria" },
+  ng: { code: "ng", name: "Nigeria" },
+  kenia: { code: "ke", name: "Kenia" },
+  kenya: { code: "ke", name: "Kenia" },
+  ke: { code: "ke", name: "Kenia" },
 };
 
 // Title synonyms for Google X-Ray boolean OR expansions
@@ -432,6 +626,7 @@ export interface XRaySearchOptions {
   keywords?: string;
   limit?: number;
   strictTitle?: boolean;
+  showSimilarJobs?: boolean;
 }
 
 /**
@@ -455,7 +650,15 @@ export function resolveSubdomain(locationText?: string): { code: string; name: s
  * site:cl.linkedin.com/in/ ("Director de Marketing" OR "Gerente de Marketing" OR "CMO") "Santiago" -intitle:"profiles" -inurl:"dir/"
  */
 export function buildXRayQuery(options: XRaySearchOptions): { query: string; subdomain: string; countryName: string } {
-  const { title = "", location = "", country = "", city = "", company = "", keywords = "" } = options;
+  const {
+    title = "",
+    location = "",
+    country = "",
+    city = "",
+    company = "",
+    keywords = "",
+    showSimilarJobs = true,
+  } = options;
   const countryInput = country.trim() || location;
   const { code: subCode, name: countryName } = resolveSubdomain(countryInput);
 
@@ -468,7 +671,13 @@ export function buildXRayQuery(options: XRaySearchOptions): { query: string; sub
   const titleTerms: string[] = [];
   const wholeNorm = normalizeSearchText(title);
 
-  if (rawTitleTokens.length === 1 && XRAY_TITLE_SYNONYMS[wholeNorm]) {
+  if (!showSimilarJobs) {
+    // Only exact user-provided titles without automatic synonym expansion
+    for (const token of rawTitleTokens) {
+      const quoted = token.startsWith('"') ? token : `"${token}"`;
+      if (!titleTerms.includes(quoted)) titleTerms.push(quoted);
+    }
+  } else if (rawTitleTokens.length === 1 && XRAY_TITLE_SYNONYMS[wholeNorm]) {
     // Single title with direct dictionary match
     for (const s of XRAY_TITLE_SYNONYMS[wholeNorm]) {
       if (!titleTerms.includes(s)) titleTerms.push(s);
