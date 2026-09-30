@@ -34,11 +34,27 @@ export const authOptions: NextAuthOptions = {
         }
 
         const db = getDb();
-        const user = db
+        const cleanEmail = credentials.email.trim().toLowerCase();
+        let user = db
           .prepare(
             "SELECT id, name, email, password_hash, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?"
           )
-          .get(credentials.email) as UserRow | undefined;
+          .get(cleanEmail) as UserRow | undefined;
+
+        // On-demand demo seeding if logging into demo workspace
+        if (!user && cleanEmail === "demo@inhubflow.com" && credentials.password === "Demo2026!") {
+          try {
+            const { seedDemoWorkspace } = await import("@/lib/demo/seed-demo");
+            seedDemoWorkspace(db);
+            user = db
+              .prepare(
+                "SELECT id, name, email, password_hash, role, slots_limit, subscription_status, plan_tier, owner_id, assigned_account_id FROM users WHERE email = ?"
+              )
+              .get("demo@inhubflow.com") as UserRow | undefined;
+          } catch (seedErr) {
+            console.error("[NextAuth] Error on-demand seeding demo workspace:", seedErr);
+          }
+        }
 
         if (!user) return null;
 
