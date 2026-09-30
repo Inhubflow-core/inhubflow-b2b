@@ -115,9 +115,6 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
     updatedCount: number;
   } | null>(null);
 
-  const [showQueryModal, setShowQueryModal] = useState(false);
-  const [copiedQuery, setCopiedQuery] = useState(false);
-
   const [showSimilarJobs, setShowSimilarJobs] = useState(true);
   const [showSynonymsModal, setShowSynonymsModal] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<{ primary: string; suggestions: TitleSuggestion[] }>({
@@ -147,14 +144,6 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
       showSimilarJobs,
     });
   }, [title, country, city, effectiveLoc, company, strictTitle, showSimilarJobs]);
-
-  const googleSearchUrl = useMemo(() => {
-    return `https://www.google.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
-  }, [currentQueryObj]);
-
-  const bingSearchUrl = useMemo(() => {
-    return `https://www.bing.com/search?q=${encodeURIComponent(currentQueryObj.query)}`;
-  }, [currentQueryObj]);
 
   const titleTokens = useMemo(() => {
     return title
@@ -728,7 +717,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   {t("leadFinder.quantityLabel")}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
-                  {[10, 25, 50, 100].map((val) => (
+                  {[25, 50, 100, 250].map((val) => (
                     <button
                       key={val}
                       type="button"
@@ -768,25 +757,15 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-2 space-y-2">
+              <div className="pt-2">
                 {!isSearching ? (
-                  <>
-                    <button
-                      type="submit"
-                      disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
-                    >
-                      <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowQueryModal(true)}
-                      disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <RiExternalLinkLine size={15} /> Ver Query / Abrir en Google Search
-                    </button>
-                  </>
+                  <button
+                    type="submit"
+                    disabled={!title.trim() && !city.trim() && !company.trim() && country === "Global / Todos"}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold !text-white bg-brand-500 hover:bg-brand-600 shadow-md shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
+                  >
+                    <RiFlashlightLine size={18} /> {t("leadFinder.searchButton")}
+                  </button>
                 ) : (
                   <div className="flex items-center gap-2">
                     <button
@@ -1029,95 +1008,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
         </div>
       </div>
 
-      {/* Modal Consulta Google X-Ray (Inspirado en RecruitEm) */}
-      {showQueryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                  Consulta de Búsqueda Google X-Ray
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Copia o abre directamente la consulta en Google para ver los resultados en vivo en LinkedIn.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowQueryModal(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-              >
-                <RiCloseLine size={20} />
-              </button>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                URL generada de Google Search
-              </label>
-              <div className="relative">
-                <textarea
-                  readOnly
-                  rows={3}
-                  value={googleSearchUrl}
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 p-3 text-xs font-mono text-gray-800 dark:text-gray-200 focus:outline-none select-all"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Operador Booleano de Búsqueda
-              </label>
-              <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-xs font-mono text-gray-700 dark:text-gray-300 break-words">
-                {currentQueryObj.query}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(googleSearchUrl);
-                  setCopiedQuery(true);
-                  toast.success("URL de Google copiada al portapapeles");
-                  setTimeout(() => setCopiedQuery(false), 2000);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all"
-              >
-                {copiedQuery ? (
-                  <>
-                    <RiCheckLine size={16} className="text-emerald-500" /> Copiado
-                  </>
-                ) : (
-                  <>
-                    <RiFileCopyLine size={16} /> Copiar URL
-                  </>
-                )}
-              </button>
-
-              <div className="flex items-center gap-2">
-                <a
-                  href={bingSearchUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 border border-gray-300 dark:border-gray-700 transition-all"
-                >
-                  <RiExternalLinkLine size={14} /> Abrir en Bing
-                </a>
-                <a
-                  href={googleSearchUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all"
-                >
-                  <RiExternalLinkLine size={14} /> Abrir en Google
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Modal Sugerencias de Cargos y Sinónimos (Inspirado en RecruitEm Show Similar Jobs) */}
       {showSynonymsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">

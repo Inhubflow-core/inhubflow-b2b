@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  const numericLimit = Math.min(Math.max(parseInt(String(limit), 10) || 25, 5), 100);
+  const numericLimit = Math.min(Math.max(parseInt(String(limit), 10) || 25, 5), 250);
   const parts = [title?.trim(), effectiveLocation?.trim(), company?.trim()].filter(Boolean);
   const cleanListName =
     listName?.trim() ||

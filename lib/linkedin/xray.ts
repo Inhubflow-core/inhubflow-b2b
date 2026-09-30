@@ -157,7 +157,7 @@ export async function searchLinkedInWithSerper(
     });
 
     const remaining = limit - collectedLeads.length;
-    const maxPagesForBatch = Math.min(Math.max(Math.ceil((remaining * 2.0) / pageSize), 3), 12);
+    const maxPagesForBatch = Math.min(Math.max(Math.ceil((remaining * 2.0) / pageSize), 3), 20);
     const gl = subdomain === "www" ? "us" : subdomain;
     const hl = subdomain === "br" ? "pt" : "es";
 
