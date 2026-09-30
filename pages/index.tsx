@@ -28,6 +28,7 @@ interface DashboardStats {
     total_targets: number;
     connections_requested: number;
     connected: number;
+    visits?: number;
     follows?: number;
     messages_sent: number;
     inmails_sent: number;
@@ -723,7 +724,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <MetricTile
                 label={t("dashboard.profilesVisited")}
-                value={totals.connections_requested}
+                value={totals.visits || totals.connections_requested}
                 color="#0284c7"
                 icon={<FiEye size={15} />}
               />

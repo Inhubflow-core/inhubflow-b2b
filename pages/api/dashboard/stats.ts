@@ -18,12 +18,12 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // Today's summary (always global — not scoped to filter)
     const today = db.prepare(`
       SELECT
-        COUNT(CASE WHEN message LIKE 'Visited%' THEN 1 END) AS visits_today,
-        COUNT(CASE WHEN message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%' THEN 1 END) AS follows_today,
-        COUNT(CASE WHEN message LIKE 'Connection request sent%' THEN 1 END) AS connections_today,
-        COUNT(CASE WHEN message LIKE 'Message sent%' THEN 1 END) AS messages_today,
-        COUNT(CASE WHEN message LIKE 'InMail sent%' THEN 1 END) AS inmails_today,
-        COUNT(CASE WHEN message LIKE 'Email sent%' THEN 1 END) AS emails_today
+        COUNT(CASE WHEN (message LIKE 'Visited%' OR message LIKE '%Visitó perfil%') AND date(created_at) = date('now') THEN 1 END) AS visits_today,
+        COUNT(CASE WHEN (message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') AND date(created_at) = date('now') THEN 1 END) AS follows_today,
+        COUNT(CASE WHEN (message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%') AND date(created_at) = date('now') THEN 1 END) AS connections_today,
+        COUNT(CASE WHEN (message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%') AND date(created_at) = date('now') THEN 1 END) AS messages_today,
+        COUNT(CASE WHEN (message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%') AND date(created_at) = date('now') THEN 1 END) AS inmails_today,
+        COUNT(CASE WHEN message LIKE 'Email sent%' AND date(created_at) = date('now') THEN 1 END) AS emails_today
       FROM logs
       WHERE date(created_at) = date('now')
     `).get() as Record<string, number>;
@@ -54,7 +54,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       sdr.threads_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_threads").get() as any)?.c || 0;
       sdr.decisions_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_decisions").get() as any)?.c || 0;
       sdr.actions_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_actions").get() as any)?.c || 0;
-      sdr.bookings_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_meeting_bookings").get() as any)?.c || 0;
+      const calCount = (db.prepare("SELECT COUNT(*) as c FROM calendar_events").get() as any)?.c || 0;
+      const sdrCount = (db.prepare("SELECT COUNT(*) as c FROM sdr_meeting_bookings").get() as any)?.c || 0;
+      sdr.bookings_count = Math.max(calCount, sdrCount);
       sdr.pending_actions = (db.prepare("SELECT COUNT(*) as c FROM sdr_actions WHERE status = 'pending'").get() as any)?.c || 0;
     } catch {}
 
@@ -86,6 +88,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE}) AS total_targets,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND connection_requested_at IS NOT NULL) AS connections_requested,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND connected_at IS NOT NULL) AS connected,
+          (SELECT COUNT(*) FROM logs WHERE message LIKE '%Visitó perfil%' OR message LIKE 'Visited%') AS visits,
           (SELECT COUNT(*) FROM logs WHERE message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') AS follows,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND message_sent_at IS NOT NULL) AS messages_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND inmail_sent_at IS NOT NULL) AS inmails_sent,
@@ -100,11 +103,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       const activity = db.prepare(`
         SELECT
           date(created_at) AS day,
-          COUNT(CASE WHEN message LIKE 'Visited%' THEN 1 END) AS visits,
+          COUNT(CASE WHEN message LIKE 'Visited%' OR message LIKE '%Visitó perfil%' THEN 1 END) AS visits,
           COUNT(CASE WHEN message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%' THEN 1 END) AS follows,
-          COUNT(CASE WHEN message LIKE 'Connection request sent%' THEN 1 END) AS connections,
-          COUNT(CASE WHEN message LIKE 'Message sent%' THEN 1 END) AS messages,
-          COUNT(CASE WHEN message LIKE 'InMail sent%' THEN 1 END) AS inmails,
+          COUNT(CASE WHEN message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%' THEN 1 END) AS connections,
+          COUNT(CASE WHEN message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%' THEN 1 END) AS messages,
+          COUNT(CASE WHEN message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%' THEN 1 END) AS inmails,
           COUNT(CASE WHEN message LIKE 'Email sent%' THEN 1 END) AS emails
         FROM logs
         WHERE created_at >= datetime('now', '-${days} days')
@@ -136,13 +139,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
           WHERE run_id IN (${runsSubquery})
-            AND message LIKE 'Connection request sent%') AS connections_requested,
-
-        (SELECT COUNT(DISTINCT l.target_id) FROM logs l
-          JOIN targets t ON t.id = l.target_id
-          WHERE l.run_id IN (${runsSubquery})
-            AND l.message LIKE 'Connection request sent%'
-            AND t.connected_at IS NOT NULL) AS connected,
+            AND (message LIKE '%Visitó perfil%' OR message LIKE 'Visited%')) AS visits,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
           WHERE run_id IN (${runsSubquery})
@@ -150,16 +147,26 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
           WHERE run_id IN (${runsSubquery})
-            AND message LIKE 'Message sent%') AS messages_sent,
-
-        (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})
-            AND message LIKE 'InMail sent%') AS inmails_sent,
+            AND (message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%')) AS connections_requested,
 
         (SELECT COUNT(DISTINCT l.target_id) FROM logs l
           JOIN targets t ON t.id = l.target_id
           WHERE l.run_id IN (${runsSubquery})
-            AND (l.message LIKE 'Message sent%' OR l.message LIKE 'InMail sent%')
+            AND (l.message LIKE 'Connection request sent%' OR l.message LIKE '%Solicitud de conexión%')
+            AND t.connected_at IS NOT NULL) AS connected,
+
+        (SELECT COUNT(DISTINCT target_id) FROM logs
+          WHERE run_id IN (${runsSubquery})
+            AND (message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%')) AS messages_sent,
+
+        (SELECT COUNT(DISTINCT target_id) FROM logs
+          WHERE run_id IN (${runsSubquery})
+            AND (message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%')) AS inmails_sent,
+
+        (SELECT COUNT(DISTINCT l.target_id) FROM logs l
+          JOIN targets t ON t.id = l.target_id
+          WHERE l.run_id IN (${runsSubquery})
+            AND (l.message LIKE 'Message sent%' OR l.message LIKE '%Mensaje enviado%' OR l.message LIKE 'InMail sent%' OR l.message LIKE '%InMail enviado%')
             AND t.last_replied_at IS NOT NULL) AS replies_received,
 
         (SELECT COUNT(*) FROM runs WHERE status = 'running') AS active_runs,
@@ -177,9 +184,10 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             AND t.email_replied_at IS NOT NULL) AS email_replies
     `).get(
       runsArg,  // SCOPED_TARGETS
+      runsArg,  // visits
+      runsArg,  // follows
       runsArg,  // connections_requested
       runsArg,  // connected
-      runsArg,  // follows
       runsArg,  // messages_sent
       runsArg,  // inmails_sent
       runsArg,  // replies_received
@@ -190,11 +198,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     const activity = db.prepare(`
       SELECT
         date(created_at) AS day,
-        COUNT(CASE WHEN message LIKE 'Visited%' THEN 1 END) AS visits,
+        COUNT(CASE WHEN message LIKE 'Visited%' OR message LIKE '%Visitó perfil%' THEN 1 END) AS visits,
         COUNT(CASE WHEN message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%' THEN 1 END) AS follows,
-        COUNT(CASE WHEN message LIKE 'Connection request sent%' THEN 1 END) AS connections,
-        COUNT(CASE WHEN message LIKE 'Message sent%' THEN 1 END) AS messages,
-        COUNT(CASE WHEN message LIKE 'InMail sent%' THEN 1 END) AS inmails,
+        COUNT(CASE WHEN message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%' THEN 1 END) AS connections,
+        COUNT(CASE WHEN message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%' THEN 1 END) AS messages,
+        COUNT(CASE WHEN message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%' THEN 1 END) AS inmails,
         COUNT(CASE WHEN message LIKE 'Email sent%' THEN 1 END) AS emails
       FROM logs
       WHERE created_at >= datetime('now', '-${days} days')
