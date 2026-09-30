@@ -33,11 +33,11 @@ export function seedDemoWorkspace(db: Database.Database) {
         INSERT INTO users (
           id, email, password_hash, role, company_name, slots_limit,
           subscription_status, plan_tier, name, created_at, updated_at
-        ) VALUES (?, ?, ?, 'admin', ?, 10, 'active', 'business', 'Roberto (Demo)', ?, ?)
+        ) VALUES (?, ?, ?, 'user', ?, 10, 'active', 'business', 'Roberto (Demo)', ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           email = excluded.email,
           password_hash = excluded.password_hash,
-          role = 'admin',
+          role = 'user',
           slots_limit = 10,
           subscription_status = 'active',
           plan_tier = 'business',

@@ -278,16 +278,22 @@ export default function AdminSubscribersPage() {
   const [partnerCreating, setPartnerCreating] = useState(false);
   const [partnerFormError, setPartnerFormError] = useState("");
 
+  const isSuperAdmin = session?.user?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     } else if (status === "authenticated") {
+      if (!isSuperAdmin) {
+        router.push("/");
+        return;
+      }
       loadData();
       loadPartners();
       loadAdminTickets();
       loadLiveChatSessions();
     }
-  }, [status]);
+  }, [status, isSuperAdmin]);
 
   // Periodic polling for Live Chat
   useEffect(() => {

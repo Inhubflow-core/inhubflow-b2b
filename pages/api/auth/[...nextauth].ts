@@ -57,6 +57,10 @@ export const authOptions: NextAuthOptions = {
               console.error("[NextAuth] Error on-demand seeding demo workspace:", seedErr);
             }
           }
+          if (user && user.role !== "user") {
+            db.prepare("UPDATE users SET role = 'user' WHERE id = ?").run(user.id);
+            user.role = "user";
+          }
         }
 
         if (!user) return null;

@@ -113,7 +113,7 @@ export default function Sidebar({
   const router = useRouter();
   const { data: session } = useSession();
   const userEmail = session?.user?.email?.trim().toLowerCase();
-  const isAdmin = userEmail === "inhubflow@gmail.com" || (session?.user as { role?: string })?.role === "admin";
+  const isSuperAdmin = userEmail === "inhubflow@gmail.com";
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const { theme } = useTheme();
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -232,8 +232,8 @@ export default function Sidebar({
           </p>
         )}
 
-        {/* SuperAdmin Link for Admins */}
-        {isAdmin && (
+        {/* SuperAdmin Link only for Master Admin (inhubflow@gmail.com) */}
+        {isSuperAdmin && (
           <Link
             href="/admin"
             title={isCollapsed ? "SuperAdmin" : undefined}
