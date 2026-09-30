@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     sendEvent("init", {
-      message: "Conectado al motor Google X-Ray Search para LinkedIn...",
+      message: "Conectado al motor X-Ray LinkedIn Search...",
       filters: { title, location, company, keywords },
       limit: numericLimit,
       listName: cleanListName,
@@ -74,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const db = getDb();
       let profiles: SearchLead[] = [];
 
-      // ─── TIER 1: High-Precision Google X-Ray Search ─────────────────────────
+      // ─── TIER 1: High-Precision X-Ray LinkedIn Search ───────────────────────
       try {
         profiles = await searchLinkedInWithXRay(
           {
@@ -95,8 +95,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         );
       } catch (xrayErr: unknown) {
-        console.error("[search-and-import] Google X-Ray error:", xrayErr);
-        const message = xrayErr instanceof Error ? xrayErr.message : "Error durante la búsqueda con Google X-Ray.";
+        console.error("[search-and-import] X-Ray LinkedIn Search error:", xrayErr);
+        const message = xrayErr instanceof Error ? xrayErr.message : "Error durante la búsqueda con X-Ray LinkedIn Search.";
         const code = xrayErr instanceof XRaySearchError ? xrayErr.code : "provider_error";
         sendEvent("error", { error: message, code });
         res.end();
@@ -160,7 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         strictTitle: strictTitle !== false,
       });
     } catch (xrayErr: unknown) {
-      console.error("[search-and-import] Google X-Ray non-streaming error:", xrayErr);
+      console.error("[search-and-import] X-Ray LinkedIn Search non-streaming error:", xrayErr);
       const message = xrayErr instanceof Error ? xrayErr.message : "Error durante la búsqueda de prospectos.";
       const code = xrayErr instanceof XRaySearchError ? xrayErr.code : "provider_error";
       return res.status(500).json({ error: message, code });

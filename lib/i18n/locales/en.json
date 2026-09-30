@@ -209,7 +209,7 @@
     "locationPlaceholder": "e.g. Madrid, Spain | São Paulo, Brazil | London, UK...",
     "companyLabel": "Company or Industry",
     "optional": "(Optional)",
-    "companyPlaceholder": "e.g. Health, SaaS, Real Estate, Google...",
+    "companyPlaceholder": "e.g. Health, SaaS, Real Estate, Microsoft...",
     "quantityLabel": "Number of Leads to Extract",
     "leadsCount": "{count} leads",
     "listNameLabel": "Name of List to Create",

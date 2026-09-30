@@ -209,7 +209,7 @@
     "locationPlaceholder": "ex: São Paulo, Brasil | Lisboa, Portugal | Madrid...",
     "companyLabel": "Empresa ou Setor",
     "optional": "(Opcional)",
-    "companyPlaceholder": "ex: Saúde, SaaS, Imobiliária, Google...",
+    "companyPlaceholder": "ex: Saúde, SaaS, Imobiliária, Microsoft...",
     "quantityLabel": "Quantidade de Leads a Extrair",
     "leadsCount": "{count} leads",
     "listNameLabel": "Nome da Lista a Criar",

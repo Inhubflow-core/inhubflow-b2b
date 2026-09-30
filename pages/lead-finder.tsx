@@ -338,7 +338,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
           }
 
           if (eventName === "error") {
-            throw new Error(parsedData?.error || "Ocurrió un error en la búsqueda con Google X-Ray.");
+            throw new Error(parsedData?.error || "Ocurrió un error en la búsqueda con X-Ray LinkedIn Search.");
           }
 
           if (eventName === "init") {
@@ -675,7 +675,7 @@ export default function LeadFinderPage({ accounts: initialAccounts }: LeadFinder
                   {t("leadFinder.companyLabel")} <span className="text-gray-400 font-normal">{t("leadFinder.optional")}</span>
                 </label>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1.5">
-                  Empresa específica donde trabajan (ej. Falabella, Codelco, Google) o déjalo vacío para prospectar en cualquier empresa.
+                  Empresa específica donde trabajan (ej. Falabella, Codelco, Microsoft) o déjalo vacío para prospectar en cualquier empresa.
                 </p>
                 <div className="relative">
                   <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />

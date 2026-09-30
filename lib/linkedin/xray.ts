@@ -170,7 +170,7 @@ export async function searchLinkedInWithSerper(
     page: 1,
     totalPages: Math.ceil(limit / pageSize),
     totalFound: 0,
-    message: `Iniciando Google X-Ray Search con Serper...`,
+    message: `Iniciando X-Ray LinkedIn Search...`,
   });
 
   for (let batchIdx = 0; batchIdx < roleBatches.length; batchIdx++) {
@@ -196,7 +196,7 @@ export async function searchLinkedInWithSerper(
         page: pageIdx,
         totalPages: Math.ceil(limit / pageSize),
         totalFound: collectedLeads.length,
-        message: `Consultando prospectos en Google X-Ray (${collectedLeads.length}/${limit})...`,
+        message: `Consultando prospectos en X-Ray LinkedIn Search (${collectedLeads.length}/${limit})...`,
       });
 
       let organic: Array<{ title: string; link: string; snippet: string | null }>;
@@ -298,7 +298,7 @@ export async function searchLinkedInWithXRay(
 ): Promise<SearchLead[]> {
   if (!process.env.SERPER_API_KEY) {
     throw new XRaySearchError(
-      "Google X-Ray requiere SERPER_API_KEY; el navegador Chromium local fue retirado.",
+      "X-Ray LinkedIn Search requiere SERPER_API_KEY en el servidor.",
       "provider_error"
     );
   }
