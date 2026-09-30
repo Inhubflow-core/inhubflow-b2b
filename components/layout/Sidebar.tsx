@@ -199,7 +199,7 @@ export default function Sidebar({
           ) : (
             <div className="flex flex-col items-start justify-center w-full py-1">
               <Image
-                src="/logo-master-light.png?v=3"
+                src="/logo-master-light.png?v=4"
                 alt="InHubFlow"
                 width={200}
                 height={44}
@@ -208,7 +208,7 @@ export default function Sidebar({
                 priority
               />
               <Image
-                src="/logo-master-dark.png?v=3"
+                src="/logo-master-dark.png?v=4"
                 alt="InHubFlow"
                 width={200}
                 height={44}

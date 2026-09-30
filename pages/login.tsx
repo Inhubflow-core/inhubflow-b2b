@@ -106,7 +106,7 @@ export default function LoginPage() {
           {/* Brand Header */}
           <div className="flex flex-col items-center gap-3 mb-6 text-center">
             <Image
-              src="/logo-master-light.png?v=2"
+              src="/logo-master-light.png?v=4"
               alt="InHubFlow Logo"
               width={220}
               height={60}
@@ -115,7 +115,7 @@ export default function LoginPage() {
               priority
             />
             <Image
-              src="/logo-master-dark.png?v=2"
+              src="/logo-master-dark.png?v=4"
               alt="InHubFlow Logo"
               width={220}
               height={60}
