@@ -1897,7 +1897,7 @@ export default function SignalsPage({
                     key={lead.id}
                     className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-brand-500/40 dark:hover:border-brand-500/40"
                   >
-                    <div className="space-y-2 max-w-2xl">
+                    <div className="space-y-2 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="checkbox"
