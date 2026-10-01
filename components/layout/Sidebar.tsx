@@ -181,7 +181,7 @@ export default function Sidebar({
     >
       {/* Brand Header */}
       <div className={`flex shrink-0 items-center border-b border-gray-200 dark:border-gray-800 transition-all duration-300 ${
-        isCollapsed ? "h-16 justify-center px-2" : "h-20 justify-start px-5"
+        isCollapsed ? "h-16 justify-center px-2" : "h-16 justify-start px-5"
       }`}>
         <Link href="/" className="flex items-center w-full">
           {isCollapsed ? (
@@ -199,24 +199,24 @@ export default function Sidebar({
           ) : (
             <div className="flex flex-col items-start justify-center w-full py-1">
               <Image
-                src="/logo-master-light.png?v=4"
-                alt="InHubFlow"
-                width={200}
-                height={44}
-                className="block dark:hidden w-[200px] h-[44px] object-contain transition-all duration-200"
+                src="/logo-master-light.png?v=5"
+                alt="InHubFlow Logo"
+                width={220}
+                height={55}
+                className="block dark:hidden h-8 sm:h-10 w-auto max-w-[140px] sm:max-w-[190px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
               <Image
-                src="/logo-master-dark.png?v=4"
-                alt="InHubFlow"
-                width={200}
-                height={44}
-                className="hidden dark:block w-[200px] h-[44px] object-contain transition-all duration-200"
+                src="/logo-master-dark.png?v=5"
+                alt="InHubFlow Logo"
+                width={220}
+                height={55}
+                className="hidden dark:block h-8 sm:h-10 w-auto max-w-[140px] sm:max-w-[190px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
-              <span className="text-[10px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-1">
+              <span className="text-[9px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-0.5">
                 B2B OUTREACH ENGINE
               </span>
             </div>

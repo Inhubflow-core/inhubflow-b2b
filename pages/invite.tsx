@@ -121,7 +121,7 @@ export default function AcceptInvitePage() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center z-10">
           <div className="flex justify-center mb-4">
             <Image
-              src="/logo-master-light.png?v=4"
+              src="/logo-master-light.png?v=5"
               alt="InHubFlow"
               width={180}
               height={40}
@@ -129,7 +129,7 @@ export default function AcceptInvitePage() {
               unoptimized
             />
             <Image
-              src="/logo-master-dark.png?v=4"
+              src="/logo-master-dark.png?v=5"
               alt="InHubFlow"
               width={180}
               height={40}
