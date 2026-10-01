@@ -1483,8 +1483,8 @@ function Wizard({
                           </div>
 
                           <div className="relative">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xs text-xs hover:border-brand-500/40 transition-all">
-                              <RiTimeLine size={12} className="text-brand-500 shrink-0" />
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xs hover:border-brand-500/40 transition-all">
+                              <RiTimeLine size={11} className="text-brand-500 shrink-0" />
 
                               {/* Botón "-" para decrementar */}
                               <button
@@ -1494,10 +1494,10 @@ function Wizard({
                                   updateStep(idx, { delayDaysBefore: Math.max(0, ws.delayDaysBefore - 1) });
                                 }}
                                 disabled={ws.delayDaysBefore <= 0}
-                                className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+                                className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-20 disabled:hover:bg-transparent transition-colors"
                                 title="Restar 1 día"
                               >
-                                <RiSubtractLine size={10} />
+                                <RiSubtractLine size={9} />
                               </button>
 
                               {/* Texto editable / selector con indicador de dropdown */}
@@ -1507,7 +1507,7 @@ function Wizard({
                                   e.stopPropagation();
                                   setOpenDelayPopoverIdx(openDelayPopoverIdx === idx ? null : idx);
                                 }}
-                                className="font-medium text-gray-700 dark:text-gray-200 hover:text-brand-500 transition-colors flex items-center gap-1 px-1 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/60 cursor-pointer"
+                                className="text-[11px] font-medium text-gray-600 dark:text-gray-300 hover:text-brand-500 transition-colors flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/60 cursor-pointer"
                                 title="Seleccionar días de espera"
                               >
                                 <span>
@@ -1515,7 +1515,7 @@ function Wizard({
                                     ? t("campaignWizard.steps.waitDays", { days: ws.delayDaysBefore })
                                     : t("campaignWizard.steps.immediately")}
                                 </span>
-                                <RiArrowDownSLine size={12} className="text-gray-400" />
+                                <RiArrowDownSLine size={10} className="text-gray-400" />
                               </button>
 
                               {/* Botón "+" para incrementar fuera del card */}
@@ -1525,10 +1525,10 @@ function Wizard({
                                   e.stopPropagation();
                                   updateStep(idx, { delayDaysBefore: ws.delayDaysBefore + 1 });
                                 }}
-                                className="w-5 h-5 rounded-full flex items-center justify-center bg-brand-50 text-brand-600 hover:bg-brand-500 hover:text-white dark:bg-brand-900/40 dark:text-brand-300 dark:hover:bg-brand-600 transition-all font-bold shadow-2xs cursor-pointer"
+                                className="w-4 h-4 rounded-full flex items-center justify-center bg-brand-50 text-brand-600 hover:bg-brand-500 hover:text-white dark:bg-brand-900/40 dark:text-brand-300 dark:hover:bg-brand-600 transition-all font-bold shadow-2xs cursor-pointer"
                                 title="Sumar 1 día (+1d)"
                               >
-                                <RiAddLine size={12} />
+                                <RiAddLine size={10} />
                               </button>
                             </div>
 
@@ -1631,11 +1631,11 @@ function Wizard({
                           <RiDraggable size={15} />
                         </div>
 
-                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${STEP_COLORS[ws.type]}`}>
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${STEP_COLORS[ws.type]}`}>
                           {STEP_ICONS[ws.type]}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">
+                          <p className="text-[13.5px] font-semibold text-gray-800 dark:text-gray-100 truncate tracking-tight">
                             {ws.type === "email" ? getEmailStepLabel(wizardSteps, idx, t) : ws.type === "message" ? getMessageStepLabel(wizardSteps, idx, t) : getStepLabel(ws.type, t)}
                           </p>
                           {ws.type === "connect" && ws.connectNote && (
