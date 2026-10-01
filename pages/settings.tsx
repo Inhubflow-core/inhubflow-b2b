@@ -61,19 +61,21 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   const currentUser = session.user as any;
+  const userEmail = currentUser?.email?.trim().toLowerCase() || null;
+  const isDemo = userEmail === "demo@inhubflow.com";
   const isSuperAdmin =
     currentUser?.role === "admin" ||
     currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
   const workspaceOwnerId = currentUser?.owner_id || currentUser?.id;
 
-  const db = getDb();
+  const db = getDb(userEmail);
 
   const liQuery = isSuperAdmin
     ? `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
               a.unipile_status AS linkedin_connection_status, a.profile_image_url,
               (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
-       FROM accounts a ORDER BY a.created_at DESC`
+       FROM accounts a WHERE a.id NOT LIKE 'demo_%' ORDER BY a.created_at DESC`
     : `SELECT a.id, a.name, a.email, a.is_authenticated, a.daily_connection_limit, a.daily_message_limit, a.daily_inmail_limit,
               a.active_hours_start, a.active_hours_end, a.timezone, a.working_days, a.created_at,
               a.unipile_status AS linkedin_connection_status, a.profile_image_url,

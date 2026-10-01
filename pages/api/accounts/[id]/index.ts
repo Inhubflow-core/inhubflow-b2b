@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+import { isAccountAuthorized } from "@/lib/social-selling/auth";
 
 // Excludes cookies_json — the frontend never uses the raw session blob, only
 // is_authenticated, so there's no reason to ship it (even encrypted) to the client.
@@ -8,9 +11,14 @@ const ACCOUNT_COLUMNS = `id, name, email, is_authenticated, unipile_status AS li
   inbox_synced_at, accepted_sync_at, li_connections, li_pending, li_profile_views,
   li_stats_synced_at, connections_synced_through_ms, profile_image_url`;
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const db = getDb();
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session?.user) return res.status(401).json({ error: "No autenticado" });
+  const currentUser = session.user as any;
+  const userEmail = currentUser.email?.trim().toLowerCase() || null;
+  const db = userEmail === "demo@inhubflow.com" ? getDemoDb() : getDb();
   const id = req.query.id as string;
+  if (!isAccountAuthorized(db, currentUser, id)) return res.status(404).json({ error: "Cuenta no encontrada" });
 
   if (req.method === "GET") {
     const account = db.prepare(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = ?`).get(id);

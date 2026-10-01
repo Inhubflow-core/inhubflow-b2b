@@ -92,7 +92,7 @@ export const getServerSideProps: GetServerSideProps<SocialSellingProps> = async 
   }
 
   const currentUser = session.user as any;
-  const db = getDb();
+  const db = getDb(currentUser?.email?.trim().toLowerCase() || null);
 
   const accounts: AccountItem[] = getAuthorizedAccounts(db, currentUser);
 

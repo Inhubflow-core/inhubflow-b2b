@@ -21,10 +21,11 @@ export function getAuthorizedAccounts(
 
   const email = typeof sessionUser.email === "string" ? sessionUser.email.trim().toLowerCase() : "";
   const isSuperAdmin = email === "inhubflow@gmail.com";
+  const accountFilter = email === "demo@inhubflow.com" ? "1=1" : "id NOT LIKE 'demo_%'";
 
   if (isSuperAdmin) {
     return db
-      .prepare("SELECT id, name, unipile_account_id, unipile_status FROM accounts ORDER BY name ASC")
+      .prepare(`SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE ${accountFilter} ORDER BY name ASC`)
       .all() as AuthorizedAccount[];
   }
 
@@ -39,16 +40,23 @@ export function getAuthorizedAccounts(
       : null;
 
   if (isWorkspaceAdmin) {
+    if (email === "demo@inhubflow.com") {
+      return db
+        .prepare(
+          `SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE ${accountFilter} ORDER BY name ASC`
+        )
+        .all() as AuthorizedAccount[];
+    }
     if (isWorkspaceOwner) {
       return db
         .prepare(
-          "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? OR owner_id IS NULL ORDER BY name ASC"
+          `SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE ${accountFilter} AND (owner_id = ? OR owner_id IS NULL) ORDER BY name ASC`
         )
         .all(workspaceOwnerId) as AuthorizedAccount[];
     }
     return db
       .prepare(
-        "SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE owner_id = ? ORDER BY name ASC"
+        `SELECT id, name, unipile_account_id, unipile_status FROM accounts WHERE ${accountFilter} AND owner_id = ? ORDER BY name ASC`
       )
       .all(workspaceOwnerId) as AuthorizedAccount[];
   }
