@@ -71,11 +71,17 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   const user = session.user as { id?: string; owner_id?: string | null; email?: string };
-  const isSuperAdmin = user.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+  const userEmail = user.email?.trim().toLowerCase() || null;
+  const isSuperAdmin = userEmail === "inhubflow@gmail.com";
+  const isDemo = userEmail === "demo@inhubflow.com";
   const workspaceOwnerId = user.owner_id ?? user.id ?? "";
 
-  const db = getDb();
   const id = context.params?.id as string;
+  if (!isDemo && id.startsWith("demo_")) {
+    return { notFound: true };
+  }
+
+  const db = getDb(userEmail);
 
   const where = !isSuperAdmin
     ? "WHERE c.id = ? AND (c.workspace_owner_id = ? OR c.workspace_owner_id IS NULL)"

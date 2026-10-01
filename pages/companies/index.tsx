@@ -59,11 +59,16 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   const user = session.user as { id?: string; owner_id?: string | null; email?: string };
-  const isSuperAdmin = user.email?.trim().toLowerCase() === "inhubflow@gmail.com";
+  const userEmail = user.email?.trim().toLowerCase() || null;
+  const isSuperAdmin = userEmail === "inhubflow@gmail.com";
+  const isDemo = userEmail === "demo@inhubflow.com";
   const workspaceOwnerId = user.owner_id ?? user.id ?? "";
 
-  const db = getDb();
-  const where = !isSuperAdmin ? "WHERE (c.workspace_owner_id = ? OR c.workspace_owner_id IS NULL)" : "";
+  const db = getDb(userEmail);
+  const demoFilter = isDemo ? "" : "AND c.id NOT LIKE 'demo_%'";
+  const where = !isSuperAdmin
+    ? `WHERE (c.workspace_owner_id = ? OR c.workspace_owner_id IS NULL) ${demoFilter}`
+    : (isDemo ? "" : "WHERE c.id NOT LIKE 'demo_%'");
   const params = !isSuperAdmin ? [workspaceOwnerId] : [];
 
   const companies = db.prepare(`

@@ -99,9 +99,20 @@ interface Target {
   lists: ListRef[];
 }
 
-export const getServerSideProps: GetServerSideProps = async ({ params }) => {
-  const db = getDb();
-  const id = params?.id as string;
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  const userEmail = (session?.user as any)?.email?.trim().toLowerCase() || null;
+  const isDemo = userEmail === "demo@inhubflow.com";
+  const id = context.params?.id as string;
+
+  if (!isDemo && id.startsWith("demo_")) {
+    return { notFound: true };
+  }
+
+  const db = getDb(userEmail);
   const target = db.prepare("SELECT * FROM targets WHERE id = ?").get(id) as Target | undefined;
   if (!target) return { notFound: true };
   const companyObj = target.company_id
@@ -113,7 +124,8 @@ export const getServerSideProps: GetServerSideProps = async ({ params }) => {
     WHERE lt.target_id = ? ORDER BY l.name COLLATE NOCASE
   `).all(id) as ListRef[];
 
-  const allLists = db.prepare(`SELECT id, name FROM lists ORDER BY name COLLATE NOCASE`).all() as ListRef[];
+  const demoListFilter = isDemo ? "" : "WHERE id NOT LIKE 'demo_%'";
+  const allLists = db.prepare(`SELECT id, name FROM lists ${demoListFilter} ORDER BY name COLLATE NOCASE`).all() as ListRef[];
 
   const runRows = db.prepare(`
     SELECT rp.run_id, r.workflow_id, w.name as workflow_name,

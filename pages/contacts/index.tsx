@@ -38,26 +38,36 @@ interface Contact {
   created_at: string;
 }
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
 interface ListOption {
   id: string;
   name: string;
   target_count: number;
 }
 
-export const getServerSideProps: GetServerSideProps = async () => {
-  const db = getDb();
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  const userEmail = (session?.user as any)?.email?.trim().toLowerCase() || null;
+  const isDemo = userEmail === "demo@inhubflow.com";
+  const db = getDb(userEmail);
+  const demoListFilter = isDemo ? "" : "WHERE l.id NOT LIKE 'demo_%'";
+  const demoTargetFilter = isDemo ? "" : "AND t.id NOT LIKE 'demo_%'";
+
   const lists = db
     .prepare(
       `SELECT l.id, l.name, COUNT(lt.target_id) as target_count
        FROM lists l
        LEFT JOIN list_targets lt ON lt.list_id = l.id
+       ${demoListFilter}
        GROUP BY l.id
        ORDER BY l.name ASC`
     )
     .all() as ListOption[];
   const total = (
     db
-      .prepare("SELECT COUNT(*) as c FROM targets t WHERE EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id)")
+      .prepare(`SELECT COUNT(*) as c FROM targets t WHERE EXISTS (SELECT 1 FROM list_targets lt WHERE lt.target_id = t.id) ${demoTargetFilter}`)
       .get() as { c: number }
   ).c;
   return { props: { lists, total } };

@@ -29,6 +29,9 @@ import { MeetingRequestsPanel, type MeetingRequestItem } from "@/components/cale
 import type { CalendarEventWithTarget } from "@/lib/calendar/calendar-service";
 import type { CalendarSettings } from "@/lib/calendar/schema";
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
 type CalendarViewMode = "month" | "week" | "agenda";
 
 interface CalendarPageProps {
@@ -37,15 +40,19 @@ interface CalendarPageProps {
   timezone: string;
 }
 
-export const getServerSideProps: GetServerSideProps<CalendarPageProps> = async () => {
-  const db = getDb();
+export const getServerSideProps: GetServerSideProps<CalendarPageProps> = async (context) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  const userEmail = (session?.user as any)?.email?.trim().toLowerCase() || null;
+  const isDemo = userEmail === "demo@inhubflow.com";
+  const db = getDb(userEmail);
+  const demoFilter = isDemo ? "" : "WHERE id NOT LIKE 'demo_%'";
 
   const initialLists = db
-    .prepare("SELECT id, name FROM lists ORDER BY name COLLATE NOCASE ASC")
+    .prepare(`SELECT id, name FROM lists ${demoFilter} ORDER BY name COLLATE NOCASE ASC`)
     .all() as Array<{ id: string; name: string }>;
 
   const initialWorkflows = db
-    .prepare("SELECT id, name FROM workflows ORDER BY name COLLATE NOCASE ASC")
+    .prepare(`SELECT id, name FROM workflows ${demoFilter} ORDER BY name COLLATE NOCASE ASC`)
     .all() as Array<{ id: string; name: string }>;
 
   const settings = db
