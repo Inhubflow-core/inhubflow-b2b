@@ -197,7 +197,7 @@ export default function Sidebar({
               />
             </div>
           ) : (
-            <div className="flex flex-col items-start justify-center w-full py-1">
+            <div className="flex items-center">
               <Image
                 src="/logo-master-light.png?v=5"
                 alt="InHubFlow Logo"
@@ -216,9 +216,6 @@ export default function Sidebar({
                 unoptimized
                 priority
               />
-              <span className="text-[9px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-0.5">
-                B2B OUTREACH ENGINE
-              </span>
             </div>
           )}
         </Link>
