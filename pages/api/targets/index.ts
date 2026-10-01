@@ -1,8 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb } from "@/lib/db";
+import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
+
+// ... filters helpers ...
 import type { ActiveFilter, FilterOp } from "@/components/ui/FilterBar";
 
 // Parse f[0][field], f[0][op], f[0][value], f[1][field], ... from query
@@ -120,6 +122,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
   const db = isDemo ? getDemoDb() : getDb();
 
+  if (!isDemo) {
+    cleanDemoDataFromMainDb(db);
+  }
+
   if (req.method === "POST") {
     const { full_name, linkedin_url, title, company, location, email, phone, list_id } = req.body;
     if (!full_name || !linkedin_url) {
@@ -208,6 +214,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const like = `%${search.trim()}%`;
     extraClauses.push("(t.full_name LIKE ? OR t.company LIKE ? OR t.title LIKE ?)");
     extraParams.push(like, like, like);
+  }
+
+  if (!isDemo) {
+    extraClauses.push("t.id NOT LIKE 'demo_%'");
   }
 
   const filters = parseFilters(req.query);

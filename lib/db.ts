@@ -63,6 +63,30 @@ export function getDemoDb(): Database.Database {
   return demoDb;
 }
 
+export function cleanDemoDataFromMainDb(targetDb: Database.Database): void {
+  try {
+    targetDb.prepare(`DELETE FROM list_targets WHERE list_id LIKE 'demo_list_%' OR target_id LIKE 'demo_target_%'`).run();
+    targetDb.prepare(`DELETE FROM lists WHERE id LIKE 'demo_list_%'`).run();
+    targetDb.prepare(`DELETE FROM targets WHERE id LIKE 'demo_target_%'`).run();
+    targetDb.prepare(`DELETE FROM workflow_steps WHERE id LIKE 'demo_step_%' OR workflow_id LIKE 'demo_wf_%'`).run();
+    targetDb.prepare(`DELETE FROM run_profiles WHERE run_id LIKE 'demo_run_%'`).run();
+    targetDb.prepare(`DELETE FROM runs WHERE id LIKE 'demo_run_%' OR workflow_id LIKE 'demo_wf_%'`).run();
+    targetDb.prepare(`DELETE FROM workflows WHERE id LIKE 'demo_wf_%'`).run();
+    targetDb.prepare(`DELETE FROM sdr_threads WHERE id LIKE 'demo_th_%' OR target_id LIKE 'demo_target_%'`).run();
+    targetDb.prepare(`DELETE FROM signal_leads WHERE id LIKE 'demo_sig_%'`).run();
+    targetDb.prepare(`DELETE FROM signal_monitors WHERE id LIKE 'demo_mon_%'`).run();
+    targetDb.prepare(`DELETE FROM social_selling_posts WHERE id LIKE 'demo_sp_%'`).run();
+    targetDb.prepare(`DELETE FROM linkedin_inbox_messages WHERE id LIKE 'demo_msg_%'`).run();
+    targetDb.prepare(`DELETE FROM calendar_events WHERE id LIKE 'demo_cal_%'`).run();
+    targetDb.prepare(`DELETE FROM email_accounts WHERE id LIKE 'demo_email_%'`).run();
+    targetDb.prepare(`DELETE FROM accounts WHERE id LIKE 'demo_acc_%'`).run();
+    targetDb.prepare(`DELETE FROM logs WHERE run_id LIKE 'demo_run_%' OR message LIKE '%[Demo]%' OR id LIKE 'demo_log_%'`).run();
+    targetDb.prepare(`DELETE FROM users WHERE email = 'demo@inhubflow.com'`).run();
+  } catch (e) {
+    console.warn("[cleanDemoDataFromMainDb] Warning:", e);
+  }
+}
+
 export function getDb(userEmail?: string | null): Database.Database {
   if (userEmail && userEmail.trim().toLowerCase() === "demo@inhubflow.com") {
     return getDemoDb();
@@ -74,6 +98,7 @@ export function getDb(userEmail?: string | null): Database.Database {
     db.pragma("foreign_keys = ON");
     initDb(db);
     runMigrations(db);
+    cleanDemoDataFromMainDb(db);
     autoSeedInstance(db);
     scheduleUpdateCheck();
     schedulePhotoSyncCheck(db);

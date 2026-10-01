@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb } from "@/lib/db";
+import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
@@ -12,13 +12,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isDemo = userEmail === "demo@inhubflow.com";
     const db = isDemo ? getDemoDb() : getDb();
 
+    if (!isDemo) {
+      cleanDemoDataFromMainDb(db);
+    }
+
     const listId = req.query.list_id as string | undefined;
     const workflowId = req.query.workflow_id as string | undefined;
     const days = Math.min(Math.max(Number(req.query.days) || 7, 7), 90);
 
     // Fetch lists and workflows for filter dropdowns (always unfiltered)
-    const lists = db.prepare("SELECT id, name FROM lists ORDER BY name").all() as { id: string; name: string }[];
-    const workflows = db.prepare("SELECT id, name FROM workflows ORDER BY name").all() as { id: string; name: string }[];
+    const demoFilterWhere = isDemo ? "" : "WHERE id NOT LIKE 'demo_%'";
+    const lists = db.prepare(`SELECT id, name FROM lists ${demoFilterWhere} ORDER BY name`).all() as { id: string; name: string }[];
+    const workflows = db.prepare(`SELECT id, name FROM workflows ${demoFilterWhere} ORDER BY name`).all() as { id: string; name: string }[];
 
     // Today's summary (always global — not scoped to filter)
     const today = db.prepare(`
@@ -101,8 +106,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND inmail_sent_at IS NOT NULL) AS inmails_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND last_replied_at IS NOT NULL) AS replies_received,
           (SELECT COUNT(*) FROM runs WHERE status = 'running') AS active_runs,
-          (SELECT COUNT(*) FROM lists) AS total_lists,
-          (SELECT COUNT(*) FROM workflows) AS total_workflows,
+          (SELECT COUNT(*) FROM lists WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_lists,
+          (SELECT COUNT(*) FROM workflows WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_workflows,
           (SELECT COUNT(*) FROM logs WHERE message LIKE 'Email sent%') AS emails_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND email_replied_at IS NOT NULL) AS email_replies
       `).get() as Record<string, number>;

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb } from "@/lib/db";
+import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getInstanceSettings } from "@/lib/auto-seed";
 import { getServerSession } from "next-auth/next";
@@ -11,6 +11,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const currentUser = session?.user as any;
     const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
     const db = isDemo ? getDemoDb() : getDb();
+
+    if (!isDemo) {
+      cleanDemoDataFromMainDb(db);
+    }
 
     // Excludes cookies_json — the frontend never uses the raw session blob, only
     // is_authenticated, so there's no reason to ship it (even encrypted) to the client.
@@ -48,12 +52,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         currentUser?.role === "admin" ||
         currentUser?.email?.trim().toLowerCase() === "inhubflow@gmail.com";
 
-      // 3. SuperAdmin: Sees all accounts
+      // 3. SuperAdmin: Sees all accounts (excluding demo accounts if not in demo mode)
       if (isSuperAdmin) {
+        const demoFilter = isDemo ? "" : "WHERE a.id NOT LIKE 'demo_%'";
         const accounts = db.prepare(`
           SELECT ${ACCOUNT_COLUMNS},
             (SELECT COUNT(*) FROM runs r WHERE r.account_id = a.id AND r.status IN ('running', 'paused')) AS active_run_count
-          FROM accounts a ORDER BY a.created_at DESC
+          FROM accounts a ${demoFilter} ORDER BY a.created_at DESC
         `).all();
         return res.json(accounts);
       }
