@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -9,10 +9,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isDemo = (session?.user as any)?.email?.trim().toLowerCase() === "demo@inhubflow.com";
   const db = isDemo ? getDemoDb() : getDb();
   const ownerId = (session?.user as any)?.id || null;
-
-  if (!isDemo) {
-    cleanDemoDataFromMainDb(db);
-  }
 
   if (req.method === "GET") {
     const filterDemoClause = isDemo ? "" : "AND l.id NOT LIKE 'demo_%'";

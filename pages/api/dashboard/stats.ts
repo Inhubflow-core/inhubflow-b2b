@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
 
@@ -11,10 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userEmail = (session?.user as any)?.email?.trim().toLowerCase();
     const isDemo = userEmail === "demo@inhubflow.com";
     const db = isDemo ? getDemoDb() : getDb();
-
-    if (!isDemo) {
-      cleanDemoDataFromMainDb(db);
-    }
 
     const listId = req.query.list_id as string | undefined;
     const workflowId = req.query.workflow_id as string | undefined;
@@ -152,28 +148,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Targets in scope = distinct targets that appeared in scoped runs.
-    // Keep the defensive ID filter because old demo rows may survive a partial purge.
-    const scopedTargetDemoFilter = isDemo ? "" : " AND target_id NOT LIKE 'demo_%'";
-    const SCOPED_TARGETS = `SELECT DISTINCT target_id FROM run_profiles WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}${scopedTargetDemoFilter}`;
+    const scopedDemoFilter = isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'";
+    const SCOPED_TARGETS = `SELECT DISTINCT target_id FROM run_profiles WHERE run_id IN (${runsSubquery})${scopedDemoFilter}`;
 
     const totals = db.prepare(`
       SELECT
         (SELECT COUNT(*) FROM (${SCOPED_TARGETS})) AS total_targets,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE '%Visitó perfil%' OR message LIKE 'Visited%')) AS visits,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%')) AS follows,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE '%Like%' OR message LIKE '%comentario%')) AS social_interactions,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE 'Connection request sent%' OR message LIKE '%Solicitud de conexión%')) AS connections_requested,
 
         (SELECT COUNT(DISTINCT l.target_id) FROM logs l
@@ -183,11 +178,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             AND t.connected_at IS NOT NULL) AS connected,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE 'Message sent%' OR message LIKE '%Mensaje enviado%')) AS messages_sent,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND (message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%')) AS inmails_sent,
 
         (SELECT COUNT(DISTINCT l.target_id) FROM logs l
@@ -201,7 +196,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         (SELECT COUNT(*) FROM workflows WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_workflows,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
-          WHERE run_id IN (${runsSubquery})${isDemo ? "" : " AND target_id NOT LIKE 'demo_%' AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%'"}
+          WHERE run_id IN (${runsSubquery})${scopedDemoFilter}
             AND message LIKE 'Email sent%') AS emails_sent,
 
         (SELECT COUNT(DISTINCT l.target_id) FROM logs l

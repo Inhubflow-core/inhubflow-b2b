@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getInstanceSettings } from "@/lib/auto-seed";
 import { getServerSession } from "next-auth/next";
@@ -11,10 +11,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const currentUser = session?.user as any;
     const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
     const db = isDemo ? getDemoDb() : getDb();
-
-    if (!isDemo) {
-      cleanDemoDataFromMainDb(db);
-    }
 
     // Excludes cookies_json — the frontend never uses the raw session blob, only
     // is_authenticated, so there's no reason to ship it (even encrypted) to the client.

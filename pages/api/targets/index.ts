@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getDb, getDemoDb, cleanDemoDataFromMainDb } from "@/lib/db";
+import { getDb, getDemoDb } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
@@ -121,10 +121,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const currentUser = session?.user as any;
   const isDemo = currentUser?.email?.trim().toLowerCase() === "demo@inhubflow.com";
   const db = isDemo ? getDemoDb() : getDb();
-
-  if (!isDemo) {
-    cleanDemoDataFromMainDb(db);
-  }
 
   if (req.method === "POST") {
     const { full_name, linkedin_url, title, company, location, email, phone, list_id } = req.body;
