@@ -201,18 +201,18 @@ export default function Sidebar({
               <Image
                 src="/logo-master-light.png?v=5"
                 alt="InHubFlow Logo"
-                width={210}
-                height={52}
-                className="block dark:hidden h-8 sm:h-9 w-auto max-w-[145px] sm:max-w-[170px] object-contain transition-all duration-200"
+                width={220}
+                height={55}
+                className="block dark:hidden h-10 w-auto object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
               <Image
                 src="/logo-master-dark.png?v=5"
                 alt="InHubFlow Logo"
-                width={210}
-                height={52}
-                className="hidden dark:block h-8 sm:h-9 w-auto max-w-[145px] sm:max-w-[170px] object-contain transition-all duration-200"
+                width={220}
+                height={55}
+                className="hidden dark:block h-10 w-auto object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
