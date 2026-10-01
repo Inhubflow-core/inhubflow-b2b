@@ -26,6 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const workflows = db.prepare(`SELECT id, name FROM workflows ${demoFilterWhere} ORDER BY name`).all() as { id: string; name: string }[];
 
     // Today's summary (always global — not scoped to filter)
+    const demoLogCondition = isDemo ? "" : "AND run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%' AND message NOT LIKE '%[Demo]%'";
+    const demoLogFilter = isDemo ? "" : "AND (run_id NOT LIKE 'demo_%' AND id NOT LIKE 'demo_%' AND message NOT LIKE '%[Demo]%')";
+
     const today = db.prepare(`
       SELECT
         COUNT(CASE WHEN (message LIKE 'Visited%' OR message LIKE '%Visitó perfil%') AND date(created_at) = date('now') THEN 1 END) AS visits_today,
@@ -36,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         COUNT(CASE WHEN (message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%') AND date(created_at) = date('now') THEN 1 END) AS inmails_today,
         COUNT(CASE WHEN message LIKE 'Email sent%' AND date(created_at) = date('now') THEN 1 END) AS emails_today
       FROM logs
-      WHERE date(created_at) = date('now')
+      WHERE date(created_at) = date('now') ${demoLogCondition}
     `).get() as Record<string, number>;
 
     // Pipeline stages distribution (global CRM overview)
@@ -45,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pipelineStages = db.prepare(`
         SELECT ps.id, ps.name, ps.color, ps.order_index, COUNT(t.id) as count
         FROM pipeline_stages ps
-        LEFT JOIN targets t ON t.stage_id = ps.id
+        LEFT JOIN targets t ON t.stage_id = ps.id ${isDemo ? "" : "AND t.id NOT LIKE 'demo_%'"}
         GROUP BY ps.id
         ORDER BY ps.order_index ASC
       `).all() as any[];
@@ -62,13 +65,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pending_actions: 0,
     };
     try {
-      sdr.threads_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_threads").get() as any)?.c || 0;
-      sdr.decisions_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_decisions").get() as any)?.c || 0;
-      sdr.actions_count = (db.prepare("SELECT COUNT(*) as c FROM sdr_actions").get() as any)?.c || 0;
-      const calCount = (db.prepare("SELECT COUNT(*) as c FROM calendar_events").get() as any)?.c || 0;
-      const sdrCount = (db.prepare("SELECT COUNT(*) as c FROM sdr_meeting_bookings").get() as any)?.c || 0;
+      const sdrDemoFilter = isDemo ? "" : "WHERE id NOT LIKE 'demo_%'";
+      sdr.threads_count = (db.prepare(`SELECT COUNT(*) as c FROM sdr_threads ${sdrDemoFilter}`).get() as any)?.c || 0;
+      sdr.decisions_count = (db.prepare(`SELECT COUNT(*) as c FROM sdr_decisions ${sdrDemoFilter}`).get() as any)?.c || 0;
+      sdr.actions_count = (db.prepare(`SELECT COUNT(*) as c FROM sdr_actions ${sdrDemoFilter}`).get() as any)?.c || 0;
+      const calCount = (db.prepare(`SELECT COUNT(*) as c FROM calendar_events ${sdrDemoFilter}`).get() as any)?.c || 0;
+      const sdrCount = (db.prepare(`SELECT COUNT(*) as c FROM sdr_meeting_bookings ${sdrDemoFilter}`).get() as any)?.c || 0;
       sdr.bookings_count = Math.max(calCount, sdrCount);
-      sdr.pending_actions = (db.prepare("SELECT COUNT(*) as c FROM sdr_actions WHERE status = 'pending'").get() as any)?.c || 0;
+      sdr.pending_actions = (db.prepare(`SELECT COUNT(*) as c FROM sdr_actions WHERE status = 'pending' ${isDemo ? "" : "AND id NOT LIKE 'demo_%'"}`).get() as any)?.c || 0;
     } catch {}
 
     // Email health & deliverability overview
@@ -83,6 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           COUNT(*) as connected_accounts,
           COALESCE(SUM(daily_email_limit), 0) as total_daily_limit
         FROM email_accounts
+        ${isDemo ? "" : "WHERE id NOT LIKE 'demo_%'"}
       `).get() as any;
       if (ehRow) {
         emailHealth.connected_accounts = ehRow.connected_accounts || 0;
@@ -92,23 +97,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!workflowId && !listId) {
       // ── Unfiltered: use targets fields (fast, global) ──────────────────────
-      const ACTIVE = `id IN (SELECT DISTINCT target_id FROM list_targets)`;
+      const ACTIVE = isDemo
+        ? `id IN (SELECT DISTINCT target_id FROM list_targets)`
+        : `id IN (SELECT DISTINCT target_id FROM list_targets) AND id NOT LIKE 'demo_%'`;
 
       const totals = db.prepare(`
         SELECT
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE}) AS total_targets,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND connection_requested_at IS NOT NULL) AS connections_requested,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND connected_at IS NOT NULL) AS connected,
-          (SELECT COUNT(*) FROM logs WHERE message LIKE '%Visitó perfil%' OR message LIKE 'Visited%') AS visits,
-          (SELECT COUNT(*) FROM logs WHERE message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') AS follows,
-          (SELECT COUNT(*) FROM logs WHERE message LIKE '%Like%' OR message LIKE '%comentario%') AS social_interactions,
+          (SELECT COUNT(*) FROM logs WHERE (message LIKE '%Visitó perfil%' OR message LIKE 'Visited%') ${demoLogFilter}) AS visits,
+          (SELECT COUNT(*) FROM logs WHERE (message LIKE '%seguido en LinkedIn%' OR message LIKE 'Followed%') ${demoLogFilter}) AS follows,
+          (SELECT COUNT(*) FROM logs WHERE (message LIKE '%Like%' OR message LIKE '%comentario%') ${demoLogFilter}) AS social_interactions,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND message_sent_at IS NOT NULL) AS messages_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND inmail_sent_at IS NOT NULL) AS inmails_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND last_replied_at IS NOT NULL) AS replies_received,
-          (SELECT COUNT(*) FROM runs WHERE status = 'running') AS active_runs,
+          (SELECT COUNT(*) FROM runs WHERE status = 'running' ${isDemo ? "" : "AND id NOT LIKE 'demo_%'"}) AS active_runs,
           (SELECT COUNT(*) FROM lists WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_lists,
           (SELECT COUNT(*) FROM workflows WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_workflows,
-          (SELECT COUNT(*) FROM logs WHERE message LIKE 'Email sent%') AS emails_sent,
+          (SELECT COUNT(*) FROM logs WHERE message LIKE 'Email sent%' ${demoLogFilter}) AS emails_sent,
           (SELECT COUNT(*) FROM targets WHERE ${ACTIVE} AND email_replied_at IS NOT NULL) AS email_replies
       `).get() as Record<string, number>;
 
@@ -123,7 +130,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           COUNT(CASE WHEN message LIKE 'InMail sent%' OR message LIKE '%InMail enviado%' THEN 1 END) AS inmails,
           COUNT(CASE WHEN message LIKE 'Email sent%' THEN 1 END) AS emails
         FROM logs
-        WHERE created_at >= datetime('now', '-${days} days')
+        WHERE created_at >= datetime('now', '-${days} days') ${demoLogCondition}
         GROUP BY date(created_at)
         ORDER BY day ASC
       `).all() as { day: string; visits: number; follows: number; connections: number; messages: number; inmails: number; emails: number }[];
@@ -186,9 +193,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             AND (l.message LIKE 'Message sent%' OR l.message LIKE '%Mensaje enviado%' OR l.message LIKE 'InMail sent%' OR l.message LIKE '%InMail enviado%')
             AND t.last_replied_at IS NOT NULL) AS replies_received,
 
-        (SELECT COUNT(*) FROM runs WHERE status = 'running') AS active_runs,
-        (SELECT COUNT(*) FROM lists) AS total_lists,
-        (SELECT COUNT(*) FROM workflows) AS total_workflows,
+        (SELECT COUNT(*) FROM runs WHERE status = 'running' ${isDemo ? "" : "AND id NOT LIKE 'demo_%'"}) AS active_runs,
+        (SELECT COUNT(*) FROM lists WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_lists,
+        (SELECT COUNT(*) FROM workflows WHERE ${isDemo ? "1=1" : "id NOT LIKE 'demo_%'"}) AS total_workflows,
 
         (SELECT COUNT(DISTINCT target_id) FROM logs
           WHERE run_id IN (${runsSubquery})

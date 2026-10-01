@@ -7,7 +7,11 @@ const Database = require("better-sqlite3");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 
-const dbPath = process.env.INHUBFLOW_DB_PATH || path.join(__dirname, "..", "inhubflow.db");
+const dbPath = process.env.INHUBFLOW_DEMO_DB_PATH || (
+  process.env.INHUBFLOW_DB_PATH
+    ? process.env.INHUBFLOW_DB_PATH.replace(/inhubflow\.db$/, "inhubflow_demo.db")
+    : path.join(__dirname, "..", "inhubflow_demo.db")
+);
 const db = new Database(dbPath);
 db.pragma("foreign_keys = OFF");
 
