@@ -201,22 +201,22 @@ export default function Sidebar({
               <Image
                 src="/logo-master-light.png?v=5"
                 alt="InHubFlow Logo"
-                width={200}
-                height={50}
-                className="block dark:hidden h-7 sm:h-8 w-auto max-w-[135px] sm:max-w-[150px] object-contain transition-all duration-200"
+                width={210}
+                height={52}
+                className="block dark:hidden h-8 sm:h-9 w-auto max-w-[145px] sm:max-w-[170px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
               <Image
                 src="/logo-master-dark.png?v=5"
                 alt="InHubFlow Logo"
-                width={200}
-                height={50}
-                className="hidden dark:block h-7 sm:h-8 w-auto max-w-[135px] sm:max-w-[150px] object-contain transition-all duration-200"
+                width={210}
+                height={52}
+                className="hidden dark:block h-8 sm:h-9 w-auto max-w-[145px] sm:max-w-[170px] object-contain transition-all duration-200"
                 unoptimized
                 priority
               />
-              <span className="text-[8.5px] font-extrabold text-brand-500 uppercase tracking-widest pl-0.5 mt-0.5">
+              <span className="text-[9px] font-extrabold text-brand-500 uppercase tracking-widest pl-1 mt-0.5">
                 B2B OUTREACH ENGINE
               </span>
             </div>
