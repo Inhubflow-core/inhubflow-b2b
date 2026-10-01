@@ -250,7 +250,10 @@ export default function AcceptInvitePage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                  className="w-full py-3 px-6 rounded-full text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all duration-300 cursor-pointer hover:opacity-95 hover:scale-[1.02] active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                  style={{
+                    background: 'linear-gradient(90deg, #0099ff 0%, #0022ff 100%)',
+                  }}
                 >
                   <span>{submitting ? "Activando cuenta..." : "Activar Mi Cuenta y Entrar"}</span>
                   <RiArrowRightLine size={16} />

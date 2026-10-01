@@ -9,19 +9,19 @@
   --font-outfit: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Tahoma, Arial, sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 
-  /* TailAdmin Brand Palette */
-  --color-brand-25: #f2f7ff;
-  --color-brand-50: #ecf3ff;
-  --color-brand-100: #dde9ff;
-  --color-brand-200: #c2d6ff;
-  --color-brand-300: #9cb9ff;
-  --color-brand-400: #7592ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2a31d8;
-  --color-brand-800: #252dae;
-  --color-brand-900: #262e89;
-  --color-brand-950: #161950;
+  /* TailAdmin Brand Palette (Synced with Landing Page) */
+  --color-brand-25: #f0f8ff;
+  --color-brand-50: #e0f2fe;
+  --color-brand-100: #bae6fd;
+  --color-brand-200: #7dd3fc;
+  --color-brand-300: #38bdf8;
+  --color-brand-400: #00aaff;
+  --color-brand-500: #0099ff;
+  --color-brand-600: #007ae6;
+  --color-brand-700: #005ecc;
+  --color-brand-800: #0043b3;
+  --color-brand-900: #0022ff;
+  --color-brand-950: #001489;
 
   /* TailAdmin Neutral & Dark Scale */
   --color-gray-25: #fcfcfd;
@@ -60,7 +60,7 @@
   --border-color: #d0d5dd;
   --text-main: #101828;
   --text-muted: #667085;
-  --brand-primary: #465fff;
+  --brand-primary: #0099ff;
   font-family: var(--font-inter);
 }
 
@@ -71,5 +71,5 @@ html.dark {
   --border-color: #344054;
   --text-main: #fcfcfd;
   --text-muted: #98a2b3;
-  --brand-primary: #465fff;
+  --brand-primary: #0099ff;
 }

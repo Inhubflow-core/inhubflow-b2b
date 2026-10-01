@@ -10,19 +10,19 @@
   --font-outfit: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Tahoma, Arial, sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 
-  /* TailAdmin Brand Palette */
-  --color-brand-25: #f2f7ff;
-  --color-brand-50: #ecf3ff;
-  --color-brand-100: #dde9ff;
-  --color-brand-200: #c2d6ff;
-  --color-brand-300: #9cb9ff;
-  --color-brand-400: #7592ff;
-  --color-brand-500: #465fff;
-  --color-brand-600: #3641f5;
-  --color-brand-700: #2a31d8;
-  --color-brand-800: #252dae;
-  --color-brand-900: #262e89;
-  --color-brand-950: #161950;
+  /* TailAdmin Brand Palette (Synced with Landing Page) */
+  --color-brand-25: #f0f8ff;
+  --color-brand-50: #e0f2fe;
+  --color-brand-100: #bae6fd;
+  --color-brand-200: #7dd3fc;
+  --color-brand-300: #38bdf8;
+  --color-brand-400: #00aaff;
+  --color-brand-500: #0099ff;
+  --color-brand-600: #007ae6;
+  --color-brand-700: #005ecc;
+  --color-brand-800: #0043b3;
+  --color-brand-900: #0022ff;
+  --color-brand-950: #001489;
 
   /* TailAdmin Neutral & Dark Scale */
   --color-gray-25: #fcfcfd;
@@ -66,7 +66,7 @@
   --color-base-200: #ffffff;
   --color-base-300: #d0d5dd;
   --color-base-content: #101828;
-  --color-primary: #465fff;
+  --color-primary: #0099ff;
   --color-primary-content: #ffffff;
   --color-neutral: #f2f4f7;
   --color-neutral-content: #101828;
@@ -75,7 +75,7 @@
   --color-warning: #f79009;
   --color-error: #f04438;
   --rounded-box: 1rem;
-  --rounded-btn: 0.75rem;
+  --rounded-btn: 9999px;
   --rounded-badge: 1.9rem;
 }
 
@@ -86,7 +86,7 @@
   --color-base-200: #101828;
   --color-base-300: #344054;
   --color-base-content: #fcfcfd;
-  --color-primary: #465fff;
+  --color-primary: #0099ff;
   --color-primary-content: #ffffff;
   --color-neutral: #1a2231;
   --color-neutral-content: #fcfcfd;
@@ -95,7 +95,7 @@
   --color-warning: #f79009;
   --color-error: #f04438;
   --rounded-box: 1rem;
-  --rounded-btn: 0.75rem;
+  --rounded-btn: 9999px;
   --rounded-badge: 1.9rem;
 }
 
@@ -241,7 +241,7 @@ input {
 }
 
 ::selection {
-  background: rgba(70, 95, 255, 0.25);
+  background: rgba(0, 153, 255, 0.25);
 }
 
 a {
@@ -278,45 +278,123 @@ html.dark .table td {
   border-color: #1d2939;
 }
 
-/* ── Unified Button Design System ── */
+/* ── Unified Button Design System (Synced with Landing Page) ── */
 .btn {
   font-family: "Outfit", sans-serif !important;
   font-weight: 600 !important;
-  border-radius: 0.75rem !important; /* rounded-xl (12px) */
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 9999px !important; /* Full pill format */
+  box-shadow: 0 1px 3px 0 rgba(16, 24, 40, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   letter-spacing: -0.01em;
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.98) !important;
 }
 
-/* Secondary / Default DaisyUI buttons with crisp border */
-.btn:not(.btn-primary):not(.btn-secondary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link) {
+/* ── FORMATO 1: Botón Primario (Degradado Azul Landing "Comenzar Prueba Gratis") ── */
+.btn-primary,
+.btn-gradient,
+.btn.bg-brand-500,
+.btn.bg-brand-600,
+button.bg-brand-500,
+button.bg-brand-600,
+a.bg-brand-500,
+a.bg-brand-600 {
+  background: linear-gradient(90deg, #0099ff 0%, #0022ff 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 14px 0 rgba(0, 153, 255, 0.25) !important;
+}
+
+.btn-primary:hover,
+.btn-gradient:hover,
+.btn.bg-brand-500:hover,
+.btn.bg-brand-600:hover,
+button.bg-brand-500:hover,
+button.bg-brand-600:hover,
+a.bg-brand-500:hover,
+a.bg-brand-600:hover {
+  background: linear-gradient(90deg, #1aa3ff 0%, #1a38ff 100%) !important;
+  box-shadow: 0 6px 20px 0 rgba(0, 153, 255, 0.38) !important;
+  transform: scale(1.02) !important;
+  opacity: 0.98 !important;
+}
+
+.btn-primary:active,
+.btn-gradient:active,
+.btn.bg-brand-500:active,
+.btn.bg-brand-600:active,
+button.bg-brand-500:active,
+button.bg-brand-600:active,
+a.bg-brand-500:active,
+a.bg-brand-600:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── FORMATO 2: Botón Secundario / Outline / Neutral (Landing "Explorar Radar de Señales") ── */
+.btn-secondary,
+.btn-outline,
+.btn:not(.btn-primary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link):not(.btn-circle):not(.btn-square):not(.bg-brand-500):not(.bg-brand-600):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]) {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%) !important;
   border: 1px solid #d0d5dd !important;
-  background-color: #ffffff !important;
-  color: #344054 !important;
+  color: #111827 !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 3px 0 rgba(16, 24, 40, 0.08) !important;
 }
 
-html.dark .btn:not(.btn-primary):not(.btn-secondary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link) {
-  border: 1px solid #344054 !important;
-  background-color: #1d2939 !important;
-  color: #fcfcfd !important;
+html.dark .btn-secondary,
+html.dark .btn-outline,
+html.dark .btn:not(.btn-primary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link):not(.btn-circle):not(.btn-square):not(.bg-brand-500):not(.bg-brand-600):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]) {
+  background: linear-gradient(180deg, #1f2937 0%, #111827 100%) !important;
+  border: 1px solid #374151 !important;
+  color: #f9fafb !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35) !important;
 }
 
-.btn-outline {
-  border: 1px solid #d0d5dd !important;
-  border-radius: 0.75rem !important;
+.btn-secondary:hover,
+.btn-outline:hover,
+.btn:not(.btn-primary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link):not(.btn-circle):not(.btn-square):not(.bg-brand-500):not(.bg-brand-600):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):hover {
+  background: linear-gradient(180deg, #FFFFFF 0%, #d1d5db 100%) !important;
+  transform: scale(1.02) !important;
+  opacity: 0.98 !important;
 }
 
-html.dark .btn-outline {
-  border: 1px solid #344054 !important;
+html.dark .btn-secondary:hover,
+html.dark .btn-outline:hover,
+html.dark .btn:not(.btn-primary):not(.btn-accent):not(.btn-error):not(.btn-success):not(.btn-warning):not(.btn-info):not(.btn-ghost):not(.btn-link):not(.btn-circle):not(.btn-square):not(.bg-brand-500):not(.bg-brand-600):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-amber"]):hover {
+  background: linear-gradient(180deg, #374151 0%, #1f2937 100%) !important;
+  transform: scale(1.02) !important;
+  opacity: 0.98 !important;
+}
+
+/* Excepciones específicas para botones circulares de iconos y ghost */
+.btn-circle {
+  border-radius: 9999px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
 }
 
 .btn-ghost {
-  border-radius: 0.75rem !important;
-  font-weight: 500;
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  transform: scale(1.02) !important;
+}
+
+html.dark .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* Product tour (driver.js) — styled to match InHubFlow */
@@ -343,17 +421,19 @@ html.dark .btn-outline {
   font-size: 11px;
 }
 .inhubflow-tour-popover .driver-popover-footer button {
-  background: #1d2939;
+  background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
   color: #fcfcfd;
   text-shadow: none;
   border: 1px solid #344054;
-  border-radius: 8px;
+  border-radius: 9999px;
   font-size: 12px;
-  font-weight: 500;
-  padding: 5px 12px;
+  font-weight: 600;
+  padding: 6px 14px;
 }
 .inhubflow-tour-popover .driver-popover-footer .driver-popover-next-btn {
-  background: #465fff;
-  border-color: #465fff;
-  color: #ffffff;
+  background: linear-gradient(90deg, #0099ff 0%, #0022ff 100%) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
 }
