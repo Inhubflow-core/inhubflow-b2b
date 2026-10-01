@@ -255,24 +255,58 @@ export default function Header({
         <div className="relative" ref={userRef}>
           <button
             onClick={() => setIsUserOpen(!isUserOpen)}
-            className="flex items-center gap-2 rounded-xl border border-gray-300 p-1.5 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800 shadow-xs"
+            className={`flex items-center gap-2 rounded-xl border p-1.5 transition-colors shadow-xs ${
+              session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com"
+                ? "border-amber-400 bg-amber-50/50 hover:bg-amber-100/60 dark:border-amber-500/50 dark:bg-amber-950/20"
+                : "border-gray-300 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+            }`}
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-brand-500 to-indigo-500 text-xs font-bold text-white shadow-sm">
+            <div
+              className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm ${
+                session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com"
+                  ? "bg-gradient-to-tr from-amber-500 to-orange-500"
+                  : "bg-gradient-to-tr from-brand-500 to-indigo-500"
+              }`}
+            >
               {session?.user?.email ? session.user.email[0].toUpperCase() : "U"}
             </div>
             <span className="hidden md:inline max-w-[120px] truncate text-xs font-medium text-gray-700 dark:text-gray-300">
               {session?.user?.email ?? "Usuario"}
             </span>
+            {session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com" && (
+              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white leading-none">
+                DEMO
+              </span>
+            )}
           </button>
 
           {isUserOpen && (
-            <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-gray-300 bg-white p-2 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-gray-900 z-50">
+            <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-2xl border border-gray-300 bg-white p-2 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-gray-900 z-50">
               <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-800 mb-1">
-                <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-                  {session?.user?.email ?? "Usuario"}
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                    {session?.user?.email ?? "Usuario"}
+                  </p>
+                  {session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com" && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-white">
+                      DEMO
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {session?.user?.email?.trim().toLowerCase() === "inhubflow@gmail.com"
+                    ? "InHub SuperAdmin Master"
+                    : session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com"
+                    ? "Espacio Demo (Datos Simulados)"
+                    : "InHub Administrator"}
                 </p>
-                <p className="text-[11px] text-gray-400">InHub Administrator</p>
               </div>
+
+              {session?.user?.email?.trim().toLowerCase() === "demo@inhubflow.com" && (
+                <div className="p-2 mb-1 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-[11px] text-amber-800 dark:text-amber-300">
+                  Estás en la cuenta demo de prueba. Para volver a tu panel SuperAdmin real, cierra sesión e ingresa con tu correo principal.
+                </div>
+              )}
 
               <Link
                 href="/settings"

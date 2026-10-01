@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/pages/api/auth/[...nextauth]";
-import { getDb } from "@/lib/db";
+import { getDemoDb } from "@/lib/db";
 import { seedDemoWorkspace } from "@/lib/demo/seed-demo";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const db = getDb();
+    const db = getDemoDb();
     const result = seedDemoWorkspace(db);
     return res.status(200).json({
       success: true,
