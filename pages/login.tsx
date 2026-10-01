@@ -185,7 +185,10 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 flex h-11 w-full items-center justify-center rounded-xl bg-brand-500 px-4 text-xs font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-600 active:scale-[0.99] disabled:opacity-50"
+                className="mt-3 flex h-12 w-full items-center justify-center rounded-full px-6 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition-all duration-300 hover:opacity-95 hover:scale-[1.02] active:scale-98 disabled:opacity-50 cursor-pointer"
+                style={{
+                  background: 'linear-gradient(90deg, #0099ff 0%, #0022ff 100%)',
+                }}
               >
                 {loading ? (
                   <span className="loading loading-spinner loading-xs" />
