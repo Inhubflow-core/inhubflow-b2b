@@ -64,40 +64,51 @@ export function getDemoDb(): Database.Database {
 }
 
 export function cleanDemoDataFromMainDb(targetDb: Database.Database): void {
+  const cleanupStatements = [
+    `DELETE FROM list_targets WHERE list_id LIKE 'demo_%' OR target_id LIKE 'demo_%'`,
+    `DELETE FROM lists WHERE id LIKE 'demo_%'`,
+    `DELETE FROM workflow_steps WHERE id LIKE 'demo_%' OR workflow_id LIKE 'demo_%'`,
+    `DELETE FROM run_profile_tracks WHERE run_profile_id LIKE 'demo_%'`,
+    `DELETE FROM run_profiles WHERE run_id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR id LIKE 'demo_%'`,
+    `DELETE FROM runs WHERE id LIKE 'demo_%' OR workflow_id LIKE 'demo_%'`,
+    `DELETE FROM workflows WHERE id LIKE 'demo_%'`,
+    `DELETE FROM sdr_meeting_bookings WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%' OR target_id LIKE 'demo_%'`,
+    `DELETE FROM sdr_actions WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%'`,
+    `DELETE FROM sdr_decisions WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%'`,
+    `DELETE FROM sdr_threads WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%'`,
+    `DELETE FROM signal_leads WHERE id LIKE 'demo_%'`,
+    `DELETE FROM signal_monitors WHERE id LIKE 'demo_%'`,
+    `DELETE FROM social_selling_posts WHERE id LIKE 'demo_%'`,
+    `DELETE FROM linkedin_inbox_messages WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR account_id LIKE 'demo_%'`,
+    `DELETE FROM linkedin_target_accounts WHERE target_id LIKE 'demo_%' OR account_id LIKE 'demo_%'`,
+    `DELETE FROM linkedin_step_deliveries WHERE target_id LIKE 'demo_%' OR run_id LIKE 'demo_%'`,
+    `DELETE FROM calendar_events WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%'`,
+    `DELETE FROM email_replies WHERE target_id LIKE 'demo_%' OR email_account_id LIKE 'demo_%'`,
+    `DELETE FROM email_accounts WHERE id LIKE 'demo_%'`,
+    `DELETE FROM todos WHERE target_id LIKE 'demo_%'`,
+    `DELETE FROM activity_logs WHERE target_id LIKE 'demo_%'`,
+    `DELETE FROM target_tags WHERE target_id LIKE 'demo_%'`,
+    `DELETE FROM tag_events WHERE target_id LIKE 'demo_%'`,
+    `DELETE FROM logs WHERE run_id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR message LIKE '%[Demo]%' OR id LIKE 'demo_%'`,
+    `DELETE FROM targets WHERE id LIKE 'demo_%'`,
+    `DELETE FROM accounts WHERE id LIKE 'demo_%'`,
+    `DELETE FROM users WHERE email = 'demo@inhubflow.com' OR id LIKE 'demo_%'`,
+  ];
+
+  const previousForeignKeys = targetDb.pragma("foreign_keys", { simple: true });
   try {
     targetDb.pragma("foreign_keys = OFF");
-    targetDb.prepare(`DELETE FROM list_targets WHERE list_id LIKE 'demo_%' OR target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM lists WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM workflow_steps WHERE id LIKE 'demo_%' OR workflow_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM run_profile_tracks WHERE run_id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR run_profile_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM run_profiles WHERE run_id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM runs WHERE id LIKE 'demo_%' OR workflow_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM workflows WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM sdr_meeting_bookings WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%' OR target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM sdr_actions WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM sdr_decisions WHERE id LIKE 'demo_%' OR thread_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM sdr_threads WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM signal_leads WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM signal_monitors WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM social_selling_posts WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM linkedin_inbox_messages WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR account_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM linkedin_target_accounts WHERE target_id LIKE 'demo_%' OR account_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM linkedin_step_deliveries WHERE target_id LIKE 'demo_%' OR run_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM calendar_events WHERE id LIKE 'demo_%' OR target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM email_replies WHERE target_id LIKE 'demo_%' OR email_account_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM email_accounts WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM accounts WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM todos WHERE target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM activity_logs WHERE target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM target_tags WHERE target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM tag_events WHERE target_id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM logs WHERE run_id LIKE 'demo_%' OR target_id LIKE 'demo_%' OR message LIKE '%[Demo]%' OR id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM targets WHERE id LIKE 'demo_%'`).run();
-    targetDb.prepare(`DELETE FROM users WHERE email = 'demo@inhubflow.com' OR id LIKE 'demo_%'`).run();
-    targetDb.pragma("foreign_keys = ON");
-  } catch (e) {
-    console.warn("[cleanDemoDataFromMainDb] Warning:", e);
-    try { targetDb.pragma("foreign_keys = ON"); } catch {}
+    // Optional module tables differ between existing installations. A missing
+    // table/column must not abort the remaining purge statements.
+    for (const sql of cleanupStatements) {
+      try {
+        targetDb.prepare(sql).run();
+      } catch (error) {
+        console.warn(`[cleanDemoDataFromMainDb] Skipped cleanup statement: ${sql}`, error);
+      }
+    }
+  } finally {
+    try { targetDb.pragma(`foreign_keys = ${previousForeignKeys ? "ON" : "OFF"}`); } catch {}
   }
 }
 
