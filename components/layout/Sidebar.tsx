@@ -180,10 +180,8 @@ export default function Sidebar({
       }`}
     >
       {/* Brand Header */}
-      <div className={`flex shrink-0 items-center border-b border-gray-200 dark:border-gray-800 transition-all duration-300 ${
-        isCollapsed ? "h-16 justify-center px-2" : "h-16 justify-start px-5"
-      }`}>
-        <Link href="/" className="flex items-center w-full">
+      <div className="flex shrink-0 h-16 items-center justify-center border-b border-gray-200 dark:border-gray-800 px-3 transition-all duration-300">
+        <Link href="/" className="flex items-center justify-center w-full">
           {isCollapsed ? (
             <div className="relative flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-transparent">
               <Image
@@ -197,7 +195,7 @@ export default function Sidebar({
               />
             </div>
           ) : (
-            <div className="flex items-center">
+            <div className="flex items-center justify-center">
               <Image
                 src="/logo-master-light.png?v=5"
                 alt="InHubFlow Logo"
