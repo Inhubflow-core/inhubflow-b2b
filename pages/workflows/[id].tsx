@@ -45,6 +45,7 @@ import {
   RiArrowUpSLine,
   RiAttachment2,
   RiThumbUpLine,
+  RiSubtractLine,
 } from "react-icons/ri";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -610,6 +611,7 @@ function Wizard({
   const [configIdx, setConfigIdx] = useState<number | null>(null); // which step is being configured
   const [draggedStepPos, setDraggedStepPos] = useState<number | null>(null);
   const [dragOverStepPos, setDragOverStepPos] = useState<number | null>(null);
+  const [openDelayPopoverIdx, setOpenDelayPopoverIdx] = useState<number | null>(null);
   const [launching, setLaunching] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -665,6 +667,19 @@ function Wizard({
       .then((d) => { if (d?.models) setOrModels(d.models); })
       .catch(() => {});
   }, [hasPremium]);
+
+  // Click outside to close delay popover
+  useEffect(() => {
+    if (openDelayPopoverIdx === null) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-delay-popover]")) {
+        setOpenDelayPopoverIdx(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDelayPopoverIdx]);
 
   // In add-contacts mode, auto-select the active run's list so the user only picks contacts.
   useEffect(() => {
@@ -1456,15 +1471,139 @@ function Wizard({
                       className={`transition-all duration-150 ${isDropTarget ? "scale-[1.01]" : ""}`}
                     >
                       {!isFirst && (
-                        <div className="flex items-center gap-2 py-1 pl-3">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="w-px h-2 bg-base-300/60" />
-                            <RiTimeLine size={11} className="text-base-content/30" />
-                            <div className="w-px h-2 bg-base-300/60" />
+                        <div
+                          className="flex items-center gap-2 py-1.5 pl-3 select-none"
+                          onClick={(e) => e.stopPropagation()}
+                          data-delay-popover
+                        >
+                          <div className="flex flex-col items-center gap-0.5 shrink-0">
+                            <div className="w-px h-2.5 bg-gray-200 dark:bg-gray-700" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand-400/60" />
+                            <div className="w-px h-2.5 bg-gray-200 dark:bg-gray-700" />
                           </div>
-                          <span className="text-xs text-base-content/30">
-                            {ws.delayDaysBefore > 0 ? t("campaignWizard.steps.waitDays", { days: ws.delayDaysBefore }) : t("campaignWizard.steps.immediately")}
-                          </span>
+
+                          <div className="relative">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xs text-xs hover:border-brand-500/40 transition-all">
+                              <RiTimeLine size={12} className="text-brand-500 shrink-0" />
+
+                              {/* Botón "-" para decrementar */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStep(idx, { delayDaysBefore: Math.max(0, ws.delayDaysBefore - 1) });
+                                }}
+                                disabled={ws.delayDaysBefore <= 0}
+                                className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+                                title="Restar 1 día"
+                              >
+                                <RiSubtractLine size={10} />
+                              </button>
+
+                              {/* Texto editable / selector con indicador de dropdown */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDelayPopoverIdx(openDelayPopoverIdx === idx ? null : idx);
+                                }}
+                                className="font-medium text-gray-700 dark:text-gray-200 hover:text-brand-500 transition-colors flex items-center gap-1 px-1 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700/60 cursor-pointer"
+                                title="Seleccionar días de espera"
+                              >
+                                <span>
+                                  {ws.delayDaysBefore > 0
+                                    ? t("campaignWizard.steps.waitDays", { days: ws.delayDaysBefore })
+                                    : t("campaignWizard.steps.immediately")}
+                                </span>
+                                <RiArrowDownSLine size={12} className="text-gray-400" />
+                              </button>
+
+                              {/* Botón "+" para incrementar fuera del card */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStep(idx, { delayDaysBefore: ws.delayDaysBefore + 1 });
+                                }}
+                                className="w-5 h-5 rounded-full flex items-center justify-center bg-brand-50 text-brand-600 hover:bg-brand-500 hover:text-white dark:bg-brand-900/40 dark:text-brand-300 dark:hover:bg-brand-600 transition-all font-bold shadow-2xs cursor-pointer"
+                                title="Sumar 1 día (+1d)"
+                              >
+                                <RiAddLine size={12} />
+                              </button>
+                            </div>
+
+                            {/* Popover desplegable para elegir presets rápidos o ingresar días personalizados */}
+                            {openDelayPopoverIdx === idx && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-0 top-full mt-1.5 z-40 w-64 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-100"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+                                    <RiTimeLine size={13} className="text-brand-500" />
+                                    Tiempo de espera
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenDelayPopoverIdx(null)}
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded cursor-pointer"
+                                  >
+                                    <RiCloseLine size={14} />
+                                  </button>
+                                </div>
+
+                                {/* Presets rápidos */}
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {[
+                                    { label: "0d (Inmed.)", days: 0 },
+                                    { label: "1 día", days: 1 },
+                                    { label: "2 días", days: 2 },
+                                    { label: "3 días", days: 3 },
+                                    { label: "5 días", days: 5 },
+                                    { label: "7 días", days: 7 },
+                                  ].map(({ label, days }) => {
+                                    const active = ws.delayDaysBefore === days;
+                                    return (
+                                      <button
+                                        key={days}
+                                        type="button"
+                                        onClick={() => {
+                                          updateStep(idx, { delayDaysBefore: days });
+                                          setOpenDelayPopoverIdx(null);
+                                        }}
+                                        className={`text-xs py-1 px-1.5 rounded-lg border font-medium transition-colors text-center cursor-pointer ${
+                                          active
+                                            ? "bg-brand-500 text-white border-brand-500 shadow-2xs"
+                                            : "bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-brand-500/50 hover:bg-brand-50/50 dark:hover:bg-brand-900/20"
+                                        }`}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Input manual con stepper */}
+                                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
+                                  <span className="text-[11px] text-gray-400">Personalizado:</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={90}
+                                      value={ws.delayDaysBefore}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        updateStep(idx, { delayDaysBefore: val });
+                                      }}
+                                      className="w-14 px-2 py-0.5 text-xs text-center border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
+                                    />
+                                    <span className="text-xs text-gray-500">días</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                       <div
@@ -2115,15 +2254,32 @@ function Wizard({
                 <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-800">
                   <RiTimeLine size={14} className="text-base-content/30 shrink-0" />
                   <span className="text-sm text-base-content/50">{t("campaignWizard.config.waitBefore")}</span>
-                  <div className="flex items-center gap-2 ml-auto">
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => updateStep(idx, { delayDaysBefore: Math.max(0, ws.delayDaysBefore - 1) })}
+                      disabled={ws.delayDaysBefore <= 0}
+                      className="w-6 h-6 rounded-md flex items-center justify-center border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-25 text-xs text-gray-500 cursor-pointer"
+                      title="Restar 1 día"
+                    >
+                      <RiSubtractLine size={12} />
+                    </button>
                     <input
                       type="number"
                       min={0}
-                      className="input input-xs input-bordered w-16 bg-base-300/50 text-xs text-center"
+                      className="input input-xs input-bordered w-14 bg-base-300/50 text-xs text-center"
                       value={ws.delayDaysBefore}
-                      onChange={(e) => updateStep(idx, { delayDaysBefore: Number(e.target.value) })}
+                      onChange={(e) => updateStep(idx, { delayDaysBefore: Math.max(0, Number(e.target.value) || 0) })}
                     />
-                    <span className="text-xs text-base-content/40">{t("campaignWizard.config.days")}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateStep(idx, { delayDaysBefore: ws.delayDaysBefore + 1 })}
+                      className="w-6 h-6 rounded-md flex items-center justify-center border border-brand-200 dark:border-brand-800 bg-brand-50 text-brand-600 hover:bg-brand-500 hover:text-white dark:bg-brand-900/30 dark:text-brand-300 text-xs font-bold cursor-pointer"
+                      title="Sumar 1 día"
+                    >
+                      <RiAddLine size={12} />
+                    </button>
+                    <span className="text-xs text-base-content/40 ml-1">{t("campaignWizard.config.days")}</span>
                   </div>
                 </div>
 
