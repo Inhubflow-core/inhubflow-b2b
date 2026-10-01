@@ -1952,42 +1952,46 @@ export default function SignalsPage({
                         {lead.headline} {lead.location ? `• ${lead.location}` : ""}
                       </p>
 
-                      {lead.signal_snippet && (
-                        <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200">
-                          <span className="font-bold">Contexto de la Señal: </span>
-                          {lead.signal_snippet}
-                        </div>
-                      )}
-
-                      {lead.icebreaker_preview && (
-                        <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-bold text-brand-600 dark:text-brand-400">Mensaje personalizado sugerido</span>
-                            {lead.status === "pending" && editingLeadId !== lead.id && (
-                              <button
-                                type="button"
-                                onClick={() => { setEditingLeadId(lead.id); setEditingDraft(lead.icebreaker_preview || ""); }}
-                                className="text-xs text-brand-600 hover:underline"
-                              >
-                                Editar antes de aprobar
-                              </button>
-                            )}
-                          </div>
-                          {editingLeadId === lead.id ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={editingDraft}
-                                onChange={(event) => setEditingDraft(event.target.value)}
-                                rows={4}
-                                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-900"
-                              />
-                              <div className="flex gap-2 justify-end">
-                                <button type="button" onClick={() => setEditingLeadId(null)} className="px-2 py-1 text-gray-500">Cancelar</button>
-                                <button type="button" onClick={() => handleSaveLeadDraft(lead.id)} className="px-3 py-1 rounded-lg bg-brand-500 text-white">Guardar</button>
-                              </div>
+                      {(lead.signal_snippet || lead.icebreaker_preview) && (
+                        <div className="flex flex-col md:flex-row gap-2.5">
+                          {lead.signal_snippet && (
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 md:flex-1 min-w-0">
+                              <span className="font-bold">Contexto de la Señal: </span>
+                              {lead.signal_snippet}
                             </div>
-                          ) : (
-                            <p>“{lead.icebreaker_preview}”</p>
+                          )}
+
+                          {lead.icebreaker_preview && (
+                            <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 space-y-2 md:flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-bold text-brand-600 dark:text-brand-400">Mensaje personalizado sugerido</span>
+                                {lead.status === "pending" && editingLeadId !== lead.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setEditingLeadId(lead.id); setEditingDraft(lead.icebreaker_preview || ""); }}
+                                    className="text-xs text-brand-600 hover:underline whitespace-nowrap"
+                                  >
+                                    Editar antes de aprobar
+                                  </button>
+                                )}
+                              </div>
+                              {editingLeadId === lead.id ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    value={editingDraft}
+                                    onChange={(event) => setEditingDraft(event.target.value)}
+                                    rows={4}
+                                    className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-900"
+                                  />
+                                  <div className="flex gap-2 justify-end">
+                                    <button type="button" onClick={() => setEditingLeadId(null)} className="px-2 py-1 text-gray-500">Cancelar</button>
+                                    <button type="button" onClick={() => handleSaveLeadDraft(lead.id)} className="px-3 py-1 rounded-lg bg-brand-500 text-white">Guardar</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p>"{lead.icebreaker_preview}"</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
