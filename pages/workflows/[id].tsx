@@ -167,7 +167,7 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
   visit: <RiEyeLine size={15} />,
   follow: <RiUserFollowLine size={15} />,
   like_comment: <RiThumbUpLine size={15} />,
-  connect: <RiLinkedinBoxLine size={15} />,
+  connect: <RiUserFollowLine size={15} />,
   message: <RiMessage2Line size={15} />,
   sales_inmail: <RiSendPlaneLine size={15} />,
   delay: <RiTimeLine size={15} />,
@@ -177,9 +177,9 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 // Static base labels fallback
 const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
-  follow: "Follow Profile",
+  follow: "Follow & Connect",
   like_comment: "Like + Comment",
-  connect: "Connect on LinkedIn",
+  connect: "Follow & Connect",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
   email: "Cold Email",
@@ -1603,16 +1603,14 @@ function Wizard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-base-content/30 mr-1">{t("campaignWizard.steps.addStep")}</span>
                       {track === "linkedin"
-                        ? (["visit", "follow", "like_comment", "connect", "message", "sales_inmail"] as const)
+                        ? (["visit", "like_comment", "connect", "message", "sales_inmail"] as const)
                             // Sales Nav InMail is a premium feature — hide from the picker in the public build.
                             .filter((type) => type !== "sales_inmail" || hasPremium)
                             .map((type) => {
-                            const disabled = (type === "connect" && hasConnect) || (type === "follow" && hasFollow) || (type === "like_comment" && hasLikeComment);
+                            const disabled = (type === "connect" && (hasConnect || hasFollow)) || (type === "like_comment" && hasLikeComment);
                             const title = disabled
                               ? (type === "connect"
                                   ? t("campaignWizard.steps.connectOnce")
-                                  : type === "follow"
-                                  ? (t("campaignWizard.steps.followOnce") || "Solo se puede agregar un paso de Seguir por campaña")
                                   : (t("campaignWizard.steps.likeCommentOnce") || "Solo se puede agregar un paso de Like + Comentario por campaña"))
                               : undefined;
                             return (
@@ -2175,11 +2173,18 @@ function Wizard({
                   </div>
                 )}
 
-                {ws.type === "connect" && (
+                {(ws.type === "connect" || ws.type === "follow") && (
                   <div className="space-y-4">
-                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary/90 flex items-start gap-2">
-                      <span className="text-base shrink-0 leading-none">💡</span>
-                      <span>{t("campaignWizard.config.connectAutoFollowTip") || "Al solicitar la conexión, LinkedIn activa automáticamente el seguimiento mutuo del perfil para nutrir el feed y la relevancia del contacto."}</span>
+                    <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary/90 flex items-start gap-2.5">
+                      <span className="text-base shrink-0 leading-none">🤝</span>
+                      <div className="space-y-1">
+                        <p className="font-semibold text-primary">
+                          Acción 2-en-1: Seguir Perfil + Solicitar Conexión
+                        </p>
+                        <p className="text-xs text-base-content/70 leading-relaxed">
+                          {t("campaignWizard.config.connectAutoFollowTip") || "Al solicitar la conexión, LinkedIn activa automáticamente el seguimiento mutuo del perfil para nutrir el feed y la relevancia del contacto."}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <input
