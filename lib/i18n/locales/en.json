@@ -524,7 +524,7 @@
     "steps": {
       "visit": "Visit Profile",
       "likeComment": "Like + Comment",
-      "connect": "Follow & Connect",
+      "connect": "Follow + Connect",
       "message": "LinkedIn Message",
       "salesInmail": "Sales Nav InMail",
       "email": "Cold Email",
@@ -533,7 +533,7 @@
       "messageFollowUp": "LinkedIn Follow-up #{num}",
       "linkedinTitle": "LinkedIn steps",
       "emailTitle": "Email steps",
-      "linkedinDesc": "Profile visit, post engagement (Like + Comment), follow & connect, and follow-up messages. Run in sequence.",
+      "linkedinDesc": "Profile visit, post engagement (Like + Comment), follow + connect, and follow-up messages. Run in sequence.",
       "emailDesc": "Cold email and follow-ups. Run in sequence, independently of the LinkedIn track.",
       "parallelNote": " · Both tracks execute in parallel.",
       "noLinkedinSteps": "No LinkedIn steps yet. Add your first step below.",
@@ -546,10 +546,10 @@
       "aiWritesInMail": "AI writes subject + body",
       "noSubjectRequired": "No subject — required",
       "noSubject": "No subject",
-      "connectOnce": "Follow & Connect step can only be added once",
+      "connectOnce": "Follow + Connect step can only be added once",
       "likeCommentOnce": "Like + Comment step can only be added once",
-      "follow": "Follow & Connect",
-      "followOnce": "Follow & Connect step can only be added once"
+      "follow": "Follow + Connect",
+      "followOnce": "Follow + Connect step can only be added once"
     },
     "prospects": {
       "title": "Choose your prospects",

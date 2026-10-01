@@ -165,9 +165,9 @@ interface EmailAccount {
 
 const STEP_ICONS: Record<string, React.ReactNode> = {
   visit: <RiEyeLine size={15} />,
-  follow: <RiUserFollowLine size={15} />,
+  follow: <RiLinkedinBoxLine size={15} />,
   like_comment: <RiThumbUpLine size={15} />,
-  connect: <RiUserFollowLine size={15} />,
+  connect: <RiLinkedinBoxLine size={15} />,
   message: <RiMessage2Line size={15} />,
   sales_inmail: <RiSendPlaneLine size={15} />,
   delay: <RiTimeLine size={15} />,
@@ -177,9 +177,9 @@ const STEP_ICONS: Record<string, React.ReactNode> = {
 // Static base labels fallback
 const STEP_LABELS: Record<string, string> = {
   visit: "Visit Profile",
-  follow: "Follow & Connect",
+  follow: "Follow + Connect",
   like_comment: "Like + Comment",
-  connect: "Follow & Connect",
+  connect: "Follow + Connect",
   message: "LinkedIn Message",
   sales_inmail: "Sales Nav InMail",
   email: "Cold Email",
@@ -1616,14 +1616,14 @@ function Wizard({
                             return (
                               <button key={type} onClick={() => !disabled && addWizardStep(type)} title={title}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs ${disabled ? "border-base-300/20 bg-base-200/40 text-base-content/20 cursor-not-allowed" : "border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary/70 hover:text-primary"}`}>
-                                <RiAddLine size={11} /> {getStepLabel(type, t)}
+                                <RiLinkedinBoxLine size={14} className={disabled ? "text-base-content/20 shrink-0" : "text-[#0a66c2] dark:text-[#38bdf8] shrink-0"} /> {getStepLabel(type, t)}
                               </button>
                             );
                           })
                         : (
                             <button onClick={() => addWizardStep("email")}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-xs border-warning/20 bg-warning/5 hover:bg-warning/10 text-warning/70 hover:text-warning">
-                              <RiAddLine size={11} /> {trackSteps.length === 0 ? t("campaignWizard.steps.coldEmail") : t("campaignWizard.steps.followUpNumber", { num: trackSteps.length + 1 })}
+                              <RiMailLine size={13} className="text-warning shrink-0" /> {trackSteps.length === 0 ? t("campaignWizard.steps.coldEmail") : t("campaignWizard.steps.followUpNumber", { num: trackSteps.length + 1 })}
                             </button>
                           )}
                     </div>
@@ -2179,7 +2179,7 @@ function Wizard({
                       <span className="text-base shrink-0 leading-none">🤝</span>
                       <div className="space-y-1">
                         <p className="font-semibold text-primary">
-                          Acción 2-en-1: Seguir Perfil + Solicitar Conexión
+                          Acción 2-en-1: Seguir + Conectar
                         </p>
                         <p className="text-xs text-base-content/70 leading-relaxed">
                           {t("campaignWizard.config.connectAutoFollowTip") || "Al solicitar la conexión, LinkedIn activa automáticamente el seguimiento mutuo del perfil para nutrir el feed y la relevancia del contacto."}

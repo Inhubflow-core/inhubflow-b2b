@@ -524,7 +524,7 @@
     "steps": {
       "visit": "Visitar Perfil",
       "likeComment": "Curtir + Comentar",
-      "connect": "Seguir e Conectar",
+      "connect": "Seguir + Conectar",
       "message": "Mensagem do LinkedIn",
       "salesInmail": "InMail do Sales Nav",
       "email": "Cold Email",
@@ -533,7 +533,7 @@
       "messageFollowUp": "Acompanhamento LinkedIn #{num}",
       "linkedinTitle": "Passos do LinkedIn",
       "emailTitle": "Passos de Email",
-      "linkedinDesc": "Visita ao perfil, interação com publicações (Curtir + Comentar), seguir e conectar, e mensagens. Executados em sequência.",
+      "linkedinDesc": "Visita ao perfil, interação com publicações (Curtir + Comentar), seguir + conectar, e mensagens. Executados em sequência.",
       "emailDesc": "Cold email e acompanhamentos. Executados em sequência, independentemente do LinkedIn.",
       "parallelNote": " · Ambos os canais são executados em paralelo.",
       "noLinkedinSteps": "Nenhum passo do LinkedIn ainda. Adicione o primeiro abaixo.",
@@ -546,10 +546,10 @@
       "aiWritesInMail": "A IA escreve assunto + corpo",
       "noSubjectRequired": "Sem assunto — obrigatório",
       "noSubject": "Sem assunto",
-      "connectOnce": "O passo de Seguir e Conectar só pode ser adicionado uma vez",
+      "connectOnce": "O passo de Seguir + Conectar só pode ser adicionado uma vez",
       "likeCommentOnce": "O passo de Curtir + Comentar só pode ser adicionado uma vez",
-      "follow": "Seguir e Conectar",
-      "followOnce": "O passo de Seguir e Conectar só pode ser adicionado uma vez"
+      "follow": "Seguir + Conectar",
+      "followOnce": "O passo de Seguir + Conectar só pode ser adicionado uma vez"
     },
     "prospects": {
       "title": "Escolha seus leads",
