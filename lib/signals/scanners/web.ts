@@ -400,9 +400,41 @@ async function findPeople(
   } catch {
     // X-Ray fallback below still verifies every candidate through LinkedIn profile retrieval.
   }
+  const locCode = locationCode(context.icp);
+  const lang = searchLanguage(locCode);
+  const locationFilter = context.icp.locations?.length ? `"${context.icp.locations[0]}"` : "";
+
+  // Si la noticia nombró fundadores y la API directa no los halló, buscarlos por X-Ray prioritario
+  if (candidates.length === 0 && namedFounders.length > 0 && (!budget || budget.searchesUsed < budget.maxSearches)) {
+    for (const founderName of namedFounders.slice(0, 2)) {
+      if (budget && budget.searchesUsed >= budget.maxSearches) break;
+      if (budget) {
+        budget.searchesUsed++;
+        await sleep(SERPER_COURTESY_DELAY_MS);
+      }
+      try {
+        const founderXray = await web.search({
+          query: `site:linkedin.com/in/ "${founderName}" "${company}"`,
+          country: locCode,
+          language: lang,
+          limit: 3,
+        });
+        for (const result of founderXray.items) {
+          const url = new URL(result.link);
+          const match = url.pathname.match(/\/in\/([^/]+)/i);
+          if (!match) continue;
+          const rawName = result.title.replace(/\s*[-|].*$/, "").trim();
+          if (rawName && !candidates.some((c) => c.url.includes(match[1]))) {
+            candidates.push({ url: `https://www.linkedin.com/in/${match[1]}/`, name: rawName, company });
+          }
+        }
+      } catch {}
+    }
+  }
+
   if (candidates.length > 0) return candidates;
 
-  // Paso 3: Fallback X-Ray para la empresa y socios
+  // Paso 3: Fallback X-Ray para la empresa y socios en la ubicación solicitada
   if (budget && budget.searchesUsed >= budget.maxSearches) {
     return candidates;
   }
@@ -411,14 +443,29 @@ async function findPeople(
     await sleep(SERPER_COURTESY_DELAY_MS);
   }
 
-  const locCode = locationCode(context.icp);
-  const lang = searchLanguage(locCode);
-  const xray = await web.search({
-    query: `site:linkedin.com/in/ (${titles.map((title) => `"${title}"`).join(" OR ")}) "${company}"`,
+  const titleTokens = titles.map((title) => `"${title}"`).join(" OR ");
+  let xray = await web.search({
+    query: locationFilter
+      ? `site:linkedin.com/in/ (${titleTokens}) "${company}" ${locationFilter}`
+      : `site:linkedin.com/in/ (${titleTokens}) "${company}"`,
     country: locCode,
     language: lang,
     limit: Math.min(10, context.limit),
   });
+
+  if (xray.items.length === 0 && locationFilter && (!budget || budget.searchesUsed < budget.maxSearches)) {
+    if (budget) {
+      budget.searchesUsed++;
+      await sleep(SERPER_COURTESY_DELAY_MS);
+    }
+    xray = await web.search({
+      query: `site:linkedin.com/in/ (${titleTokens}) "${company}"`,
+      country: locCode,
+      language: lang,
+      limit: Math.min(10, context.limit),
+    });
+  }
+
   for (const result of xray.items) {
     try {
       const url = new URL(result.link);

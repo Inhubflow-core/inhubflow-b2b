@@ -365,16 +365,20 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
   }
 
   // 3. Ubicación: verificar si no es Global/Todos
-  if (icp.locations?.length && lead.location) {
+  if (icp.locations?.length) {
     const isGlobal = icp.locations.some((loc) => {
       const n = normalize(loc);
       return n === "global" || n === "todos" || n === "global / todos" || n === "all";
     });
     if (!isGlobal) {
       const expandedLocations = expandLocationCriteria(icp.locations);
-      const matchesLocation = containsAny(lead.location, expandedLocations);
-      if (!matchesLocation && !isDirectPostSignal && !isWebVerifiedSignal) {
-        return false;
+      if (lead.location) {
+        const matchesLocation = containsAny(lead.location, expandedLocations);
+        if (!matchesLocation && !isDirectPostSignal) {
+          return false;
+        }
+      } else {
+        if (!isWebVerifiedSignal) return false;
       }
     }
   }
