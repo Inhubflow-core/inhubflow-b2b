@@ -63,25 +63,42 @@ function relativeDate(value: string | null, nowMs: number): string | null {
   return factors[unit] ? new Date(nowMs - amount * factors[unit]).toISOString() : null;
 }
 
+const INVALID_COMPANY_NAMES = new Set([
+  "spain", "espana", "españa", "chile", "mexico", "mexicana", "mexicano",
+  "colombia", "colombiana", "colombiano", "argentina", "argentino",
+  "peru", "peruana", "peruano", "brasil", "brazil", "usa", "eeuu",
+  "estados unidos", "united states", "uk", "reino unido", "france", "francia",
+  "germany", "alemania", "startup", "startups", "fundador", "founder", "ceo"
+]);
+
 function cleanCompany(value: string): string | null {
   const cleaned = value
     .replace(/^(the|startup|empresa|la empresa)\s+/i, "")
     .replace(/[,:|–—-].*$/, "")
     .replace(/\s+/g, " ")
     .trim();
-  return cleaned.length >= 2 && cleaned.length <= 100 ? cleaned : null;
+  if (cleaned.length < 2 || cleaned.length > 100) return null;
+  const norm = normalize(cleaned);
+  if (INVALID_COMPANY_NAMES.has(norm)) return null;
+  if (/^(?:spain|españa|chile|mexico|colombia|argentina|peru|brasil)[-\s]+based/i.test(value)) return null;
+  return cleaned;
 }
 
 function extractCompany(result: WebSearchResult, type: string): string | null {
-  const corpus = [result.snippet || "", result.title];
+  const corpus = [result.title, result.snippet || ""];
   const verbs = type === "acquisition_event"
     ? "acquires|acquired|to acquire|compra|adquiere|adquirió"
     : type === "industry_event"
       ? "speaks at|attends|participa en|presenta en|asiste a"
       : "has raised|raises|raised|secures|secured|closes|closed|lands|announces|levantó|levanta|recaudó|recauda|obtuvo|cierra|cerró|anuncia";
-  const pattern = new RegExp(`^(.{2,100}?)\\s+(?:${verbs})\\b`, "i");
-  for (const text of corpus) {
-    const match = text.trim().match(pattern);
+  const pattern = new RegExp(`(?:^|\\b)(.{2,80}?)\\s+(?:${verbs})\\b`, "i");
+  for (const rawText of corpus) {
+    const text = rawText
+      .replace(/^(?:economía|noticias|actualidad|news|breaking|reportaje|entrevista)[\s.:–-]+/i, "")
+      .replace(/^[A-ZÁÉÍÓÚÑa-záéíóúñ]+'s\s+/i, "")
+      .replace(/^(?:[a-zA-ZáéíóúñÁÉÍÓÚÑ]+[-\s]+based\s+)?(?:la\s+)?(?:startup|empresa|compañía)\s+(?:española\s+|chilena\s+|mexicana\s+|colombiana\s+)?/i, "")
+      .trim();
+    const match = text.match(pattern);
     if (match?.[1]) {
       const candidate = cleanCompany(match[1].replace(/^.*?\bstartup\s+/i, ""));
       if (candidate) return candidate;
@@ -243,26 +260,31 @@ function webQuery(context: SignalScannerContext): string {
     acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió)',
     industry_event: '(conference OR summit OR event OR conferencia OR feria)',
     company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión)',
-    keyword_intent: context.keywords.length ? `(${context.keywords.map((keyword) => `"${keyword}"`).join(" OR ")})` : "",
   };
 
   const activeKinds = (context.icp.event_kinds && context.icp.event_kinds.length > 0)
     ? context.icp.event_kinds
     : [context.monitor.type];
 
-  const matchedTerms = activeKinds
+  const matchedEventTerms = activeKinds
     .map((kind) => terms[kind])
     .filter(Boolean);
 
-  if (context.keywords.length && terms.keyword_intent && !matchedTerms.includes(terms.keyword_intent)) {
-    matchedTerms.push(terms.keyword_intent);
-  }
+  const eventClause = matchedEventTerms.length > 1
+    ? `(${matchedEventTerms.join(" OR ")})`
+    : (matchedEventTerms[0] || "");
 
-  const queryTerms = matchedTerms.length > 1
-    ? `(${matchedTerms.join(" OR ")})`
-    : (matchedTerms[0] || context.keywords.join(" OR "));
+  // Domain/niche keywords (e.g. SaaS, Inteligencia Artificial, Fintech) are combined with AND against the event clause
+  const domainKeywords = (context.keywords || []).filter((k) => {
+    const norm = normalize(k);
+    return !/ronda|inversion|inversión|funding|capital|semilla|serie a|acquisition|adquisicion|adquisición|evento|noticia|anuncio/i.test(norm);
+  });
 
-  return [queryTerms, titles, location].filter(Boolean).join(" ");
+  const keywordClause = domainKeywords.length > 0
+    ? `(${domainKeywords.map((k) => (k.includes(" ") ? `"${k}"` : k)).join(" OR ")})`
+    : "";
+
+  return [eventClause, keywordClause, titles, location].filter(Boolean).join(" ");
 }
 
 const MAX_SERPER_SEARCHES_PER_SCAN = 8;

@@ -170,14 +170,84 @@ export function expandTitleCriteria(titles: string[]): string[] {
   return Array.from(result);
 }
 
+const LOCATION_SYNONYMS: Record<string, string[]> = {
+  espana: [
+    "espana", "españa", "spain", "madrid", "barcelona", "valencia", "sevilla",
+    "malaga", "málaga", "bilbao", "zaragoza", "alicante", "cataluna", "cataluña", "catalonia",
+    "andalucia", "andalucía", "pais vasco", "país vasco", "galicia", "canarias",
+    "baleares", "espanya", "san sebastian", "san sebastián", "vigo", "la coruña", "a coruña"
+  ],
+  mexico: [
+    "mexico", "méxico", "cdmx", "ciudad de mexico", "ciudad de méxico", "guadalajara",
+    "monterrey", "puebla", "queretaro", "querétaro", "tijuana", "merida", "mérida",
+    "jalisco", "nuevo leon", "nuevo león"
+  ],
+  colombia: [
+    "colombia", "bogota", "bogotá", "medellin", "medellín", "cali", "barranquilla",
+    "cartagena", "antioquia", "cundinamarca"
+  ],
+  chile: [
+    "chile", "santiago", "valparaiso", "valparaíso", "concepcion", "concepción",
+    "las condes", "providencia"
+  ],
+  argentina: [
+    "argentina", "buenos aires", "caba", "cordoba", "córdoba", "rosario", "mendoza",
+    "la plata", "santa fe"
+  ],
+  peru: [
+    "peru", "perú", "lima", "arequipa", "trujillo", "cusco"
+  ],
+  brasil: [
+    "brasil", "brazil", "sao paulo", "são paulo", "rio de janeiro", "curitiba",
+    "florianopolis", "florianópolis", "belo horizonte", "porto alegre"
+  ],
+  usa: [
+    "usa", "united states", "eeuu", "estados unidos", "california", "new york",
+    "texas", "florida", "san francisco", "sf bay area", "austin", "miami", "seattle",
+    "boston", "los angeles", "silicon valley"
+  ],
+  uk: [
+    "uk", "united kingdom", "reino unido", "london", "londres", "manchester", "cambridge", "oxford"
+  ],
+  francia: [
+    "france", "francia", "paris", "parís", "lyon"
+  ],
+  alemania: [
+    "germany", "alemania", "deutschland", "berlin", "berlín", "munich", "múnich", "frankfurt", "hamburg"
+  ],
+};
+
+export function expandLocationCriteria(locations: string[]): string[] {
+  const result = new Set<string>();
+  for (const rawLoc of locations) {
+    const norm = normalize(rawLoc);
+    if (!norm) continue;
+    result.add(rawLoc);
+    result.add(norm);
+
+    for (const [key, synonyms] of Object.entries(LOCATION_SYNONYMS)) {
+      const matchesKey = norm.includes(key) || key.includes(norm);
+      const matchesSynonym = synonyms.some((syn) => norm.includes(normalize(syn)) || normalize(syn).includes(norm));
+      if (matchesKey || matchesSynonym) {
+        for (const s of synonyms) {
+          result.add(s);
+          result.add(normalize(s));
+        }
+      }
+    }
+  }
+  return Array.from(result);
+}
+
 export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilters, nowMs = Date.now()): SignalScore {
   const titleConfigured = Boolean(icp.titles?.length);
   const locationConfigured = Boolean(icp.locations?.length);
   const sizeConfigured = Boolean(icp.company_sizes?.length);
 
   const expandedTitles = titleConfigured ? expandTitleCriteria(icp.titles || []) : [];
+  const expandedLocations = locationConfigured ? expandLocationCriteria(icp.locations || []) : [];
   const titleMatch = titleConfigured ? containsAny(lead.headline, expandedTitles) : null;
-  const locationMatch = locationConfigured ? containsAny(lead.location, icp.locations || []) : null;
+  const locationMatch = locationConfigured ? containsAny(lead.location, expandedLocations) : null;
   const sizeText = lead.companySize == null ? "" : String(lead.companySize);
   const companySizeMatch = sizeConfigured && sizeText ? containsAny(sizeText, icp.company_sizes || []) : sizeConfigured ? null : null;
   const occurredAt = lead.evidence.occurredAt ? Date.parse(lead.evidence.occurredAt) : Number.NaN;
@@ -214,6 +284,13 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
     "competitor_reactions",
   ].includes(lead.signalType);
 
+  const isWebVerifiedSignal = [
+    "funding_round",
+    "acquisition_event",
+    "company_news",
+    "industry_event",
+  ].includes(lead.signalType);
+
   // 2. Cargos: con expansión semántica inteligente (inglés/español)
   if (icp.titles?.length && lead.headline) {
     const expandedTitles = expandTitleCriteria(icp.titles);
@@ -229,8 +306,12 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
       const n = normalize(loc);
       return n === "global" || n === "todos" || n === "global / todos" || n === "all";
     });
-    if (!isGlobal && !containsAny(lead.location, icp.locations)) {
-      if (!isDirectPostSignal) return false;
+    if (!isGlobal) {
+      const expandedLocations = expandLocationCriteria(icp.locations);
+      const matchesLocation = containsAny(lead.location, expandedLocations);
+      if (!matchesLocation && !isDirectPostSignal && !isWebVerifiedSignal) {
+        return false;
+      }
     }
   }
 

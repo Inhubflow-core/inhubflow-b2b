@@ -55,12 +55,15 @@ export async function resolveUnipileAccount(
   }
   const usable = (remoteAccounts.items || []).filter(isUsableLinkedInAccount);
 
-  // If local has a name, check if there is an exact name match in Unipile
-  // to auto-correct any mismatch (e.g. mapping "Roberto OrSe" to the actual "Roberto OrSe" Unipile account)
+  // If local has a name, check if there is an exact or fuzzy name match in Unipile
+  // to auto-correct any mismatch (e.g. mapping "Roberto OrSe" to "RobertoOrse Agencia")
   if (local.name && usable.length > 0) {
-    const nameMatch = usable.find(
-      (a) => a.name?.trim().toLowerCase() === local.name?.trim().toLowerCase()
-    );
+    const localNorm = local.name.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const nameMatch = usable.find((a) => {
+      const aNorm = (a.name || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      return aNorm === localNorm || aNorm.includes(localNorm) || localNorm.includes(aNorm);
+    }) || (usable.length === 1 ? usable[0] : undefined);
+
     if (nameMatch && nameMatch.id !== local.unipile_account_id) {
       console.log(`[resolveUnipileAccount] Auto-correcting Unipile account ID for "${local.name}" from ${local.unipile_account_id} to ${nameMatch.id}`);
       db.prepare("UPDATE accounts SET unipile_account_id = ?, unipile_status = ?, is_authenticated = 1 WHERE id = ?")
@@ -74,18 +77,38 @@ export async function resolveUnipileAccount(
   }
 
   if (local.unipile_account_id) {
-    const remote = await client.getAccount(local.unipile_account_id);
-    const status = accountStatus(remote);
-    db.prepare("UPDATE accounts SET unipile_status = ?, is_authenticated = ? WHERE id = ?")
-      .run(status || "UNKNOWN", isUsableLinkedInAccount(remote) ? 1 : 0, local.id);
-    if (!isUsableLinkedInAccount(remote)) {
-      throw new Error(`La cuenta de LinkedIn no está lista (estado ${status || "UNKNOWN"})`);
+    try {
+      const remote = await client.getAccount(local.unipile_account_id);
+      const status = accountStatus(remote);
+      db.prepare("UPDATE accounts SET unipile_status = ?, is_authenticated = ? WHERE id = ?")
+        .run(status || "UNKNOWN", isUsableLinkedInAccount(remote) ? 1 : 0, local.id);
+      if (!isUsableLinkedInAccount(remote)) {
+        throw new Error(`La cuenta de LinkedIn no está lista (estado ${status || "UNKNOWN"})`);
+      }
+      return {
+        localAccountId: local.id,
+        unipileAccountId: local.unipile_account_id,
+        account: remote,
+      };
+    } catch (err) {
+      // If direct ID lookup fails (e.g. 404 after cluster migration or new trial), fallback to usable remote account
+      if (usable.length > 0) {
+        const localNorm = (local.name || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const fallback = usable.find((a) => {
+          const aNorm = (a.name || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+          return aNorm.includes(localNorm) || localNorm.includes(aNorm);
+        }) || usable[0];
+        console.warn(`[resolveUnipileAccount] Stored ID ${local.unipile_account_id} failed; recovered with active account ${fallback.id} (${fallback.name})`);
+        db.prepare("UPDATE accounts SET unipile_account_id = ?, unipile_status = ?, is_authenticated = 1 WHERE id = ?")
+          .run(fallback.id, accountStatus(fallback), local.id);
+        return {
+          localAccountId: local.id,
+          unipileAccountId: fallback.id,
+          account: fallback,
+        };
+      }
+      throw err;
     }
-    return {
-      localAccountId: local.id,
-      unipileAccountId: local.unipile_account_id,
-      account: remote,
-    };
   }
 
   const mappedIds = new Set(
