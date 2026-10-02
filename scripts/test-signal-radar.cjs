@@ -27,7 +27,7 @@ const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/sc
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
-const { extractCompanyFromHeadline } = require("../lib/signals/scanners/scoring.ts");
+const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -104,6 +104,22 @@ function mockClient(overrides = {}) {
 }
 
 async function run() {
+  console.log("▶ El plan determinista cubre nichos y cargos multilingües");
+  {
+    const tests = [
+      ["Encuentra 10 Directores de Operaciones y Logística en empresas de E-commerce y Retail en México", ["Director de Operaciones"], ["México"], /e-commerce|retail|logística/i],
+      ["Encuentra 10 Directores de Recursos Humanos y People en empresas de tecnología en Chile", ["Head of People"], ["Chile"], /people|talento/i],
+      ["Encuentra 10 Fundadores y CEOs de startups de Inteligencia Artificial y Software B2B en Italia", ["CEO", "Founder"], ["Italia"], /inteligencia artificial|ai|saas/i],
+    ];
+    for (const [query, expectedTitles, expectedLocations, keywordPattern] of tests) {
+      const plan = deterministicSignalResearchPlan(query);
+      for (const title of expectedTitles) assert.ok(plan.titles.includes(title), `${query}: falta cargo ${title}`);
+      for (const location of expectedLocations) assert.ok(plan.locations.includes(location), `${query}: falta ubicación ${location}`);
+      assert.ok(plan.keywords.some((keyword) => keywordPattern.test(keyword)), `${query}: falta nicho`);
+      assert.equal(plan.resultLimit, 10);
+    }
+  }
+
   console.log("▶ Ask AI interpreta consultas claras incluso si Gemini está saturado");
   {
     const plan = deterministicSignalResearchPlan("Encuentra 10 CEOs que levantaron fondos de inversión");
@@ -398,6 +414,39 @@ async function run() {
     assert.ok(titles.includes("Co-Founder"), "Debe incluir Co-Founder");
     assert.ok(titles.includes("Founder"), "Debe incluir Founder");
     assert.ok(titles.includes("Socio Fundador"), "Debe incluir Socio Fundador");
+  }
+
+  console.log("▶ Validación estricta de país, alfabeto y variantes B2B");
+  {
+    // Daria Makarova (caso real del usuario: texto cirílico ruso con Global & Russia en Рускомтехнологии)
+    const dariaText = "С удовольствием сообщаю, что я начинаю работу в новой должности - Product Marketing Manager B2B | Global & Russia в компании Рускомтехнологии!";
+    const dariaHeadline = "Product Marketing Manager | B2B Tech | Product Launch | GTM-Strategy&Operational marketing";
+
+    // Debe ser rechazada si el país objetivo es Perú, España, México o cualquier país occidental
+    assert.equal(hasIncompatibleScript(dariaText, "Perú"), true, "Cirílico ruso debe ser incompatible con Perú");
+    assert.equal(hasIncompatibleScript(dariaText, "España"), true, "Cirílico ruso debe ser incompatible con España");
+    assert.equal(hasConflictingCountry(dariaText, dariaHeadline, "Perú"), true, "Rusia debe ser país en conflicto con Perú");
+
+    // Post legítimo peruano
+    const peruText = "Comparto las mejores estrategias de marketing b2b para el mercado de Lima y Perú";
+    const peruHeadline = "Gerente de Marketing B2B | Especialista en Crecimiento";
+    assert.equal(hasIncompatibleScript(peruText, "Perú"), false, "Texto en español debe ser compatible");
+    assert.equal(hasConflictingCountry(peruText, peruHeadline, "Perú"), false, "Mención de Lima/Perú no debe entrar en conflicto");
+
+    // Inversión de sintaxis B2B (b2b marketing <-> marketing b2b)
+    const variants1 = getB2bTermVariants("b2b marketing");
+    assert.ok(variants1.includes("b2b marketing"), "Debe incluir original");
+    assert.ok(variants1.includes("marketing b2b"), "Debe invertir a marketing b2b");
+
+    const variants2 = getB2bTermVariants("leads b2b");
+    assert.ok(variants2.includes("leads b2b"), "Debe incluir original");
+    assert.ok(variants2.includes("b2b leads"), "Debe invertir a b2b leads");
+
+    // Capitales/ciudades principales por país
+    assert.equal(getPrimaryCityForCountry("Perú"), "Lima");
+    assert.equal(getPrimaryCityForCountry("España"), "Madrid");
+    assert.equal(getPrimaryCityForCountry("México"), "CDMX");
+    assert.equal(getPrimaryCityForCountry("Colombia"), "Bogotá");
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

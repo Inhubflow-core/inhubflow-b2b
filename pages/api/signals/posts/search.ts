@@ -4,7 +4,18 @@ import { getDb } from "@/lib/db";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
 import { unipile } from "@/lib/unipile/client";
 import type { UnipileSearchPost } from "@/lib/unipile/types";
-import { expandLocationCriteria, expandTitleCriteria } from "@/lib/signals/scanners/scoring";
+import {
+  expandLocationCriteria,
+  expandTitleCriteria,
+  hasIncompatibleScript,
+  hasConflictingCountry,
+  getB2bTermVariants,
+  getPrimaryCityForCountry,
+  isSpanishCountry,
+  isPortugueseCountry,
+  hasSpanishLanguageIndicators,
+  hasPortugueseLanguageIndicators,
+} from "@/lib/signals/scanners/scoring";
 
 export interface DiscoveredPostItem {
   id: string;
@@ -45,59 +56,116 @@ function buildSearchQueries(keywords: string, competitor?: string, country?: str
     .map((t) => t.trim())
     .filter(Boolean);
 
-  let formattedKeywords = splitTerms.map(quoteTerm).join(" OR ") || quoteTerm(keywords);
-  const baseQuery = comp && formattedKeywords ? `${quoteTerm(comp)} ${formattedKeywords}` : (formattedKeywords || quoteTerm(comp));
-
-  const queries: string[] = [];
   const cNorm = (country || "").toLowerCase().trim();
   const hasCountry = Boolean(cNorm && cNorm !== "global / todos" && cNorm !== "global" && cNorm !== "todos");
+  const primaryCity = hasCountry ? getPrimaryCityForCountry(country || "") : null;
 
-  // 1. Si se especificó un país y la consulta no lo incluye, probar primero contextualizada con el país
-  if (hasCountry && !keywords.toLowerCase().includes(cNorm)) {
-    queries.push(`${baseQuery} ${country}`);
+  // Obtener variantes (ej: "b2b marketing" <-> "marketing b2b")
+  const allTermVariants: string[] = [];
+  const termsToProcess = splitTerms.length > 0 ? splitTerms : (keywords ? [keywords] : []);
+  for (const t of termsToProcess) {
+    if (!t) continue;
+    allTermVariants.push(...getB2bTermVariants(t));
+  }
+  const uniqueVariants = Array.from(new Set(allTermVariants.filter(Boolean)));
+
+  const queries: string[] = [];
+
+  // Si hay país objetivo definido:
+  if (hasCountry && country) {
+    // 1. Frases exactas con el país (ej: "marketing b2b" Perú, "b2b marketing" Perú)
+    for (const v of uniqueVariants) {
+      if (comp) {
+        queries.push(`${quoteTerm(comp)} ${quoteTerm(v)} ${country}`);
+      } else {
+        queries.push(`${quoteTerm(v)} ${country}`);
+      }
+    }
+
+    // 2. Frases exactas con la ciudad principal del país (ej: "marketing b2b" Lima, "b2b marketing" Lima)
+    if (primaryCity) {
+      for (const v of uniqueVariants) {
+        if (!comp) {
+          queries.push(`${quoteTerm(v)} ${primaryCity}`);
+        }
+      }
+    }
+
+    // 3. Búsqueda sin comillas con el país (para tolerancia semántica en LinkedIn)
+    for (const v of uniqueVariants) {
+      const unquoted = v.replace(/"/g, "").trim();
+      if (comp) {
+        queries.push(`${comp} ${unquoted} ${country}`);
+      } else {
+        queries.push(`${unquoted} ${country}`);
+      }
+    }
   }
 
-  // 2. Consulta estándar (con frases exactas entre comillas)
-  if (baseQuery) {
-    queries.push(baseQuery);
+  // 4. Frases exactas sin país (fallback estándar - se filtrará estrictamente por país/alfabeto a nivel post)
+  for (const v of uniqueVariants) {
+    if (comp) {
+      queries.push(`${quoteTerm(comp)} ${quoteTerm(v)}`);
+    } else {
+      queries.push(quoteTerm(v));
+    }
   }
 
-  // 3. Fallback: primer término individual si había múltiples
-  if (splitTerms.length > 1) {
-    const singleTerm = comp ? `${quoteTerm(comp)} ${quoteTerm(splitTerms[0])}` : quoteTerm(splitTerms[0]);
-    queries.push(singleTerm);
-  }
-
-  // 4. Fallback: sólo el competidor o marca si existe
+  // 5. Fallback: sólo competidor
   if (comp) {
     queries.push(quoteTerm(comp));
   }
 
-  return [...new Set(queries.filter(Boolean))];
+  return Array.from(new Set(queries.filter(Boolean)));
 }
 
 function scorePost(
   post: UnipileSearchPost,
   icp: { title?: string; country?: string; company?: string; keywords: string[] }
 ): { score: number; isIcpMatch: boolean; reasons: string[] } {
-  let score = 40;
-  const reasons: string[] = [];
-  let isIcpMatch = false;
   const text = (post.text || "").toLowerCase();
   const headline = (post.author?.headline || "").toLowerCase();
+  const fullText = `${text} ${headline}`;
+  const country = icp.country?.trim() || "";
+  const hasCountry = Boolean(country && country !== "Global / Todos" && country !== "Global" && country !== "Todos");
 
-  // 1. Coincidencia de palabras clave en el texto (universal para cualquier industria o servicio)
-  for (const kw of icp.keywords) {
-    const clean = kw.toLowerCase().replace(/"/g, "").trim();
-    if (!clean) continue;
-    if (text.includes(clean)) {
-      score += 30;
-      reasons.push(`Menciona "${clean}"`);
-      break;
-    }
+  // 1. Descalificación por alfabeto incompatible (ej: Cirílico ruso si se buscó Perú o España)
+  if (hasCountry && hasIncompatibleScript(fullText, country)) {
+    return { score: 0, isIcpMatch: false, reasons: ["Alfabeto incompatible con el país objetivo"] };
   }
 
-  // 2. Coincidencia con Cargo / Rol del ICP en el headline del autor (universal con expandTitleCriteria)
+  // 2. Descalificación por país extranjero contradictorio (ej: Global & Russia si se buscó Perú)
+  if (hasCountry && hasConflictingCountry(text, headline, country)) {
+    return { score: 0, isIcpMatch: false, reasons: ["Ubicación en país no coincidente"] };
+  }
+
+  let score = 25;
+  const reasons: string[] = [];
+  let hasLocationMatch = false;
+  let hasTitleMatch = false;
+
+  // 3. Coincidencia con Ubicación / Territorio
+  if (hasCountry) {
+    const expandedLocs = expandLocationCriteria([country]);
+    const matchLoc = Array.from(expandedLocs).find(
+      (loc) => loc.length >= 3 && (text.includes(loc.toLowerCase()) || headline.includes(loc.toLowerCase()))
+    );
+    if (matchLoc) {
+      score += 35;
+      hasLocationMatch = true;
+      reasons.push(`Ubicación: ${country}`);
+    } else if (isSpanishCountry(country) && hasSpanishLanguageIndicators(text)) {
+      score += 20;
+      reasons.push("Contenido en español");
+    } else if (isPortugueseCountry(country) && hasPortugueseLanguageIndicators(text)) {
+      score += 20;
+      reasons.push("Conteúdo em português");
+    }
+  } else {
+    score += 15;
+  }
+
+  // 4. Coincidencia con Cargo / Rol
   if (icp.title) {
     const titleTokens = icp.title
       .toLowerCase()
@@ -109,25 +177,26 @@ function scorePost(
       (tok) => tok.length >= 3 && headline.includes(tok.toLowerCase())
     );
     if (match) {
-      score += 20;
-      isIcpMatch = true;
+      score += 25;
+      hasTitleMatch = true;
       reasons.push(`Autor: ${match}`);
     }
   }
 
-  // 3. Coincidencia con País / Territorio (universal con expandLocationCriteria para cualquier país del mundo)
-  if (icp.country && !/global/i.test(icp.country)) {
-    const expandedLocs = expandLocationCriteria([icp.country]);
-    const matchLoc = Array.from(expandedLocs).find(
-      (loc) => loc.length >= 3 && (text.includes(loc.toLowerCase()) || headline.includes(loc.toLowerCase()))
-    );
-    if (matchLoc) {
-      score += 10;
-      reasons.push(`Ubicación: ${icp.country}`);
+  // 5. Coincidencia con Palabras Clave
+  for (const kw of icp.keywords) {
+    const clean = kw.toLowerCase().replace(/"/g, "").trim();
+    if (!clean) continue;
+    const variants = getB2bTermVariants(clean);
+    const matchedVariant = variants.find((v) => text.includes(v.toLowerCase()));
+    if (matchedVariant) {
+      score += 20;
+      reasons.push(`Menciona "${clean}"`);
+      break;
     }
   }
 
-  // 4. Coincidencia con Industria / Empresa (universal para cualquier nicho o sector)
+  // 6. Coincidencia con Industria / Sector
   if (icp.company) {
     const compTokens = icp.company
       .toLowerCase()
@@ -138,12 +207,16 @@ function scorePost(
       (tok) => tok.length >= 3 && (text.includes(tok) || headline.includes(tok))
     );
     if (matchComp) {
-      score += 10;
+      score += 15;
       reasons.push(`Sector: ${matchComp}`);
     }
   }
 
-  return { score: Math.min(100, score), isIcpMatch, reasons };
+  const isIcpMatch = hasCountry
+    ? (hasTitleMatch && (hasLocationMatch || (isSpanishCountry(country) && hasSpanishLanguageIndicators(text)) || (isPortugueseCountry(country) && hasPortugueseLanguageIndicators(text))))
+    : hasTitleMatch;
+
+  return { score: Math.min(100, Math.max(0, score)), isIcpMatch, reasons };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -221,79 +294,96 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     };
 
-    let rawPosts: UnipileSearchPost[] = [];
-    let executedQuery = candidateQueries[0] || rawKeywords;
-
-    for (const q of candidateQueries) {
-      executedQuery = q;
-      rawPosts = await executeSearch(q, unipileDatePosted).catch(() => []);
-      if (rawPosts.length > 0) break;
-
-      // Si no hubo resultados y había filtro de fecha, probar sin filtro de fecha
-      if (unipileDatePosted) {
-        rawPosts = await executeSearch(q, undefined).catch(() => []);
-        if (rawPosts.length > 0) break;
-      }
-    }
+    const hasCountry = Boolean(rawCountry && rawCountry !== "Global / Todos" && rawCountry !== "Global" && rawCountry !== "Todos");
 
     const splitKwList = rawKeywords
       .split(/[,;\n]+/)
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const formattedPosts: DiscoveredPostItem[] = rawPosts.map((post) => {
-      const { score, isIcpMatch, reasons } = scorePost(post, {
-        title: rawTitle,
-        country: rawCountry,
-        company: rawCompany,
-        keywords: splitKwList.length > 0 ? splitKwList : [rawKeywords],
+    const formatAndFilter = (posts: UnipileSearchPost[]): DiscoveredPostItem[] => {
+      const formatted: DiscoveredPostItem[] = posts.map((post) => {
+        const { score, isIcpMatch, reasons } = scorePost(post, {
+          title: rawTitle,
+          country: rawCountry,
+          company: rawCompany,
+          keywords: splitKwList.length > 0 ? splitKwList : [rawKeywords],
+        });
+
+        return {
+          id: post.id || post.social_id || "",
+          shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
+          text: post.text || "",
+          date: post.date || null,
+          parsedDatetime: post.parsed_datetime || null,
+          reactionCount: Number(post.reaction_counter) || 0,
+          commentCount: Number(post.comment_counter) || 0,
+          repostCount: Number(post.repost_counter) || 0,
+          author: {
+            id: post.author?.id || null,
+            name: post.author?.name || "Autor en LinkedIn",
+            headline: post.author?.headline || null,
+            profilePictureUrl: post.author?.profile_picture_url || null,
+            publicIdentifier: post.author?.public_identifier || null,
+            isCompany: Boolean(post.author?.is_company),
+          },
+          relevanceScore: score,
+          isIcpMatch,
+          relevanceReasons: reasons,
+        };
       });
 
-      return {
-        id: post.id || post.social_id || "",
-        shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
-        text: post.text || "",
-        date: post.date || null,
-        parsedDatetime: post.parsed_datetime || null,
-        reactionCount: Number(post.reaction_counter) || 0,
-        commentCount: Number(post.comment_counter) || 0,
-        repostCount: Number(post.repost_counter) || 0,
-        author: {
-          id: post.author?.id || null,
-          name: post.author?.name || "Autor en LinkedIn",
-          headline: post.author?.headline || null,
-          profilePictureUrl: post.author?.profile_picture_url || null,
-          publicIdentifier: post.author?.public_identifier || null,
-          isCompany: Boolean(post.author?.is_company),
-        },
-        relevanceScore: score,
-        isIcpMatch,
-        relevanceReasons: reasons,
-      };
-    });
+      return formatted.filter((p) => {
+        if ((p.relevanceScore || 0) <= 0) return false;
+        if (hasCountry) {
+          const fullText = `${p.text} ${p.author?.headline || ""}`;
+          if (hasIncompatibleScript(fullText, rawCountry)) return false;
+          if (hasConflictingCountry(p.text, p.author?.headline, rawCountry)) return false;
+        }
+        return true;
+      });
+    };
+
+    let validPosts: DiscoveredPostItem[] = [];
+    let executedQuery = candidateQueries[0] || rawKeywords;
+
+    for (const q of candidateQueries) {
+      executedQuery = q;
+      let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
+      let filtered = formatAndFilter(raw);
+
+      if (filtered.length === 0 && unipileDatePosted) {
+        raw = await executeSearch(q, undefined).catch(() => []);
+        filtered = formatAndFilter(raw);
+      }
+
+      if (filtered.length > 0) {
+        validPosts = filtered;
+        break;
+      }
+    }
 
     // Ordenar por relevancia e interacción
     if (sort_by === "engagement") {
-      formattedPosts.sort((a, b) => {
+      validPosts.sort((a, b) => {
         const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
         if (relDiff !== 0 && Math.abs(relDiff) >= 15) return relDiff;
         return (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2);
       });
     } else if (sort_by === "date") {
-      // Priorizar alta relevancia primero, luego orden por fecha
-      formattedPosts.sort((a, b) => {
+      validPosts.sort((a, b) => {
         const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
         if (relDiff !== 0 && Math.abs(relDiff) >= 20) return relDiff;
-        return 0; // mantener orden devuelto por fecha
+        return 0;
       });
     }
 
     return res.status(200).json({
       success: true,
       query: executedQuery,
-      count: formattedPosts.length,
-      posts: formattedPosts,
-      items: formattedPosts,
+      count: validPosts.length,
+      posts: validPosts,
+      items: validPosts,
     });
   } catch (error) {
     console.error("[api/signals/posts/search] Error searching posts:", error);

@@ -301,7 +301,8 @@ function locationQueryTerm(location: string): string {
 
 function webQuery(context: SignalScannerContext): string {
   const titles = context.icp.titles?.length ? `(${context.icp.titles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
-  const location = context.icp.locations?.length ? locationQueryTerm(context.icp.locations[0]) : "";
+  const locations = (context.icp.locations || []).map(locationQueryTerm);
+  const location = locations.length > 1 ? `(${locations.join(" OR ")})` : (locations[0] || "");
   const terms: Record<string, string> = {
     funding_round: '("ronda de inversión" OR "levantó inversión" OR "financiamiento" OR "capital semilla" OR "Serie A" OR "funding round" OR "raised funding" OR "round di finanziamento" OR "ha raccolto" OR "levée de fonds" OR "finanzierungsrunde")',
     acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió OR acquisizione OR acquise)',
@@ -312,25 +313,15 @@ function webQuery(context: SignalScannerContext): string {
   const activeKinds = (context.icp.event_kinds && context.icp.event_kinds.length > 0)
     ? context.icp.event_kinds
     : [context.monitor.type];
-
-  const matchedEventTerms = activeKinds
-    .map((kind) => terms[kind])
-    .filter(Boolean);
-
-  const eventClause = matchedEventTerms.length > 1
-    ? `(${matchedEventTerms.join(" OR ")})`
-    : (matchedEventTerms[0] || "");
-
-  // Domain/niche keywords (e.g. SaaS, Inteligencia Artificial, Fintech) are combined with AND against the event clause
+  const matchedEventTerms = activeKinds.map((kind) => terms[kind]).filter(Boolean);
+  const eventClause = matchedEventTerms.length > 1 ? `(${matchedEventTerms.join(" OR ")})` : (matchedEventTerms[0] || "");
   const domainKeywords = (context.keywords || []).filter((k) => {
     const norm = normalize(k);
     return !/ronda|inversion|inversión|funding|capital|semilla|serie a|acquisition|adquisicion|adquisición|evento|noticia|anuncio/i.test(norm);
   });
-
   const keywordClause = domainKeywords.length > 0
     ? `(${domainKeywords.map((k) => (k.includes(" ") ? `"${k}"` : k)).join(" OR ")})`
     : "";
-
   return [eventClause, keywordClause, titles, location].filter(Boolean).join(" ");
 }
 

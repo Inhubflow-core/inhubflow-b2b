@@ -51,10 +51,24 @@ export interface SignalResearchPlan {
 
 const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/\bceos?\b/i, "CEO"], [/fundadores?|founders?/i, "Founder"],
-  [/directores? comerciales?|sales directors?/i, "Director Comercial"],
-  [/vp(?: de)? ventas|vp sales/i, "VP Sales"], [/cmos?\b/i, "CMO"],
-  [/head of growth/i, "Head of Growth"], [/coos?\b/i, "COO"],
+  [/directores? comerciales?|sales directors?/i, "Director Comercial"], [/directores? de operaciones?|operations directors?|vp\s*(?:of|de)?\s*ops|log[ií]stica|supply\s*chain/i, "Director de Operaciones"],
+  [/coos?\b/i, "COO"], [/cmos?\b/i, "CMO"],
+  [/head\s+of\s+(?:people|hr|talent)|chro|recursos? humanos?|people|talent|rrhh|recursos? humanos?/i, "Head of People"],
+  [/vp(?: de)? ventas|vp sales/i, "VP Sales"],
+  [/head of growth/i, "Head of Growth"],
 ];
+const NICHE_PATTERNS: Array<[RegExp, string[]]> = [
+  [/fintech|pagos?|neobancos?|cr[eé]dito financiero/i, ["Fintech", "pagos"]],
+  [/e-?commerce|retail|log[ií]stica|supply\s*chain/i, ["e-commerce", "retail", "logística"]],
+  [/inteligencia artificial|\bai\b|deeptech|software\s+b2b|\bsaas\b/i, ["Inteligencia Artificial", "AI", "SaaS"]],
+  [/healthtech|biotecnolog[ií]a|biotech|salud digital/i, ["Healthtech", "biotecnología"]],
+  [/rrhh|recursos? humanos?|people|talento|gesti[oó]n de talento/i, ["People", "talento"]],
+];
+
+function inferNicheKeywords(query: string): string[] {
+  return unique(NICHE_PATTERNS.flatMap(([pattern, values]) => pattern.test(query) ? values : []));
+}
+
 const LOCATION_MAP: Record<string, string> = {
   "españa": "España", "spain": "España",
   "méxico": "México", "mexico": "México",
@@ -162,10 +176,17 @@ export function deterministicSignalResearchPlan(query: string): SignalResearchPl
   }
 
   if (keywords.length === 0) {
-    const cleaned = query
-      .replace(/\b(encuentra|buscar?|dame|quiero|personas?|empresas?|prospectos?|leads?|\d+)\b/gi, " ")
-      .replace(/\s+/g, " ").trim();
-    keywords = [cleaned || query.trim()];
+    const inferredNiche = inferNicheKeywords(query);
+    if (inferredNiche.length > 0) {
+      keywords = inferredNiche;
+    } else {
+      const cleaned = query
+        .replace(/\b(encuentra|buscar?|dame|quiero|personas?|empresas?|prospectos?|leads?|\d+)\b/gi, " ")
+        .replace(/\s+/g, " ").trim();
+      keywords = [cleaned || query.trim()];
+    }
+  } else {
+    keywords = unique([...keywords, ...inferNicheKeywords(query)]);
   }
   const descriptor = titles[0] || keywords[0];
   return {

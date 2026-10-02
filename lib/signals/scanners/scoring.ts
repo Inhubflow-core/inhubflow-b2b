@@ -327,6 +327,160 @@ export function expandLocationCriteria(locations: string[]): string[] {
   return Array.from(result);
 }
 
+export function hasIncompatibleScript(text: string, country?: string): boolean {
+  if (!text) return false;
+  const c = normalize(country || "");
+  if (!c || c === "global" || c === "todos" || c === "global / todos" || c === "all") return false;
+
+  const hasCyrillic = /[\u0400-\u04FF]/.test(text);
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F]/.test(text);
+  const hasCjk = /[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/.test(text);
+  const hasDevanagari = /[\u0900-\u097F]/.test(text);
+  const hasThai = /[\u0E00-\u0E7F]/.test(text);
+  const hasHebrew = /[\u0590-\u05FF]/.test(text);
+
+  if (!hasCyrillic && !hasArabic && !hasCjk && !hasDevanagari && !hasThai && !hasHebrew) {
+    return false;
+  }
+
+  const isCyrillicCountry = /rusia|russia|ucrania|ukraine|bielorrusia|belarus|kazaj|bulgari|serbi/i.test(c);
+  const isArabicCountry = /emiratos|emirates|uae|dubai|arabia|saudi|egipto|egypt|qatar|kuwait|marruecos|morocco/i.test(c);
+  const isCjkCountry = /china|japon|japan|corea|korea|taiwan|hong kong/i.test(c);
+  const isDevanagariCountry = /india/i.test(c);
+  const isThaiCountry = /tailandia|thailand/i.test(c);
+  const isHebrewCountry = /israel/i.test(c);
+
+  if (hasCyrillic && !isCyrillicCountry) return true;
+  if (hasArabic && !isArabicCountry) return true;
+  if (hasCjk && !isCjkCountry) return true;
+  if (hasDevanagari && !isDevanagariCountry) return true;
+  if (hasThai && !isThaiCountry) return true;
+  if (hasHebrew && !isHebrewCountry) return true;
+
+  return false;
+}
+
+const FOREIGN_LOCATIONS_LIST: Array<{ countryPattern: RegExp; markers: string[] }> = [
+  {
+    countryPattern: /rusia|russia|ucrania|ukraine|bielorrusia|belarus/i,
+    markers: ["russia", "rusia", "moscow", "moscu", "saint petersburg", "petersburg", "ukraine", "ucrania", "kyiv", "kiev", "рускомтехнологии", "ruscom"],
+  },
+  {
+    countryPattern: /india/i,
+    markers: ["india", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "pune", "chennai", "gurgaon", "noida"],
+  },
+  {
+    countryPattern: /nigeria|kenya|ghana|south africa/i,
+    markers: ["nigeria", "lagos", "abuja", "kenya", "nairobi", "ghana", "accra", "south africa", "johannesburg"],
+  },
+  {
+    countryPattern: /alemania|germany|deutschland/i,
+    markers: ["germany", "alemania", "deutschland", "berlin", "munich", "frankfurt", "hamburg"],
+  },
+  {
+    countryPattern: /reino unido|united kingdom|uk/i,
+    markers: ["united kingdom", "reino unido", "london", "londres", "manchester", "birmingham"],
+  },
+];
+
+export function hasConflictingCountry(text: string, headline: string | null | undefined, targetCountry: string): boolean {
+  if (!targetCountry) return false;
+  const cNorm = normalize(targetCountry);
+  if (!cNorm || cNorm === "global" || cNorm === "todos" || cNorm === "global / todos" || cNorm === "all") return false;
+
+  const combined = normalize(`${text || ""} ${headline || ""}`);
+  if (!combined) return false;
+
+  const validTargetLocs = expandLocationCriteria([targetCountry]).map(normalize);
+  const mentionsTarget = validTargetLocs.some((loc) => loc.length >= 3 && combined.includes(loc));
+  if (mentionsTarget) return false;
+
+  for (const item of FOREIGN_LOCATIONS_LIST) {
+    if (!item.countryPattern.test(cNorm)) {
+      for (const m of item.markers) {
+        const markerNorm = normalize(m);
+        const regex = new RegExp(`(^|[^a-z0-9])${markerNorm}([^a-z0-9]|$)`, "i");
+        if (regex.test(combined)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+export function getB2bTermVariants(term: string): string[] {
+  const clean = term.replace(/"/g, "").trim();
+  const lower = clean.toLowerCase();
+  const variants = new Set<string>([clean]);
+
+  if (/^b2b\s+(.+)$/i.test(lower)) {
+    const rest = clean.slice(4).trim();
+    variants.add(`${rest} b2b`);
+    variants.add(`${rest} B2B`);
+  } else if (/^(.+)\s+b2b$/i.test(lower)) {
+    const rest = clean.slice(0, -4).trim();
+    variants.add(`b2b ${rest}`);
+    variants.add(`B2B ${rest}`);
+  }
+
+  return Array.from(variants);
+}
+
+export function getPrimaryCityForCountry(country: string): string | null {
+  const norm = normalize(country);
+  const map: Record<string, string> = {
+    peru: "Lima",
+    espana: "Madrid",
+    mexico: "CDMX",
+    colombia: "Bogotá",
+    chile: "Santiago",
+    argentina: "Buenos Aires",
+    brasil: "São Paulo",
+    brazil: "São Paulo",
+    uruguay: "Montevideo",
+    ecuador: "Quito",
+    panama: "Panamá",
+    "costa rica": "San José",
+    usa: "New York",
+    "united states": "New York",
+    uk: "London",
+    "united kingdom": "London",
+    francia: "Paris",
+    france: "Paris",
+    alemania: "Berlin",
+    germany: "Berlin",
+    italia: "Milano",
+    italy: "Milano",
+  };
+  return map[norm] || null;
+}
+
+export function isSpanishCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /espana|mexico|colombia|peru|chile|argentina|uruguay|paraguay|bolivia|ecuador|venezuela|panama|costa rica|guatemala|honduras|el salvador|nicaragua|republica dominicana|puerto rico/i.test(n);
+}
+
+export function isPortugueseCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /brasil|brazil|portugal/i.test(n);
+}
+
+export function hasSpanishLanguageIndicators(text: string): boolean {
+  const spanishWordRegex = /\b(de|la|el|en|y|los|las|para|con|por|una|un|que|del|al|es|su|más|este|esta|nuestra|nuestro|como|sobre|estamos|crecimiento|clientes|empresas|ventas)\b/gi;
+  const matches = text.match(spanishWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
+export function hasPortugueseLanguageIndicators(text: string): boolean {
+  const ptWordRegex = /\b(de|da|do|em|para|com|por|uma|um|que|na|no|mais|este|esta|nossa|nosso|como|sobre|estamos|crescimento|clientes|empresas|vendas)\b/gi;
+  const matches = text.match(ptWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
 export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilters, nowMs = Date.now()): SignalScore {
   const titleConfigured = Boolean(icp.titles?.length);
   const locationConfigured = Boolean(icp.locations?.length);
@@ -377,7 +531,8 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
     "acquisition_event",
     "company_news",
     "industry_event",
-  ].includes(lead.signalType);
+  ].includes(lead.signalType) && lead.evidence.sourceType === "web_public_evidence"
+    && lead.evidence.metadata?.identityVerified === true;
 
   // 2. Cargos: con expansión semántica inteligente (inglés/español)
   if (icp.titles?.length && lead.headline) {
@@ -388,21 +543,31 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
     }
   }
 
-  // 3. Ubicación: verificar si no es Global/Todos
+  // 3. Ubicación del perfil. La evidencia web verificada ya geolocaliza el evento/empresa;
+  // no se descarta al fundador sólo por residir en otro país.
   if (icp.locations?.length) {
     const isGlobal = icp.locations.some((loc) => {
       const n = normalize(loc);
       return n === "global" || n === "todos" || n === "global / todos" || n === "all";
     });
     if (!isGlobal) {
+      const targetLoc = icp.locations[0];
+      const leadText = `${lead.fullName || ""} ${lead.headline || ""} ${lead.location || ""}`;
+      if (hasIncompatibleScript(leadText, targetLoc)) {
+        return false;
+      }
+      if (hasConflictingCountry(lead.location || "", lead.headline, targetLoc)) {
+        return false;
+      }
+
       const expandedLocations = expandLocationCriteria(icp.locations);
       if (lead.location) {
         const matchesLocation = containsAny(lead.location, expandedLocations);
-        if (!matchesLocation && !isDirectPostSignal) {
+        if (!matchesLocation && !isDirectPostSignal && !isWebVerifiedSignal) {
           return false;
         }
-      } else {
-        if (!isWebVerifiedSignal) return false;
+      } else if (!isWebVerifiedSignal) {
+        return false;
       }
     }
   }

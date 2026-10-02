@@ -484,10 +484,11 @@ export default function SignalsPage({
 
   const icpLocations = (() => {
     const locs: string[] = [];
-    if (icpCity.trim() && icpCountry !== "Global / Todos") {
-      locs.push(`${icpCity.trim()}, ${icpCountry}`);
-    } else if (icpCountry !== "Global / Todos") {
+    if (icpCountry && icpCountry !== "Global / Todos") {
       locs.push(icpCountry);
+      if (icpCity.trim()) {
+        locs.push(icpCity.trim());
+      }
     }
     return locs;
   })();
@@ -2487,8 +2488,18 @@ export default function SignalsPage({
                           <select
                             value={icpCountry}
                             onChange={(e) => {
-                              setIcpCountry(e.target.value);
+                              const newCountry = e.target.value;
+                              setIcpCountry(newCountry);
                               setIcpCity("");
+                              // Sincronizar automáticamente el idioma del mensaje IA según el país seleccionado
+                              const n = newCountry.toLowerCase();
+                              if (n.includes("brasil") || n.includes("brazil")) {
+                                setMsgLanguage("pt-BR");
+                              } else if (n.includes("estados unidos") || n.includes("usa") || n.includes("reino unido") || n.includes("uk")) {
+                                setMsgLanguage("en");
+                              } else if (newCountry !== "Global / Todos") {
+                                setMsgLanguage("es");
+                              }
                             }}
                             className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                           >
