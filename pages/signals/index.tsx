@@ -543,6 +543,9 @@ export default function SignalsPage({
       publicIdentifier: string | null;
       isCompany: boolean;
     };
+    relevanceScore?: number;
+    isIcpMatch?: boolean;
+    relevanceReasons?: string[];
   }>>([]);
   const [selectedPostUrls, setSelectedPostUrls] = useState<string[]>([]);
   const [extractComments, setExtractComments] = useState(true);
@@ -612,6 +615,10 @@ export default function SignalsPage({
           date_posted: postSearchDate,
           sort_by: postSearchSortBy,
           limit: 25,
+          icp_title: icpTitle,
+          icp_country: icpCountry,
+          icp_company: icpCompany,
+          icp_city: icpCity,
         }),
       });
       const data = await res.json();
@@ -2920,45 +2927,58 @@ export default function SignalsPage({
                                   </button>
                                 </div>
 
-                                {/* Chips sugeridos de 1 clic */}
-                                <div className="space-y-1.5 mt-2">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
-                                    {[
-                                      "Prospección B2B",
-                                      "Inteligencia Artificial",
-                                      "Automatización",
-                                      "Cold Outreach",
-                                      "Generación de Leads",
-                                      "SaaS",
-                                    ].map((sug) => {
-                                      const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
-                                      return (
-                                        <button
-                                          key={sug}
-                                          type="button"
-                                          onClick={() => {
-                                            if (isChipActive) {
-                                              setPostSearchKeywords("");
-                                            } else {
-                                              setPostSearchKeywords(sug);
-                                            }
-                                          }}
-                                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                                            isChipActive
-                                              ? "bg-brand-500 border-brand-500 text-white shadow-xs"
-                                              : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
-                                          }`}
-                                        >
-                                          {isChipActive ? `✓ ${sug}` : `+${sug}`}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                                    💡 Elige un tema o escribe un término directo (ej: <em>HubSpot</em>, <em>Prospección</em>) para descubrir publicaciones con alto volumen de comentarios y reacciones.
-                                  </p>
-                                </div>
+                                {/* Chips sugeridos de 1 clic dinámicos según ICP */}
+                                {(() => {
+                                  const isBr = icpCountry.toLowerCase().includes("brasil") || icpCountry.toLowerCase().includes("brazil");
+                                  const isLegal = /abogad|advogad|lawyer|legal|jurid/i.test(icpTitle) || /abogac|advocac|jurid/i.test(icpCompany);
+                                  const suggestedChips = isBr && isLegal
+                                    ? ["registro de marca", "direito empresarial", "marcas e patentes", "INPI", "advocacia corporativa", "startups Brasil"]
+                                    : isBr
+                                    ? ["registro de marca", "startups Brasil", "inteligência artificial", "prospecção b2b", "vendas b2b", "SaaS"]
+                                    : isLegal
+                                    ? ["registro de marca", "derecho corporativo", "propiedad intelectual", "marcas y patentes", "compliance", "startups"]
+                                    : ["Prospección B2B", "Inteligencia Artificial", "Automatización", "Cold Outreach", "Generación de Leads", "SaaS"];
+
+                                  return (
+                                    <div className="space-y-1.5 mt-2">
+                                      {icpCountry && icpCountry !== "Global / Todos" && (
+                                        <div className="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400 font-medium pb-0.5">
+                                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+                                          Búsqueda adaptada a tu ICP: <strong>{icpCountry}</strong>{icpTitle ? ` · ${icpTitle}` : ""}
+                                        </div>
+                                      )}
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
+                                        {suggestedChips.map((sug) => {
+                                          const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
+                                          return (
+                                            <button
+                                              key={sug}
+                                              type="button"
+                                              onClick={() => {
+                                                if (isChipActive) {
+                                                  setPostSearchKeywords("");
+                                                } else {
+                                                  setPostSearchKeywords(sug);
+                                                }
+                                              }}
+                                              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                                                isChipActive
+                                                  ? "bg-brand-500 border-brand-500 text-white shadow-xs"
+                                                  : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-400"
+                                              }`}
+                                            >
+                                              {isChipActive ? `✓ ${sug}` : `+${sug}`}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                                        💡 Las frases compuestas se buscan automáticamente de forma exacta para garantizar publicaciones con alta intención.
+                                      </p>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
 
@@ -3088,9 +3108,36 @@ export default function SignalsPage({
                                           )}
                                         </div>
 
+                                        {/* Badges de Relevancia e ICP */}
+                                        {((post.relevanceScore !== undefined && post.relevanceScore > 0) || post.isIcpMatch || (post.relevanceReasons && post.relevanceReasons.length > 0)) && (
+                                          <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                                            {post.relevanceScore !== undefined && post.relevanceScore > 0 && (
+                                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                                                post.relevanceScore >= 80
+                                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                                  : post.relevanceScore >= 60
+                                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
+                                                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-300 dark:border-gray-700"
+                                              }`}>
+                                                {post.relevanceScore >= 80 ? "⭐ Alta Intención" : "Relevancia"} ({post.relevanceScore}%)
+                                              </span>
+                                            )}
+                                            {post.isIcpMatch && (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                                                🎯 Coincide con ICP
+                                              </span>
+                                            )}
+                                            {post.relevanceReasons?.map((r) => (
+                                              <span key={r} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                                                ✓ {r}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+
                                         {/* Snippet del texto */}
                                         {post.text && (
-                                          <p className="mt-2.5 text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+                                          <p className="mt-2 text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
                                             {post.text}
                                           </p>
                                         )}

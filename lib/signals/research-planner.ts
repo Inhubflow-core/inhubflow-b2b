@@ -250,7 +250,11 @@ Conserva el número máximo solicitado por el usuario en result_limit (1-100), e
       return mapPlan(PlanSchema.parse(JSON.parse(response.text)), response.modelVersion || model);
     } catch (error) {
       lastError = error;
+      const errText = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
       console.warn(`[SignalRadar] Planner ${model} no disponible:`, error instanceof Error ? error.message : error);
+      if (errText.includes("resource_exhausted") || errText.includes("exceeded your current quota")) {
+        break; // Cuota diaria agotada en el proyecto; fallback inmediato sin demoras
+      }
       if (!isTransient(error)) break;
     }
   }

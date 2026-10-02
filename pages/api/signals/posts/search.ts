@@ -22,6 +22,117 @@ export interface DiscoveredPostItem {
     publicIdentifier: string | null;
     isCompany: boolean;
   };
+  relevanceScore?: number;
+  isIcpMatch?: boolean;
+  relevanceReasons?: string[];
+}
+
+function quoteTerm(t: string): string {
+  const trimmed = t.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) return trimmed;
+  if (trimmed.includes(" ") || trimmed.includes("-")) {
+    return `"${trimmed.replace(/"/g, "")}"`;
+  }
+  return trimmed;
+}
+
+function buildSearchQueries(keywords: string, competitor?: string, country?: string): string[] {
+  const comp = (competitor || "").trim();
+  const splitTerms = (keywords || "")
+    .split(/[,;\n]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  let formattedKeywords = splitTerms.map(quoteTerm).join(" OR ") || quoteTerm(keywords);
+  const baseQuery = comp && formattedKeywords ? `${quoteTerm(comp)} ${formattedKeywords}` : (formattedKeywords || quoteTerm(comp));
+
+  const queries: string[] = [];
+  const cNorm = (country || "").toLowerCase().trim();
+  const hasCountry = Boolean(cNorm && cNorm !== "global / todos" && cNorm !== "global" && cNorm !== "todos");
+
+  if (hasCountry && !keywords.toLowerCase().includes(cNorm)) {
+    if (cNorm === "brasil" || cNorm === "brazil") {
+      if (keywords.toLowerCase().includes("registro de marca")) {
+        const compPrefix = comp ? `${quoteTerm(comp)} ` : "";
+        queries.push(`${compPrefix}("registro de marca" OR "registro de marcas") Brasil`);
+      } else {
+        queries.push(`${baseQuery} Brasil`);
+      }
+    } else {
+      queries.push(`${baseQuery} ${country}`);
+    }
+  }
+
+  if (baseQuery) {
+    queries.push(baseQuery);
+  }
+
+  if (splitTerms.length > 1) {
+    const singleTerm = comp ? `${quoteTerm(comp)} ${quoteTerm(splitTerms[0])}` : quoteTerm(splitTerms[0]);
+    queries.push(singleTerm);
+  }
+
+  if (comp) {
+    queries.push(quoteTerm(comp));
+  }
+
+  return [...new Set(queries.filter(Boolean))];
+}
+
+function scorePost(
+  post: UnipileSearchPost,
+  icp: { title?: string; country?: string; company?: string; keywords: string[] }
+): { score: number; isIcpMatch: boolean; reasons: string[] } {
+  let score = 40;
+  const reasons: string[] = [];
+  let isIcpMatch = false;
+  const text = (post.text || "").toLowerCase();
+  const headline = (post.author?.headline || "").toLowerCase();
+
+  // 1. Coincidencia de palabras clave en el texto
+  for (const kw of icp.keywords) {
+    const clean = kw.toLowerCase().replace(/"/g, "").trim();
+    if (!clean) continue;
+    if (text.includes(clean)) {
+      score += 30;
+      reasons.push(`Menciona "${clean}"`);
+      break;
+    }
+  }
+
+  // 2. Coincidencia con Cargo / Rol del ICP en el headline del autor
+  if (icp.title) {
+    const titleTokens = icp.title
+      .toLowerCase()
+      .split(/[,;\/]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const expanded = [...titleTokens];
+    if (titleTokens.some((t) => /abogad|advogad|lawyer|legal|jurid/i.test(t))) {
+      expanded.push("abogado", "abogada", "advogado", "advogada", "lawyer", "jurídico", "juridico", "oab", "direito", "marcas", "inpi");
+    }
+    const match = expanded.find((tok) => headline.includes(tok));
+    if (match) {
+      score += 20;
+      isIcpMatch = true;
+      reasons.push(`Autor: ${match}`);
+    }
+  }
+
+  // 3. Coincidencia con País / Territorio
+  if (icp.country && !/global/i.test(icp.country)) {
+    const isBr = /brasil|brazil/i.test(icp.country);
+    const cTokens = isBr
+      ? ["brasil", "brazil", "inpi", "são paulo", "sao paulo", "oab", "rio de janeiro", "curitiba", "porto alegre"]
+      : [icp.country.toLowerCase()];
+    if (cTokens.some((t) => text.includes(t) || headline.includes(t))) {
+      score += 10;
+      reasons.push(`Ubicación: ${icp.country}`);
+    }
+  }
+
+  return { score: Math.min(100, score), isIcpMatch, reasons };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -36,21 +147,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     date_posted = "past_month",
     sort_by = "engagement",
     limit = 20,
+    icp_title = "",
+    icp_country = "",
+    icp_company = "",
+    icp_city = "",
   } = req.body || {};
 
   const accountId = typeof account_id === "string" ? account_id.trim() : "";
   if (!accountId) return res.status(400).json({ error: "account_id es requerido para buscar en LinkedIn" });
 
-  const queryParts: string[] = [];
-  if (competitor && typeof competitor === "string" && competitor.trim()) {
-    queryParts.push(competitor.trim());
-  }
-  if (keywords && typeof keywords === "string" && keywords.trim()) {
-    queryParts.push(keywords.trim());
-  }
+  const rawKeywords = typeof keywords === "string" ? keywords.trim() : "";
+  const rawCompetitor = typeof competitor === "string" ? competitor.trim() : "";
+  const rawCountry = typeof icp_country === "string" ? icp_country.trim() : "";
+  const rawTitle = typeof icp_title === "string" ? icp_title.trim() : "";
+  const rawCompany = typeof icp_company === "string" ? icp_company.trim() : "";
 
-  const queryString = queryParts.join(" ").trim();
-  if (!queryString) {
+  if (!rawKeywords && !rawCompetitor) {
     return res.status(400).json({ error: "Ingresa al menos una palabra clave o el nombre de un competidor/marca" });
   }
 
@@ -79,30 +191,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       unipileDatePosted = undefined;
     }
 
-    // Procesar términos si vienen separados por comas
-    const rawKeywords = typeof keywords === "string" ? keywords.trim() : "";
-    const splitTerms = rawKeywords
-      .split(/[,;\n]+/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-
-    // Formatear query con OR si son varios términos
-    let formattedKeywords = rawKeywords;
-    if (splitTerms.length > 1) {
-      formattedKeywords = splitTerms
-        .slice(0, 3)
-        .map((t) => (t.includes(" ") ? `"${t}"` : t))
-        .join(" OR ");
-    }
-
-    const queryParts: string[] = [];
-    if (competitor && typeof competitor === "string" && competitor.trim()) {
-      queryParts.push(competitor.trim());
-    }
-    if (formattedKeywords) {
-      queryParts.push(formattedKeywords);
-    }
-    const finalQuery = queryParts.join(" ").trim() || rawKeywords;
+    const candidateQueries = buildSearchQueries(rawKeywords, rawCompetitor, rawCountry);
 
     const executeSearch = async (q: string, dPosted?: "past_24h" | "past_week" | "past_month") => {
       const searchParams: Record<string, unknown> = {
@@ -121,53 +210,76 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
     };
 
-    // 1º intento con los parámetros solicitados
-    let rawPosts = await executeSearch(finalQuery, unipileDatePosted).catch(() => []);
+    let rawPosts: UnipileSearchPost[] = [];
+    let executedQuery = candidateQueries[0] || rawKeywords;
 
-    // Fallback 1: Si no hay resultados y había filtro de fecha, intentar sin filtro de fecha
-    if (rawPosts.length === 0 && unipileDatePosted) {
-      rawPosts = await executeSearch(finalQuery, undefined).catch(() => []);
+    for (const q of candidateQueries) {
+      executedQuery = q;
+      rawPosts = await executeSearch(q, unipileDatePosted).catch(() => []);
+      if (rawPosts.length > 0) break;
+
+      // Si no hubo resultados y había filtro de fecha, probar sin filtro de fecha
+      if (unipileDatePosted) {
+        rawPosts = await executeSearch(q, undefined).catch(() => []);
+        if (rawPosts.length > 0) break;
+      }
     }
 
-    // Fallback 2: Si aún no hay resultados y había múltiples términos, probar con el primer término individual
-    if (rawPosts.length === 0 && splitTerms.length > 0) {
-      const singleTerm = splitTerms[0];
-      const fallbackQuery = competitor ? `${competitor} ${singleTerm}` : singleTerm;
-      rawPosts = await executeSearch(fallbackQuery, undefined).catch(() => []);
-    }
+    const splitKwList = rawKeywords
+      .split(/[,;\n]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
 
-    // Fallback 3: Si sigue vacío y hay competidor solo, buscar publicaciones sobre el competidor
-    if (rawPosts.length === 0 && competitor && typeof competitor === "string" && competitor.trim()) {
-      rawPosts = await executeSearch(competitor.trim(), undefined).catch(() => []);
-    }
+    const formattedPosts: DiscoveredPostItem[] = rawPosts.map((post) => {
+      const { score, isIcpMatch, reasons } = scorePost(post, {
+        title: rawTitle,
+        country: rawCountry,
+        company: rawCompany,
+        keywords: splitKwList.length > 0 ? splitKwList : [rawKeywords],
+      });
 
-    const formattedPosts: DiscoveredPostItem[] = rawPosts.map((post) => ({
-      id: post.id || post.social_id || "",
-      shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
-      text: post.text || "",
-      date: post.date || null,
-      parsedDatetime: post.parsed_datetime || null,
-      reactionCount: Number(post.reaction_counter) || 0,
-      commentCount: Number(post.comment_counter) || 0,
-      repostCount: Number(post.repost_counter) || 0,
-      author: {
-        id: post.author?.id || null,
-        name: post.author?.name || "Autor en LinkedIn",
-        headline: post.author?.headline || null,
-        profilePictureUrl: post.author?.profile_picture_url || null,
-        publicIdentifier: post.author?.public_identifier || null,
-        isCompany: Boolean(post.author?.is_company),
-      },
-    }));
+      return {
+        id: post.id || post.social_id || "",
+        shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
+        text: post.text || "",
+        date: post.date || null,
+        parsedDatetime: post.parsed_datetime || null,
+        reactionCount: Number(post.reaction_counter) || 0,
+        commentCount: Number(post.comment_counter) || 0,
+        repostCount: Number(post.repost_counter) || 0,
+        author: {
+          id: post.author?.id || null,
+          name: post.author?.name || "Autor en LinkedIn",
+          headline: post.author?.headline || null,
+          profilePictureUrl: post.author?.profile_picture_url || null,
+          publicIdentifier: post.author?.public_identifier || null,
+          isCompany: Boolean(post.author?.is_company),
+        },
+        relevanceScore: score,
+        isIcpMatch,
+        relevanceReasons: reasons,
+      };
+    });
 
-    // Si ordenamos por viralidad / engagement, ordenamos por (reacciones + comentarios) desc
+    // Ordenar por relevancia e interacción
     if (sort_by === "engagement") {
-      formattedPosts.sort((a, b) => (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2));
+      formattedPosts.sort((a, b) => {
+        const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        if (relDiff !== 0 && Math.abs(relDiff) >= 15) return relDiff;
+        return (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2);
+      });
+    } else if (sort_by === "date") {
+      // Priorizar alta relevancia primero, luego orden por fecha
+      formattedPosts.sort((a, b) => {
+        const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        if (relDiff !== 0 && Math.abs(relDiff) >= 20) return relDiff;
+        return 0; // mantener orden devuelto por fecha
+      });
     }
 
     return res.status(200).json({
       success: true,
-      query: finalQuery,
+      query: executedQuery,
       count: formattedPosts.length,
       posts: formattedPosts,
       items: formattedPosts,

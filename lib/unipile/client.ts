@@ -41,13 +41,25 @@ export class UnipileClient {
     this.apiKey = (apiKey || process.env.UNIPILE_API_KEY || '').trim();
   }
 
+  public getDsn(): string {
+    let rawDsn = (this.dsn || process.env.UNIPILE_DSN || '').trim().replace(/\/$/, '');
+    if (rawDsn && !rawDsn.startsWith('http://') && !rawDsn.startsWith('https://')) {
+      rawDsn = `https://${rawDsn}`;
+    }
+    return rawDsn;
+  }
+
+  public getApiKey(): string {
+    return (this.apiKey || process.env.UNIPILE_API_KEY || '').trim();
+  }
+
   public isConfigured(): boolean {
-    return Boolean(this.dsn && this.apiKey);
+    return Boolean(this.getDsn() && this.getApiKey());
   }
 
   private getHeaders(includeJsonContentType = true): Record<string, string> {
     return {
-      'X-API-KEY': this.apiKey,
+      'X-API-KEY': this.getApiKey(),
       'Accept': 'application/json',
       ...(includeJsonContentType ? { 'Content-Type': 'application/json' } : {}),
     };
@@ -60,7 +72,8 @@ export class UnipileClient {
       );
     }
 
-    const url = `${this.dsn}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const dsn = this.getDsn();
+    const url = `${dsn}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers = {
       ...this.getHeaders(!isMultipart),
@@ -109,7 +122,7 @@ export class UnipileClient {
       ...(type === 'reconnect'
         ? { reconnect_account: params.reconnect_account }
         : { providers: params.providers || ['LINKEDIN'] }),
-      api_url: this.dsn,
+      api_url: this.getDsn(),
       expiresOn: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       ...(params.success_redirect_url ? { success_redirect_url: params.success_redirect_url } : {}),
       ...(params.failure_redirect_url ? { failure_redirect_url: params.failure_redirect_url } : {}),
