@@ -47,12 +47,20 @@ function timeRangeCode(range?: WebSearchInput["timeRange"]): string | undefined 
 
 function classify(status: number, body: string): WebSearchProviderError {
   const normalized = body.toLowerCase();
+  let serverMessage = "";
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.message === "string") {
+      serverMessage = `: ${parsed.message}`;
+    }
+  } catch {}
+
   if (status === 401 || status === 403) return new WebSearchProviderError("La fuente web no está autorizada", "invalid_credentials", false, status);
   if (status === 429 || normalized.includes("credit") || normalized.includes("rate")) {
     return new WebSearchProviderError("La fuente web alcanzó temporalmente su límite", "rate_limited", true, status);
   }
   if (status >= 500) return new WebSearchProviderError("La fuente web no está disponible temporalmente", "unavailable", true, status);
-  return new WebSearchProviderError(`La fuente web rechazó la búsqueda (HTTP ${status})`, "invalid_response", false, status);
+  return new WebSearchProviderError(`La fuente web rechazó la búsqueda (HTTP ${status}${serverMessage})`, "invalid_response", false, status);
 }
 
 function delay(ms: number): Promise<void> {
@@ -72,6 +80,34 @@ export class WebSearchClient {
 
   isConfigured(): boolean {
     return Boolean(this.apiKey);
+  }
+
+  private parseResponse(text: string, status: number): WebSearchResponse {
+    let data: Record<string, unknown>;
+    try { data = JSON.parse(text) as Record<string, unknown>; }
+    catch { throw new WebSearchProviderError("La fuente web devolvió una respuesta inválida", "invalid_response", true, status); }
+    const organic = Array.isArray(data.organic) ? data.organic : [];
+    const items = organic.map((raw): WebSearchResult | null => {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as Record<string, unknown>;
+      if (typeof row.title !== "string" || typeof row.link !== "string") return null;
+      return {
+        title: row.title,
+        link: row.link,
+        snippet: typeof row.snippet === "string" ? row.snippet : null,
+        date: typeof row.date === "string" ? row.date : null,
+        source: typeof row.source === "string" ? row.source : null,
+        position: typeof row.position === "number" ? row.position : null,
+        imageUrl: typeof row.imageUrl === "string" ? row.imageUrl : typeof row.thumbnail === "string" ? row.thumbnail : null,
+      };
+    }).filter((item): item is WebSearchResult => Boolean(item));
+    return {
+      items,
+      searchParameters: data.searchParameters && typeof data.searchParameters === "object"
+        ? data.searchParameters as Record<string, unknown>
+        : undefined,
+      creditsUsed: typeof data.credits === "number" ? data.credits : null,
+    };
   }
 
   async search(input: WebSearchInput): Promise<WebSearchResponse> {
@@ -97,32 +133,24 @@ export class WebSearchClient {
           signal: AbortSignal.timeout(20_000),
         });
         const text = await response.text();
-        if (!response.ok) throw classify(response.status, text);
-        let data: Record<string, unknown>;
-        try { data = JSON.parse(text) as Record<string, unknown>; }
-        catch { throw new WebSearchProviderError("La fuente web devolvió una respuesta inválida", "invalid_response", true, response.status); }
-        const organic = Array.isArray(data.organic) ? data.organic : [];
-        const items = organic.map((raw): WebSearchResult | null => {
-          if (!raw || typeof raw !== "object") return null;
-          const row = raw as Record<string, unknown>;
-          if (typeof row.title !== "string" || typeof row.link !== "string") return null;
-          return {
-            title: row.title,
-            link: row.link,
-            snippet: typeof row.snippet === "string" ? row.snippet : null,
-            date: typeof row.date === "string" ? row.date : null,
-            source: typeof row.source === "string" ? row.source : null,
-            position: typeof row.position === "number" ? row.position : null,
-            imageUrl: typeof row.imageUrl === "string" ? row.imageUrl : typeof row.thumbnail === "string" ? row.thumbnail : null,
-          };
-        }).filter((item): item is WebSearchResult => Boolean(item));
-        return {
-          items,
-          searchParameters: data.searchParameters && typeof data.searchParameters === "object"
-            ? data.searchParameters as Record<string, unknown>
-            : undefined,
-          creditsUsed: typeof data.credits === "number" ? data.credits : null,
-        };
+        if (!response.ok) {
+          // Si Serper rechaza la consulta con 400 debido a num > 10 en cuentas free ("Query pattern not allowed for free accounts")
+          if (response.status === 400 && Number(payload.num) > 10) {
+            payload.num = 10;
+            const fallbackResponse = await this.fetcher(this.endpoint, {
+              method: "POST",
+              headers: { "X-API-KEY": this.apiKey, "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(20_000),
+            });
+            const fallbackText = await fallbackResponse.text();
+            if (fallbackResponse.ok) {
+              return this.parseResponse(fallbackText, fallbackResponse.status);
+            }
+          }
+          throw classify(response.status, text);
+        }
+        return this.parseResponse(text, response.status);
       } catch (error) {
         lastError = error;
         const retryable = error instanceof WebSearchProviderError

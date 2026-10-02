@@ -370,8 +370,8 @@ export async function scanWebSignals(
 ): Promise<SignalScanResult> {
   if (!web.isConfigured()) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);
   const query = webQuery(context);
-  if (!query.trim()) throw new SignalScanError("La búsqueda web necesita palabras clave", "invalid_configuration", false);
-  const articleLimit = Math.max(20, Math.min(context.limit * 3, 30));
+  // Serper free tier limita a un máximo de 10 resultados para consultas booleanas complejas
+  const articleLimit = Math.min(10, Math.max(5, context.limit));
   const effectiveWindowDays = context.icp.time_window_days && context.icp.time_window_days > 30
     ? context.icp.time_window_days
     : (context.monitor.type === "funding_round" ? 180 : (context.icp.time_window_days || 60));
