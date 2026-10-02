@@ -55,7 +55,39 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/vp(?: de)? ventas|vp sales/i, "VP Sales"], [/cmos?\b/i, "CMO"],
   [/head of growth/i, "Head of Growth"], [/coos?\b/i, "COO"],
 ];
-const LOCATION_NAMES = ["España", "México", "Colombia", "Argentina", "Chile", "Perú", "Brasil", "Estados Unidos", "USA"];
+const LOCATION_MAP: Record<string, string> = {
+  "españa": "España", "spain": "España",
+  "méxico": "México", "mexico": "México",
+  "colombia": "Colombia",
+  "argentina": "Argentina",
+  "chile": "Chile",
+  "perú": "Perú", "peru": "Perú",
+  "brasil": "Brasil", "brazil": "Brasil",
+  "italia": "Italia", "italy": "Italia",
+  "francia": "Francia", "france": "Francia",
+  "alemania": "Alemania", "germany": "Alemania", "deutschland": "Alemania",
+  "portugal": "Portugal",
+  "reino unido": "Reino Unido", "uk": "Reino Unido", "united kingdom": "Reino Unido",
+  "estados unidos": "Estados Unidos", "usa": "Estados Unidos", "eeuu": "Estados Unidos", "united states": "Estados Unidos",
+  "uruguay": "Uruguay",
+  "ecuador": "Ecuador",
+  "panamá": "Panamá", "panama": "Panamá",
+  "costa rica": "Costa Rica",
+  "república dominicana": "República Dominicana", "republica dominicana": "República Dominicana",
+  "guatemala": "Guatemala",
+  "bolivia": "Bolivia",
+  "paraguay": "Paraguay",
+  "canadá": "Canadá", "canada": "Canadá",
+  "países bajos": "Países Bajos", "paises bajos": "Países Bajos", "netherlands": "Países Bajos", "holanda": "Países Bajos",
+  "suiza": "Suiza", "switzerland": "Suiza",
+  "suecia": "Suecia", "sweden": "Suecia",
+  "irlanda": "Irlanda", "ireland": "Irlanda",
+  "polonia": "Polonia", "poland": "Polonia",
+  "bélgica": "Bélgica", "belgica": "Bélgica", "belgium": "Bélgica",
+  "austria": "Austria",
+  "australia": "Australia",
+  "israel": "Israel",
+};
 
 function unique(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
@@ -64,7 +96,13 @@ function unique(values: string[]): string[] {
 export function deterministicSignalResearchPlan(query: string): SignalResearchPlan {
   const normalized = query.toLowerCase();
   const titles = unique(ROLE_PATTERNS.filter(([pattern]) => pattern.test(query)).map(([, role]) => role));
-  const locations = LOCATION_NAMES.filter((location) => normalized.includes(location.toLowerCase()));
+  const detectedLocations: string[] = [];
+  for (const [key, canonical] of Object.entries(LOCATION_MAP)) {
+    if (new RegExp(`\\b${key}\\b`, "i").test(normalized) && !detectedLocations.includes(canonical)) {
+      detectedLocations.push(canonical);
+    }
+  }
+  const locations = detectedLocations.length > 0 ? detectedLocations : [];
   const requested = query.match(/\b(?:encuentra|buscar?|dame|quiero)?\s*(\d{1,3})\b/i);
   const resultLimit = Math.max(1, Math.min(Number(requested?.[1] || 25), 100));
   let signalType: SignalType = "keyword_intent";

@@ -210,10 +210,74 @@ const LOCATION_SYNONYMS: Record<string, string[]> = {
     "uk", "united kingdom", "reino unido", "london", "londres", "manchester", "cambridge", "oxford"
   ],
   francia: [
-    "france", "francia", "paris", "parís", "lyon"
+    "france", "francia", "paris", "parís", "lyon", "marseille", "toulouse"
   ],
   alemania: [
-    "germany", "alemania", "deutschland", "berlin", "berlín", "munich", "múnich", "frankfurt", "hamburg"
+    "germany", "alemania", "deutschland", "berlin", "berlín", "munich", "múnich", "frankfurt", "hamburg", "cologne", "colonia"
+  ],
+  italia: [
+    "italia", "italy", "milan", "milano", "roma", "rome", "turin", "torino", "bologna",
+    "napoli", "naples", "florence", "firenze", "genoa", "genova", "venice", "venezia",
+    "lombardy", "lombardia", "lazio", "piemonte", "tuscany", "toscana"
+  ],
+  portugal: [
+    "portugal", "lisboa", "lisbon", "porto", "oporto", "braga", "coimbra", "faro", "aveiro"
+  ],
+  uruguay: [
+    "uruguay", "montevideo", "punta del este", "canelones", "maldonado"
+  ],
+  ecuador: [
+    "ecuador", "quito", "guayaquil", "cuenca", "pichincha", "guayas"
+  ],
+  panama: [
+    "panama", "panamá", "ciudad de panama", "ciudad de panamá"
+  ],
+  "costa rica": [
+    "costa rica", "san jose", "san josé", "heredia", "alajuela"
+  ],
+  "republica dominicana": [
+    "republica dominicana", "república dominicana", "dominican republic", "santo domingo", "santiago de los caballeros"
+  ],
+  guatemala: [
+    "guatemala", "ciudad de guatemala"
+  ],
+  bolivia: [
+    "bolivia", "la paz", "santa cruz", "santa cruz de la sierra", "cochabamba"
+  ],
+  paraguay: [
+    "paraguay", "asuncion", "asunción"
+  ],
+  canada: [
+    "canada", "canadá", "toronto", "vancouver", "montreal", "montréal", "ottawa", "calgary",
+    "ontario", "quebec", "british columbia", "alberta"
+  ],
+  "paises bajos": [
+    "paises bajos", "países bajos", "netherlands", "holland", "holanda", "amsterdam", "ámsterdam",
+    "rotterdam", "utrecht", "the hague", "la haya", "eindhoven"
+  ],
+  suiza: [
+    "suiza", "switzerland", "zurich", "zürich", "geneva", "ginebra", "basel", "basilea", "lausanne", "bern", "berna"
+  ],
+  suecia: [
+    "suecia", "sweden", "stockholm", "estocolmo", "gothenburg", "gotemburgo", "malmo", "malmö"
+  ],
+  irlanda: [
+    "irlanda", "ireland", "dublin", "dublín", "cork", "galway"
+  ],
+  polonia: [
+    "polonia", "poland", "warsaw", "varsovia", "krakow", "cracovia", "wroclaw"
+  ],
+  belgica: [
+    "belgica", "bélgica", "belgium", "brussels", "bruselas", "antwerp", "amberes", "ghent", "gante"
+  ],
+  austria: [
+    "austria", "vienna", "viena", "salzburg", "graz"
+  ],
+  australia: [
+    "australia", "sydney", "melbourne", "brisbane", "perth", "adelaide"
+  ],
+  israel: [
+    "israel", "tel aviv", "jerusalem", "haifa", "herzliya"
   ],
 };
 

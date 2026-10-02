@@ -68,7 +68,9 @@ const INVALID_COMPANY_NAMES = new Set([
   "colombia", "colombiana", "colombiano", "argentina", "argentino",
   "peru", "peruana", "peruano", "brasil", "brazil", "usa", "eeuu",
   "estados unidos", "united states", "uk", "reino unido", "france", "francia",
-  "germany", "alemania", "startup", "startups", "fundador", "founder", "ceo"
+  "germany", "alemania", "italia", "italy", "italiana", "italiano",
+  "portugal", "uruguay", "ecuador", "panama", "costa rica", "canada",
+  "startup", "startups", "fundador", "founder", "ceo"
 ]);
 
 function cleanCompany(value: string): string | null {
@@ -227,27 +229,72 @@ function timeRange(days: number): "day" | "week" | "month" | "year" {
   return "year";
 }
 
+const COUNTRY_CODES: Record<string, string> = {
+  espana: "es", spain: "es", mexico: "mx", colombia: "co", argentina: "ar",
+  chile: "cl", peru: "pe", brasil: "br", brazil: "br", usa: "us", "estados unidos": "us",
+  italia: "it", italy: "it", francia: "fr", france: "fr", alemania: "de", germany: "de",
+  portugal: "pt", uk: "gb", "reino unido": "gb", "united kingdom": "gb",
+  uruguay: "uy", ecuador: "ec", panama: "pa", "costa rica": "cr",
+  "república dominicana": "do", "republica dominicana": "do", guatemala: "gt",
+  bolivia: "bo", paraguay: "py", canada: "ca", "países bajos": "nl", "paises bajos": "nl",
+  netherlands: "nl", holanda: "nl", suiza: "ch", switzerland: "ch", suecia: "se",
+  sweden: "se", irlanda: "ie", ireland: "ie", australia: "au", israel: "il",
+  polonia: "pl", poland: "pl", belgica: "be", belgium: "be", austria: "at",
+};
+
 function locationCode(icp: SignalIcpFilters): string {
   const value = normalize(icp.locations?.[0]);
-  const codes: Record<string, string> = {
-    espana: "es", spain: "es", mexico: "mx", colombia: "co", argentina: "ar",
-    chile: "cl", peru: "pe", brasil: "br", brazil: "br", usa: "us", "estados unidos": "us",
+  return COUNTRY_CODES[value] || "us";
+}
+
+function searchLanguage(countryCode: string): string {
+  const LANG_MAP: Record<string, string> = {
+    es: "es", mx: "es", co: "es", ar: "es", cl: "es", pe: "es", uy: "es", ec: "es", pa: "es", cr: "es", do: "es", gt: "es", bo: "es", py: "es",
+    it: "it",
+    fr: "fr",
+    de: "de", at: "de",
+    pt: "pt", br: "pt",
+    gb: "en", us: "en", ca: "en", au: "en", ie: "en", il: "en", nl: "en", se: "en", ch: "en",
   };
-  return codes[value] || "us";
+  return LANG_MAP[countryCode] || "es";
 }
 
 function locationQueryTerm(location: string): string {
   const norm = normalize(location);
   const DEMONYMS: Record<string, string> = {
-    chile: '("Chile" OR "chilena" OR "chileno")',
     colombia: '("Colombia" OR "colombiana" OR "colombiano")',
+    chile: '("Chile" OR "chilena" OR "chileno")',
     mexico: '("México" OR "mexicana" OR "mexicano" OR "Mexico")',
     argentina: '("Argentina" OR "argentina" OR "argentino")',
     espana: '("España" OR "española" OR "español" OR "Spain")',
     spain: '("España" OR "española" OR "español" OR "Spain")',
     peru: '("Perú" OR "peruana" OR "peruano" OR "Peru")',
-    brasil: '("Brasil" OR "brasileña" OR "Brazil")',
-    brazil: '("Brasil" OR "brasileña" OR "Brazil")',
+    brasil: '("Brasil" OR "brasileña" OR "brasileño" OR "Brazil" OR "Brazilian")',
+    brazil: '("Brasil" OR "brasileña" OR "brasileño" OR "Brazil" OR "Brazilian")',
+    italia: '("Italia" OR "italiana" OR "italiano" OR "Italy" OR "Italian")',
+    italy: '("Italia" OR "italiana" OR "italiano" OR "Italy" OR "Italian")',
+    francia: '("Francia" OR "francesa" OR "francés" OR "France" OR "French")',
+    france: '("Francia" OR "francesa" OR "francés" OR "France" OR "French")',
+    alemania: '("Alemania" OR "alemana" OR "alemán" OR "Germany" OR "German")',
+    germany: '("Alemania" OR "alemana" OR "alemán" OR "Germany" OR "German")',
+    portugal: '("Portugal" OR "portuguesa" OR "portugués" OR "Portuguese")',
+    uruguay: '("Uruguay" OR "uruguaya" OR "uruguayo")',
+    ecuador: '("Ecuador" OR "ecuatoriana" OR "ecuatoriano")',
+    panama: '("Panamá" OR "Panama" OR "panameña" OR "panameño")',
+    "costa rica": '("Costa Rica" OR "costarricense")',
+    "reino unido": '("Reino Unido" OR "británica" OR "británico" OR "UK" OR "United Kingdom" OR "British")',
+    uk: '("Reino Unido" OR "británica" OR "británico" OR "UK" OR "United Kingdom" OR "British")',
+    "estados unidos": '("Estados Unidos" OR "estadounidense" OR "USA" OR "United States" OR "American")',
+    usa: '("Estados Unidos" OR "estadounidense" OR "USA" OR "United States" OR "American")',
+    canada: '("Canadá" OR "Canada" OR "canadiense" OR "Canadian")',
+    "paises bajos": '("Países Bajos" OR "Netherlands" OR "Holanda" OR "Dutch")',
+    netherlands: '("Países Bajos" OR "Netherlands" OR "Holanda" OR "Dutch")',
+    suiza: '("Suiza" OR "suizo" OR "Switzerland" OR "Swiss")',
+    switzerland: '("Suiza" OR "suizo" OR "Switzerland" OR "Swiss")',
+    suecia: '("Suecia" OR "Sweden" OR "Swedish")',
+    sweden: '("Suecia" OR "Sweden" OR "Swedish")',
+    irlanda: '("Irlanda" OR "Ireland" OR "Irish")',
+    ireland: '("Irlanda" OR "Ireland" OR "Irish")',
   };
   return DEMONYMS[norm] || `"${location}"`;
 }
@@ -256,10 +303,10 @@ function webQuery(context: SignalScannerContext): string {
   const titles = context.icp.titles?.length ? `(${context.icp.titles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
   const location = context.icp.locations?.length ? locationQueryTerm(context.icp.locations[0]) : "";
   const terms: Record<string, string> = {
-    funding_round: '("ronda de inversión" OR "levantó inversión" OR "financiamiento" OR "capital semilla" OR "Serie A" OR "funding round" OR "raised funding")',
-    acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió)',
-    industry_event: '(conference OR summit OR event OR conferencia OR feria)',
-    company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión)',
+    funding_round: '("ronda de inversión" OR "levantó inversión" OR "financiamiento" OR "capital semilla" OR "Serie A" OR "funding round" OR "raised funding" OR "round di finanziamento" OR "ha raccolto" OR "levée de fonds" OR "finanzierungsrunde")',
+    acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió OR acquisizione OR acquise)',
+    industry_event: '(conference OR summit OR event OR conferencia OR feria OR conferenza)',
+    company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión OR annuncio OR lancio)',
   };
 
   const activeKinds = (context.icp.event_kinds && context.icp.event_kinds.length > 0)
@@ -364,10 +411,12 @@ async function findPeople(
     await sleep(SERPER_COURTESY_DELAY_MS);
   }
 
+  const locCode = locationCode(context.icp);
+  const lang = searchLanguage(locCode);
   const xray = await web.search({
     query: `site:linkedin.com/in/ (${titles.map((title) => `"${title}"`).join(" OR ")}) "${company}"`,
-    country: locationCode(context.icp),
-    language: "es",
+    country: locCode,
+    language: lang,
     limit: Math.min(10, context.limit),
   });
   for (const result of xray.items) {
@@ -398,10 +447,12 @@ export async function scanWebSignals(
     ? context.icp.time_window_days
     : (context.monitor.type === "funding_round" ? 180 : (context.icp.time_window_days || 60));
 
+  const country = locationCode(context.icp);
+  const language = searchLanguage(country);
   const response = await web.search({
     query,
-    country: locationCode(context.icp),
-    language: "es",
+    country,
+    language,
     limit: articleLimit,
     timeRange: timeRange(effectiveWindowDays),
   });
