@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { resolveUnipileAccount } from "@/lib/unipile/account";
 import { unipile } from "@/lib/unipile/client";
 import type { UnipileSearchPost } from "@/lib/unipile/types";
+import { expandLocationCriteria, expandTitleCriteria } from "@/lib/signals/scanners/scoring";
 
 export interface DiscoveredPostItem {
   id: string;
@@ -51,28 +52,23 @@ function buildSearchQueries(keywords: string, competitor?: string, country?: str
   const cNorm = (country || "").toLowerCase().trim();
   const hasCountry = Boolean(cNorm && cNorm !== "global / todos" && cNorm !== "global" && cNorm !== "todos");
 
+  // 1. Si se especificó un país y la consulta no lo incluye, probar primero contextualizada con el país
   if (hasCountry && !keywords.toLowerCase().includes(cNorm)) {
-    if (cNorm === "brasil" || cNorm === "brazil") {
-      if (keywords.toLowerCase().includes("registro de marca")) {
-        const compPrefix = comp ? `${quoteTerm(comp)} ` : "";
-        queries.push(`${compPrefix}("registro de marca" OR "registro de marcas") Brasil`);
-      } else {
-        queries.push(`${baseQuery} Brasil`);
-      }
-    } else {
-      queries.push(`${baseQuery} ${country}`);
-    }
+    queries.push(`${baseQuery} ${country}`);
   }
 
+  // 2. Consulta estándar (con frases exactas entre comillas)
   if (baseQuery) {
     queries.push(baseQuery);
   }
 
+  // 3. Fallback: primer término individual si había múltiples
   if (splitTerms.length > 1) {
     const singleTerm = comp ? `${quoteTerm(comp)} ${quoteTerm(splitTerms[0])}` : quoteTerm(splitTerms[0]);
     queries.push(singleTerm);
   }
 
+  // 4. Fallback: sólo el competidor o marca si existe
   if (comp) {
     queries.push(quoteTerm(comp));
   }
@@ -90,7 +86,7 @@ function scorePost(
   const text = (post.text || "").toLowerCase();
   const headline = (post.author?.headline || "").toLowerCase();
 
-  // 1. Coincidencia de palabras clave en el texto
+  // 1. Coincidencia de palabras clave en el texto (universal para cualquier industria o servicio)
   for (const kw of icp.keywords) {
     const clean = kw.toLowerCase().replace(/"/g, "").trim();
     if (!clean) continue;
@@ -101,18 +97,17 @@ function scorePost(
     }
   }
 
-  // 2. Coincidencia con Cargo / Rol del ICP en el headline del autor
+  // 2. Coincidencia con Cargo / Rol del ICP en el headline del autor (universal con expandTitleCriteria)
   if (icp.title) {
     const titleTokens = icp.title
       .toLowerCase()
       .split(/[,;\/]+/)
       .map((t) => t.trim())
       .filter(Boolean);
-    const expanded = [...titleTokens];
-    if (titleTokens.some((t) => /abogad|advogad|lawyer|legal|jurid/i.test(t))) {
-      expanded.push("abogado", "abogada", "advogado", "advogada", "lawyer", "jurídico", "juridico", "oab", "direito", "marcas", "inpi");
-    }
-    const match = expanded.find((tok) => headline.includes(tok));
+    const expanded = expandTitleCriteria(titleTokens);
+    const match = Array.from(expanded).find(
+      (tok) => tok.length >= 3 && headline.includes(tok.toLowerCase())
+    );
     if (match) {
       score += 20;
       isIcpMatch = true;
@@ -120,15 +115,31 @@ function scorePost(
     }
   }
 
-  // 3. Coincidencia con País / Territorio
+  // 3. Coincidencia con País / Territorio (universal con expandLocationCriteria para cualquier país del mundo)
   if (icp.country && !/global/i.test(icp.country)) {
-    const isBr = /brasil|brazil/i.test(icp.country);
-    const cTokens = isBr
-      ? ["brasil", "brazil", "inpi", "são paulo", "sao paulo", "oab", "rio de janeiro", "curitiba", "porto alegre"]
-      : [icp.country.toLowerCase()];
-    if (cTokens.some((t) => text.includes(t) || headline.includes(t))) {
+    const expandedLocs = expandLocationCriteria([icp.country]);
+    const matchLoc = Array.from(expandedLocs).find(
+      (loc) => loc.length >= 3 && (text.includes(loc.toLowerCase()) || headline.includes(loc.toLowerCase()))
+    );
+    if (matchLoc) {
       score += 10;
       reasons.push(`Ubicación: ${icp.country}`);
+    }
+  }
+
+  // 4. Coincidencia con Industria / Empresa (universal para cualquier nicho o sector)
+  if (icp.company) {
+    const compTokens = icp.company
+      .toLowerCase()
+      .split(/[,;\/]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const matchComp = compTokens.find(
+      (tok) => tok.length >= 3 && (text.includes(tok) || headline.includes(tok))
+    );
+    if (matchComp) {
+      score += 10;
+      reasons.push(`Sector: ${matchComp}`);
     }
   }
 

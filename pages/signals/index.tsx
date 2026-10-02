@@ -2927,17 +2927,33 @@ export default function SignalsPage({
                                   </button>
                                 </div>
 
-                                {/* Chips sugeridos de 1 clic dinámicos según ICP */}
+                                {/* Chips sugeridos de 1 clic dinámicos según el nicho e ICP */}
                                 {(() => {
+                                  const textContext = `${icpTitle} ${icpCompany}`.toLowerCase();
                                   const isBr = icpCountry.toLowerCase().includes("brasil") || icpCountry.toLowerCase().includes("brazil");
-                                  const isLegal = /abogad|advogad|lawyer|legal|jurid/i.test(icpTitle) || /abogac|advocac|jurid/i.test(icpCompany);
-                                  const suggestedChips = isBr && isLegal
-                                    ? ["registro de marca", "direito empresarial", "marcas e patentes", "INPI", "advocacia corporativa", "startups Brasil"]
-                                    : isBr
-                                    ? ["registro de marca", "startups Brasil", "inteligência artificial", "prospecção b2b", "vendas b2b", "SaaS"]
+
+                                  const isDesign = /diseñ|disen|design|creativ|ui|ux|branding|arte|gráfico|grafico/i.test(textContext);
+                                  const isModeling = /model|fashion|moda|casting|producci|audiovisual|talento/i.test(textContext);
+                                  const isMarketing = /market|publicid|growth|inbound|seo|sem|content|social media/i.test(textContext);
+                                  const isLegal = /abogad|advogad|lawyer|legal|jurid|derecho|notari/i.test(textContext);
+                                  const isTech = /software|saas|tecnolog|tech|desarroll|ia\b|ai\b|data|cloud|cto/i.test(textContext);
+                                  const isConsulting = /consult|asesor|financ|rrhh|recursos humanos|operacion/i.test(textContext);
+
+                                  const suggestedChips = isDesign
+                                    ? ["diseño web", "branding", "diseño gráfico", "identidad visual", "ui ux", "portfolio"]
+                                    : isModeling
+                                    ? ["agencia de modelos", "casting", "producción audiovisual", "campaña publicitaria", "fotografía", "moda"]
+                                    : isMarketing
+                                    ? ["agencia de marketing", "generación de leads", "growth marketing", "publicidad", "inbound", "inversión publicitaria"]
                                     : isLegal
-                                    ? ["registro de marca", "derecho corporativo", "propiedad intelectual", "marcas y patentes", "compliance", "startups"]
-                                    : ["Prospección B2B", "Inteligencia Artificial", "Automatización", "Cold Outreach", "Generación de Leads", "SaaS"];
+                                    ? (isBr ? ["registro de marca", "direito empresarial", "marcas e patentes", "INPI", "advocacia corporativa", "startups Brasil"] : ["derecho corporativo", "registro de marca", "propiedad intelectual", "compliance", "contratos", "asesoría jurídica"])
+                                    : isTech
+                                    ? ["desarrollo de software", "inteligencia artificial", "saas b2b", "automatización", "transformación digital", "cloud"]
+                                    : isConsulting
+                                    ? ["consultoría estratégica", "eficiencia operativa", "finanzas corporativas", "transformación empresarial", "consultoría", "gestión"]
+                                    : isBr
+                                    ? ["prospecção b2b", "inteligência artificial", "startups Brasil", "vendas b2b", "SaaS", "automação"]
+                                    : ["Prospección B2B", "Inteligencia Artificial", "Automatización", "Generación de Leads", "Crecimiento Empresarial", "Estrategia"];
 
                                   return (
                                     <div className="space-y-1.5 mt-2">

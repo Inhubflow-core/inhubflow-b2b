@@ -148,6 +148,30 @@ const TITLE_SYNONYMS: Record<string, string[]> = {
     "cto", "tech", "tecnologia", "developer", "desarrollador", "software",
     "engineer", "ingeniero", "tech lead", "architect", "data", "it"
   ],
+  diseno: [
+    "diseno", "diseño", "design", "designer", "disenador", "diseñador", "diseñadora",
+    "creative director", "director creativo", "directora creativa", "ui", "ux",
+    "art director", "director de arte", "visual", "branding", "graphic designer",
+    "diseñador gráfico", "diseñadora gráfica", "motion graphics", "ilustrador", "ilustradora"
+  ],
+  legal: [
+    "abogado", "abogada", "advogado", "advogada", "lawyer", "attorney", "legal",
+    "juridico", "jurídico", "direito", "law", "counsel", "general counsel",
+    "compliance", "notario", "notaria", "marcas", "inpi", "propiedad intelectual"
+  ],
+  agencia: [
+    "agencia", "agency", "agência", "modelos", "modeling", "model agency", "talent",
+    "productor", "productora", "producer", "audiovisual", "fashion", "moda",
+    "casting", "fotografo", "fotógrafo", "fotografa", "fotógrafa", "media agency"
+  ],
+  consultoria: [
+    "consultor", "consultora", "consultant", "consulting", "asesor", "asesora",
+    "advisor", "coach", "mentor", "mentora", "auditor", "auditora", "socio consultor"
+  ],
+  servicios: [
+    "proveedor", "servicios", "services", "b2b", "director", "gerente",
+    "coordinador", "coordinadora", "especialista", "specialist", "partner"
+  ],
 };
 
 export function expandTitleCriteria(titles: string[]): string[] {
