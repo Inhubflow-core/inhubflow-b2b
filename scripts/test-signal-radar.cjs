@@ -27,7 +27,7 @@ const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/sc
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
-const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry } = require("../lib/signals/scanners/scoring.ts");
+const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -356,6 +356,22 @@ async function run() {
     assert.equal(result.leads[0].evidence.metadata.throttledExperience, true);
   }
 
+  console.log("▶ La evidencia web no acepta el company candidato sin identidad coincidente");
+  {
+    const webMock = {
+      isConfigured: () => true,
+      search: async () => ({ items: [{ link: "https://example.com/funding", title: "RealCo raises $5M", snippet: "RealCo raised funding", source: "example.com", date: "today" }] }),
+    };
+    const linkedInMock = {
+      searchLinkedIn: async () => ({ items: [{ type: "PEOPLE", id: "p-fake", name: "Wrong Person", profile_url: "https://www.linkedin.com/in/wrong-person/" }] }),
+      listLinkedInSearchParameters: async () => ({ items: [] }),
+      getPostComments: async () => ({ items: [] }), getPostReactions: async () => ({ items: [] }),
+      resolveProfile: async () => ({ provider_id: "p-fake", public_profile_url: "https://www.linkedin.com/in/wrong-person/", first_name: "Wrong", last_name: "Person", headline: "CEO at UnrelatedCo", work_experience: [] }),
+    };
+    const result = await scanWebSignals(webMock, linkedInMock, { monitor: { id: "m-web-fake", type: "funding_round" }, remoteAccountId: "remote-1", icp: { titles: ["CEO"], time_window_days: 30 }, keywords: ["RealCo"], cursor: null, limit: 5, hasSalesNavigator: false });
+    assert.equal(result.leads.length, 0);
+  }
+
   console.log("▶ Manejo de error 403 feature_not_subscribed como no reintentable");
   {
     const db = baseDb(); applySignalSchema(db);
@@ -367,22 +383,12 @@ async function run() {
     const failingClient = {
       isConfigured: () => true,
       getAccount: async () => ({ id: "remote-1", type: "LINKEDIN", sources: [{ status: "OK" }], connection_params: { premiumFeatures: [] } }),
-      searchLinkedIn: async () => {
-        const err = new Error("feature_not_subscribed");
-        err.status = 403;
-        throw err;
-      },
-      listLinkedInSearchParameters: async () => ({ items: [] }),
-      getPostComments: async () => ({ items: [] }),
-      getPostReactions: async () => ({ items: [] }),
-      listAccounts: async () => ({ items: [{ id: "remote-1", name: "test", provider: "LINKEDIN" }] }),
-      resolveProfile: async () => ({ object: "UserProfile", provider_id: "x" }),
+      searchLinkedIn: async () => { const err = new Error("feature_not_subscribed"); err.status = 403; throw err; },
+      listLinkedInSearchParameters: async () => ({ items: [] }), getPostComments: async () => ({ items: [] }), getPostReactions: async () => ({ items: [] }),
+      listAccounts: async () => ({ items: [{ id: "remote-1", name: "test", provider: "LINKEDIN" }] }), resolveProfile: async () => ({ object: "UserProfile", provider_id: "x" }),
     };
     const service = new SignalRadarService({ getDatabase: () => db, client: failingClient });
-    await assert.rejects(
-      () => service.scanMonitor("m-403", "manual", { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false }),
-      (err) => err.message.includes("Sales Navigator") || err.message.includes("feature_not_subscribed")
-    );
+    await assert.rejects(() => service.scanMonitor("m-403", "manual", { actorId: "user-1", workspaceOwnerId: "owner-1", isSuperAdmin: false }), (err) => err.message.includes("Sales Navigator") || err.message.includes("feature_not_subscribed"));
     const run = db.prepare("SELECT * FROM signal_scan_runs WHERE monitor_id='m-403'").get();
     assert.equal(run.state, "unsupported");
     assert.equal(run.error_code, "unsupported_capability");
@@ -442,11 +448,31 @@ async function run() {
     assert.ok(variants2.includes("leads b2b"), "Debe incluir original");
     assert.ok(variants2.includes("b2b leads"), "Debe invertir a b2b leads");
 
-    // Capitales/ciudades principales por país
+    // Capitales/ciudades principales por país (catálogo universal 55+ países)
     assert.equal(getPrimaryCityForCountry("Perú"), "Lima");
     assert.equal(getPrimaryCityForCountry("España"), "Madrid");
-    assert.equal(getPrimaryCityForCountry("México"), "CDMX");
+    assert.equal(getPrimaryCityForCountry("México"), "Ciudad de México");
     assert.equal(getPrimaryCityForCountry("Colombia"), "Bogotá");
+    assert.equal(getPrimaryCityForCountry("Chile"), "Santiago");
+    assert.equal(getPrimaryCityForCountry("Brasil"), "São Paulo");
+    assert.equal(getPrimaryCityForCountry("Alemania"), "Berlin");
+    assert.equal(getPrimaryCityForCountry("Francia"), "Paris");
+    assert.equal(getPrimaryCityForCountry("Reino Unido"), "London");
+    assert.equal(getPrimaryCityForCountry("Italia"), "Milano");
+
+    // Detección universal de idiomas regionales
+    assert.equal(hasRegionalLanguageMatch("Estrategias de ventas para empresas y clientes en crecimiento", "Chile"), true);
+    assert.equal(hasRegionalLanguageMatch("Estratégias de vendas para empresas e clientes em crescimento", "Brasil"), true);
+    assert.equal(hasRegionalLanguageMatch("Sales and growth strategies for our team and business clients", "Estados Unidos"), true);
+    assert.equal(hasRegionalLanguageMatch("Strategien für Unternehmen und Kunden im Vertrieb", "Alemania"), true);
+    assert.equal(hasRegionalLanguageMatch("Stratégies de vente pour nos entreprises et clients", "Francia"), true);
+    assert.equal(hasRegionalLanguageMatch("Strategie di vendita per le nostre aziende e clienti", "Italia"), true);
+
+    // Conflicto de país en cualquier territorio (Alemania rechaza Bangalore; Francia rechaza Moscú)
+    assert.equal(hasConflictingCountry("Join our engineering hub in Bangalore, India!", "Engineering Lead", "Alemania"), true);
+    assert.equal(hasConflictingCountry("Our headquarters in Berlin is expanding", "VP Growth Berlin", "Alemania"), false);
+    assert.equal(hasConflictingCountry("Nouveau poste à Moscou en Russie", "Directeur Commercial", "Francia"), true);
+    assert.equal(hasConflictingCountry("Expansion commerciale à Paris et Lyon", "Directeur Commercial", "Francia"), false);
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

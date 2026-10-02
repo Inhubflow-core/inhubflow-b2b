@@ -532,8 +532,7 @@ export async function scanWebSignals(
         // Plan B: Si LinkedIn vacía work_experience por throttling, verificar contra headline o candidate.company
         const companyVerified = companyMatches(current?.company, company)
           || companyMatches(profile.headline, company)
-          || companyMatches(inferredFromHeadline, company)
-          || (candidate.company && companyMatches(candidate.company, company));
+          || companyMatches(inferredFromHeadline, company);
 
         if (!companyVerified) continue;
         const headline = profile.headline || current?.position || null;

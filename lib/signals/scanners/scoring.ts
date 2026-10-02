@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DiscoveredSignalLead } from "./contracts";
 import type { SignalIcpFilters } from "../schema";
+import { COUNTRIES_LIST } from "@/lib/lead-finder/constants";
 
 function normalize(value: string | null | undefined): string {
   return String(value || "")
@@ -363,23 +364,43 @@ export function hasIncompatibleScript(text: string, country?: string): boolean {
 const FOREIGN_LOCATIONS_LIST: Array<{ countryPattern: RegExp; markers: string[] }> = [
   {
     countryPattern: /rusia|russia|ucrania|ukraine|bielorrusia|belarus/i,
-    markers: ["russia", "rusia", "moscow", "moscu", "saint petersburg", "petersburg", "ukraine", "ucrania", "kyiv", "kiev", "рускомтехнологии", "ruscom"],
+    markers: ["russia", "rusia", "russie", "russland", "moscow", "moscu", "moscou", "moskau", "saint petersburg", "petersburg", "ukraine", "ucrania", "kyiv", "kiev", "рускомтехнологии", "ruscom"],
   },
   {
     countryPattern: /india/i,
-    markers: ["india", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "pune", "chennai", "gurgaon", "noida"],
+    markers: ["india", "inde", "indien", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "pune", "chennai", "gurgaon", "noida"],
   },
   {
     countryPattern: /nigeria|kenya|ghana|south africa/i,
     markers: ["nigeria", "lagos", "abuja", "kenya", "nairobi", "ghana", "accra", "south africa", "johannesburg"],
   },
   {
-    countryPattern: /alemania|germany|deutschland/i,
-    markers: ["germany", "alemania", "deutschland", "berlin", "munich", "frankfurt", "hamburg"],
+    countryPattern: /alemania|germany|deutschland|allemagne/i,
+    markers: ["germany", "alemania", "deutschland", "allemagne", "berlin", "munich", "munchen", "münchen", "frankfurt", "hamburg", "cologne", "koln"],
   },
   {
-    countryPattern: /reino unido|united kingdom|uk/i,
-    markers: ["united kingdom", "reino unido", "london", "londres", "manchester", "birmingham"],
+    countryPattern: /reino unido|united kingdom|uk|royaume-uni/i,
+    markers: ["united kingdom", "reino unido", "royaume-uni", "grossbritannien", "uk", "london", "londres", "manchester", "birmingham"],
+  },
+  {
+    countryPattern: /estados unidos|united states|eeuu|usa|etats-unis/i,
+    markers: ["united states", "estados unidos", "etats-unis", "usa", "san francisco", "new york", "austin", "chicago", "seattle", "silicon valley"],
+  },
+  {
+    countryPattern: /francia|france|frankreich/i,
+    markers: ["france", "francia", "frankreich", "paris", "lyon", "marseille", "toulouse"],
+  },
+  {
+    countryPattern: /italia|italy|italie|italien/i,
+    markers: ["italia", "italy", "italie", "italien", "milan", "milano", "roma", "rome", "turin", "torino"],
+  },
+  {
+    countryPattern: /espana|españa|spain|espagne|spanien/i,
+    markers: ["spain", "españa", "espana", "espagne", "spanien", "madrid", "barcelona", "valencia", "sevilla"],
+  },
+  {
+    countryPattern: /brasil|brazil|bresil|brasilien/i,
+    markers: ["brasil", "brazil", "bresil", "brasilien", "sao paulo", "são paulo", "rio de janeiro", "curitiba"],
   },
 ];
 
@@ -430,7 +451,25 @@ export function getB2bTermVariants(term: string): string[] {
 
 export function getPrimaryCityForCountry(country: string): string | null {
   const norm = normalize(country);
-  const map: Record<string, string> = {
+  if (!norm) return null;
+
+  const preferredCity: Record<string, string> = {
+    espana: "Madrid",
+    peru: "Lima",
+    colombia: "Bogotá",
+  };
+  if (preferredCity[norm]) return preferredCity[norm];
+
+  // 1. Búsqueda dinámica en el catálogo universal de más de 55 países
+  const match = COUNTRIES_LIST.find(
+    (c) => normalize(c.name) === norm || normalize(c.code) === norm
+  );
+  if (match && match.popularCities && match.popularCities.length > 0) {
+    return match.popularCities[0];
+  }
+
+  // 2. Diccionario de respaldo adicional
+  const fallbackMap: Record<string, string> = {
     peru: "Lima",
     espana: "Madrid",
     mexico: "CDMX",
@@ -454,7 +493,7 @@ export function getPrimaryCityForCountry(country: string): string | null {
     italia: "Milano",
     italy: "Milano",
   };
-  return map[norm] || null;
+  return fallbackMap[norm] || null;
 }
 
 export function isSpanishCountry(country?: string): boolean {
@@ -469,6 +508,30 @@ export function isPortugueseCountry(country?: string): boolean {
   return /brasil|brazil|portugal/i.test(n);
 }
 
+export function isEnglishCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /estados unidos|united states|usa|eeuu|reino unido|united kingdom|uk|canada|canad[aá]|australia|nueva zelanda|new zealand|irlanda|ireland|singapur|singapore/i.test(n);
+}
+
+export function isFrenchCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /francia|france|belgica|belgium|suiza|switzerland/i.test(n);
+}
+
+export function isGermanCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /alemania|germany|deutschland|austria|suiza|switzerland/i.test(n);
+}
+
+export function isItalianCountry(country?: string): boolean {
+  if (!country) return false;
+  const n = normalize(country);
+  return /italia|italy/i.test(n);
+}
+
 export function hasSpanishLanguageIndicators(text: string): boolean {
   const spanishWordRegex = /\b(de|la|el|en|y|los|las|para|con|por|una|un|que|del|al|es|su|más|este|esta|nuestra|nuestro|como|sobre|estamos|crecimiento|clientes|empresas|ventas)\b/gi;
   const matches = text.match(spanishWordRegex);
@@ -479,6 +542,41 @@ export function hasPortugueseLanguageIndicators(text: string): boolean {
   const ptWordRegex = /\b(de|da|do|em|para|com|por|uma|um|que|na|no|mais|este|esta|nossa|nosso|como|sobre|estamos|crescimento|clientes|empresas|vendas)\b/gi;
   const matches = text.match(ptWordRegex);
   return Boolean(matches && matches.length >= 3);
+}
+
+export function hasEnglishLanguageIndicators(text: string): boolean {
+  const engWordRegex = /\b(the|and|for|that|this|with|from|our|team|growth|company|sales|clients|business|market)\b/gi;
+  const matches = text.match(engWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
+export function hasFrenchLanguageIndicators(text: string): boolean {
+  const frWordRegex = /\b(le|la|les|de|du|des|pour|avec|dans|sur|nous|notre|sont|entreprises|clients)\b/gi;
+  const matches = text.match(frWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
+export function hasGermanLanguageIndicators(text: string): boolean {
+  const deWordRegex = /\b(der|die|das|und|fuer|mit|von|im|ein|eine|wir|unser|sind|unternehmen|kunden)\b/gi;
+  const matches = text.match(deWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
+export function hasItalianLanguageIndicators(text: string): boolean {
+  const itWordRegex = /\b(il|la|le|gli|di|da|con|per|tra|un|una|nostro|nostra|aziende|clienti)\b/gi;
+  const matches = text.match(itWordRegex);
+  return Boolean(matches && matches.length >= 3);
+}
+
+export function hasRegionalLanguageMatch(text: string, country?: string): boolean {
+  if (!country) return false;
+  if (isSpanishCountry(country)) return hasSpanishLanguageIndicators(text);
+  if (isPortugueseCountry(country)) return hasPortugueseLanguageIndicators(text);
+  if (isEnglishCountry(country)) return hasEnglishLanguageIndicators(text);
+  if (isFrenchCountry(country)) return hasFrenchLanguageIndicators(text);
+  if (isGermanCountry(country)) return hasGermanLanguageIndicators(text);
+  if (isItalianCountry(country)) return hasItalianLanguageIndicators(text);
+  return false;
 }
 
 export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilters, nowMs = Date.now()): SignalScore {

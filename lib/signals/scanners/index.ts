@@ -13,7 +13,7 @@ import type {
 import type { SignalType } from "@/lib/signals/schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { canonicalLinkedInProfileUrl, evidenceFingerprint, extractCompanyFromHeadline } from "./scoring";
+import { canonicalLinkedInProfileUrl, evidenceFingerprint, extractCompanyFromHeadline, expandTitleCriteria } from "./scoring";
 import { scanWebSignals } from "./web";
 
 export interface SignalScannerClient {
@@ -387,11 +387,16 @@ async function scanPosts(client: SignalScannerClient, context: SignalScannerCont
     else datePosted = undefined;
   }
 
+  const locationIds = await resolveLocationIds(client, context);
+  const expandedTitles = context.icp.titles?.length
+    ? expandTitleCriteria(context.icp.titles)
+    : [];
   const { posts, cursor } = await postSearch(client, context, {
     keywords: query,
     sort_by: "date",
     ...(datePosted ? { date_posted: datePosted } : {}),
-    ...(context.icp.titles?.length ? { author: { keywords: context.icp.titles.join(" OR ") } } : {}),
+    ...(expandedTitles.length ? { author: { keywords: expandedTitles.join(" OR ") } } : {}),
+    ...(locationIds.length ? { location: locationIds } : {}),
   });
   const cutoff = Date.now() - (activeOnly ? 48 : Math.max(1, context.icp.time_window_days || 7) * 24) * 3_600_000;
   const leads = posts

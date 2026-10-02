@@ -11,10 +11,7 @@ import {
   hasConflictingCountry,
   getB2bTermVariants,
   getPrimaryCityForCountry,
-  isSpanishCountry,
-  isPortugueseCountry,
-  hasSpanishLanguageIndicators,
-  hasPortugueseLanguageIndicators,
+  hasRegionalLanguageMatch,
 } from "@/lib/signals/scanners/scoring";
 
 export interface DiscoveredPostItem {
@@ -154,12 +151,9 @@ function scorePost(
       score += 35;
       hasLocationMatch = true;
       reasons.push(`Ubicación: ${country}`);
-    } else if (isSpanishCountry(country) && hasSpanishLanguageIndicators(text)) {
+    } else if (hasRegionalLanguageMatch(text, country)) {
       score += 20;
-      reasons.push("Contenido en español");
-    } else if (isPortugueseCountry(country) && hasPortugueseLanguageIndicators(text)) {
-      score += 20;
-      reasons.push("Conteúdo em português");
+      reasons.push("Idioma regional");
     }
   } else {
     score += 15;
@@ -213,7 +207,7 @@ function scorePost(
   }
 
   const isIcpMatch = hasCountry
-    ? (hasTitleMatch && (hasLocationMatch || (isSpanishCountry(country) && hasSpanishLanguageIndicators(text)) || (isPortugueseCountry(country) && hasPortugueseLanguageIndicators(text))))
+    ? (hasTitleMatch && (hasLocationMatch || hasRegionalLanguageMatch(text, country)))
     : hasTitleMatch;
 
   return { score: Math.min(100, Math.max(0, score)), isIcpMatch, reasons };
