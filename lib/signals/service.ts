@@ -376,13 +376,14 @@ export class SignalRadarService {
       const keywords = parseJson<string[]>(monitor.keywords_json, []);
       const cursor = parseJson<SignalScanCursor | null>(monitor.cursor_json, null);
       const requestedLimit = Math.max(1, Math.min(icp.result_limit || 50, 100));
+      const scanLimit = Math.max(requestedLimit, Math.min(100, requestedLimit * 3));
       const raw = await scanRealSignals(this.client, {
         monitor,
         remoteAccountId: resolved.unipileAccountId,
         icp,
         keywords,
         cursor,
-        limit: requestedLimit,
+        limit: scanLimit,
         hasSalesNavigator: capabilities.salesNavigator,
         shouldAbort: options?.shouldAbort,
       }, this.webClient);
@@ -403,9 +404,19 @@ export class SignalRadarService {
       }
 
       const enriched: DiscoveredSignalLead[] = [];
-      for (const candidate of raw.leads.slice(0, requestedLimit)) {
+      const rejectedReasons: Record<string, number> = {};
+      for (const candidate of raw.leads) {
+        if (enriched.length >= requestedLimit) break;
         const lead = await this.enrichCandidate(candidate, resolved.unipileAccountId, profileCache);
-        if (lead && passesIcp(lead, icp)) enriched.push(lead);
+        if (!lead) {
+          rejectedReasons.invalid_profile = (rejectedReasons.invalid_profile || 0) + 1;
+          continue;
+        }
+        if (!passesIcp(lead, icp)) {
+          rejectedReasons.icp_mismatch = (rejectedReasons.icp_mismatch || 0) + 1;
+          continue;
+        }
+        enriched.push(lead);
       }
 
       if (throttledDetected) {
@@ -437,17 +448,23 @@ export class SignalRadarService {
           WHERE id = ? AND scan_lease_owner = ?
         `).run(JSON.stringify(raw.cursor || null), JSON.stringify(capabilities), completedAt, completedAt, next, monitor.id, leaseOwner);
       })();
-      this.logEvent(monitor.id, "scan_completed", { scanRunId, found: enriched.length, ...persisted, state });
+      this.logEvent(monitor.id, "scan_completed", { scanRunId, found: enriched.length, candidates: raw.leads.length, rejectedReasons, ...persisted, state });
+      const finalMessage = enriched.length
+        ? `Escaneo completado: ${enriched.length} señales reales verificadas${enriched.length < requestedLimit ? ` de ${requestedLimit} solicitadas` : ""}, ${persisted.newLeads} nuevos prospectos.`
+        : Object.keys(rejectedReasons).length
+          ? `Se encontraron ${raw.leads.length} candidatos, pero ninguno pasó la validación del ICP.`
+          : "No se encontraron candidatos en las fuentes consultadas.";
       return {
         success: true,
         state,
         found: enriched.length,
+        candidates: raw.leads.length,
+        rejectedReasons,
+        requested: requestedLimit,
         newLeads: persisted.newLeads,
         newObservations: persisted.newObservations,
         promoted: persisted.promoted,
-        message: enriched.length
-          ? `Escaneo completado: ${enriched.length} señales reales verificadas, ${persisted.newLeads} nuevos prospectos.`
-          : throttledNotice || "Escaneo completado sin nuevas señales reales.",
+        message: throttledNotice || finalMessage,
       };
     } catch (error) {
       const isFeatureNotSubscribed =

@@ -30,10 +30,20 @@ export interface SignalScanCursor {
   [key: string]: unknown;
 }
 
+export interface SignalScanDiagnostics {
+  candidatesSeen: number;
+  candidatesEmitted: number;
+  articlesSeen?: number;
+  articlesAccepted?: number;
+  rejected?: Record<string, number>;
+  query?: string;
+}
+
 export interface SignalScanResult {
   leads: DiscoveredSignalLead[];
   cursor?: SignalScanCursor | null;
   capability?: string;
+  diagnostics?: SignalScanDiagnostics;
 }
 
 export interface SignalScannerContext {

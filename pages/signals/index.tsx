@@ -1320,7 +1320,11 @@ export default function SignalsPage({
         setAskResults(data.leads);
         // Sincronizar inmediatamente la tabla Hot Leads para reflejar los nuevos prospectos
         fetchLeads();
-        toast.success(`Se encontraron ${data.leads.length} prospectos de alta intención`, { id: toastId });
+        const scan = data.scan || {};
+        const detail = scan.candidates != null && scan.requested != null
+          ? ` (${scan.candidates} candidatos revisados; ${scan.requested} solicitados)`
+          : "";
+        toast.success(`Se encontraron ${data.leads.length} prospectos de alta intención${detail}`, { id: toastId });
       } else {
         toast.error(data.error || "Error en la consulta Ask AI", { id: toastId });
       }
