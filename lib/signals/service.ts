@@ -17,7 +17,15 @@ import {
 } from "./schema";
 import { scanRealSignals, accountHasSalesNavigator, type SignalScannerClient } from "./scanners";
 import { SignalScanError, type DiscoveredSignalLead, type SignalScanCursor } from "./scanners/contracts";
-import { canonicalLinkedInProfileUrl, extractCompanyFromHeadline, passesIcp, scoreSignalLead, signalIdentity } from "./scanners/scoring";
+import {
+  canonicalLinkedInProfileUrl,
+  extractCompanyFromHeadline,
+  isAnonymousLinkedInMember,
+  isAnonymousOrInvalidLinkedInUrl,
+  passesIcp,
+  scoreSignalLead,
+  signalIdentity,
+} from "./scanners/scoring";
 import { isExperienceThrottled } from "./scanners/identity";
 import type { UnipileProfile } from "@/lib/unipile/types";
 import { generateSignalMessage } from "./message-generator";
@@ -502,8 +510,9 @@ export class SignalRadarService {
     remoteAccountId: string,
     profileCache?: Map<string, UnipileProfile>,
   ): Promise<DiscoveredSignalLead | null> {
+    if (isAnonymousLinkedInMember(candidate.fullName)) return null;
     const canonical = canonicalLinkedInProfileUrl(candidate.linkedinUrl);
-    if (!canonical) return null;
+    if (!canonical || isAnonymousOrInvalidLinkedInUrl(canonical)) return null;
     try {
       let profile = candidate.evidence?.metadata?.resolvedProfile as UnipileProfile | undefined;
       if (!profile && profileCache?.has(canonical)) {
@@ -515,20 +524,28 @@ export class SignalRadarService {
         profile = await this.client!.resolveProfile(canonical, remoteAccountId);
         if (profileCache) profileCache.set(canonical, profile);
       }
+      const resolvedName = fullName(profile, candidate.fullName);
+      if (isAnonymousLinkedInMember(resolvedName)) return null;
       const current = profile.work_experience?.find((item) => item.current) || profile.work_experience?.[0];
       const headline = profile.headline || candidate.headline || current?.position || null;
       const company = current?.company || candidate.company || extractCompanyFromHeadline(headline) || null;
+      const resolvedUrl = profile.public_profile_url || profile.profile_url || canonical;
+      if (isAnonymousOrInvalidLinkedInUrl(resolvedUrl)) return null;
+
       return {
         ...candidate,
-        linkedinUrl: profile.public_profile_url || profile.profile_url || canonical,
+        linkedinUrl: resolvedUrl,
         providerId: profile.provider_id || candidate.providerId,
-        fullName: fullName(profile, candidate.fullName),
+        fullName: resolvedName,
         headline,
         company,
         location: profile.location || candidate.location || current?.location || null,
         profileImageUrl: profile.profile_picture_url_large || profile.profile_picture_url || ((profile as unknown as { picture_url?: string }).picture_url ?? null) || candidate.profileImageUrl || null,
       };
     } catch {
+      if (isAnonymousLinkedInMember(candidate.fullName) || isAnonymousOrInvalidLinkedInUrl(canonical)) {
+        return null;
+      }
       return { ...candidate, linkedinUrl: canonical };
     }
   }

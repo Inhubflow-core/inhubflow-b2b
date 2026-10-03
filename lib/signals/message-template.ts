@@ -16,8 +16,16 @@ export function parseSignalMessageConfig(monitor: Pick<SignalMonitor, "message_c
   }
 }
 
+function cleanFirstName(fullName: string): string {
+  const first = (fullName || "").trim().split(/\s+/)[0] || "";
+  if (/^(usu[aá]rio|usuario|linkedin|miembro|member)$/i.test(first)) {
+    return "";
+  }
+  return first;
+}
+
 function fillTemplate(template: string, lead: SignalMessageLead, topic: string, competitor: string): string {
-  const firstName = lead.full_name.split(/\s+/)[0] || "Hola";
+  const firstName = cleanFirstName(lead.full_name) || "Hola";
   return template
     .replace(/\{first_name\}/gi, firstName)
     .replace(/\{company\}/gi, lead.company || "tu empresa")
@@ -30,7 +38,8 @@ export function deterministicAntiStalkerMessage(
   lead: SignalMessageLead,
 ): string {
   const config = parseSignalMessageConfig(monitor as Pick<SignalMonitor, "message_config_json">);
-  const firstName = lead.full_name.split(/\s+/)[0] || "Hola";
+  const rawFirst = cleanFirstName(lead.full_name);
+  const firstName = rawFirst || "";
   const company = lead.company || "tu empresa";
   let keywords: string[] = [];
   try { keywords = monitor.keywords_json ? JSON.parse(monitor.keywords_json) as string[] : []; } catch {}

@@ -17,10 +17,38 @@ export function canonicalLinkedInProfileUrl(value: string): string | null {
     if (!/(^|\.)linkedin\.com$/i.test(url.hostname)) return null;
     const match = url.pathname.match(/\/in\/([^/]+)/i);
     if (!match?.[1]) return null;
-    return `https://www.linkedin.com/in/${decodeURIComponent(match[1]).toLowerCase()}/`;
+    const identifier = decodeURIComponent(match[1]).toLowerCase();
+    // Descartar URLs con hashes privados o anónimos que dan 404 en LinkedIn
+    if (identifier.startsWith("acoaa") || ["unknown", "null", "undefined"].includes(identifier)) {
+      return null;
+    }
+    return `https://www.linkedin.com/in/${identifier}/`;
   } catch {
     return null;
   }
+}
+
+export function isAnonymousLinkedInMember(name: string | null | undefined): boolean {
+  if (!name) return true;
+  const n = normalize(name);
+  return (
+    n === "linkedin member" ||
+    n === "usuario do linkedin" ||
+    n === "usuario de linkedin" ||
+    n === "miembro de linkedin" ||
+    n.startsWith("linkedin member") ||
+    n.startsWith("usuario do linkedin") ||
+    n.startsWith("usuario de linkedin") ||
+    n.startsWith("miembro de linkedin")
+  );
+}
+
+export function isAnonymousOrInvalidLinkedInUrl(url: string | null | undefined): boolean {
+  if (!url) return true;
+  const n = url.trim().toLowerCase();
+  if (/\/in\/acoaa[a-z0-9_-]+/i.test(n)) return true;
+  if (/\/in\/(unknown|null|undefined)\b/i.test(n)) return true;
+  return false;
 }
 
 export function signalIdentity(lead: DiscoveredSignalLead): string {
@@ -609,6 +637,11 @@ export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilter
 }
 
 export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): boolean {
+  // Descartar automáticamente perfiles anónimos (LinkedIn Member / Usuário do LinkedIn) y URLs inválidas
+  if (isAnonymousLinkedInMember(lead.fullName) || isAnonymousOrInvalidLinkedInUrl(lead.linkedinUrl)) {
+    return false;
+  }
+
   const effectiveCompany = lead.company || extractCompanyFromHeadline(lead.headline);
 
   // 1. Exclusiones obligatorias: si coincide con una exclusión, se descarta siempre

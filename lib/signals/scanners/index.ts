@@ -13,7 +13,14 @@ import type {
 import type { SignalType } from "@/lib/signals/schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { canonicalLinkedInProfileUrl, evidenceFingerprint, extractCompanyFromHeadline, expandTitleCriteria } from "./scoring";
+import {
+  canonicalLinkedInProfileUrl,
+  evidenceFingerprint,
+  extractCompanyFromHeadline,
+  expandTitleCriteria,
+  isAnonymousLinkedInMember,
+  isAnonymousOrInvalidLinkedInUrl,
+} from "./scoring";
 import { scanWebSignals } from "./web";
 
 export interface SignalScannerClient {
@@ -89,8 +96,15 @@ function parseTargetUrls(raw?: string | null): string[] {
 
 function profileUrl(publicIdentifier?: string, explicit?: string): string | null {
   const normalized = explicit ? canonicalLinkedInProfileUrl(explicit) : null;
-  if (normalized) return normalized;
-  return publicIdentifier ? `https://www.linkedin.com/in/${publicIdentifier}/` : null;
+  if (normalized && !isAnonymousOrInvalidLinkedInUrl(normalized)) return normalized;
+  if (
+    publicIdentifier &&
+    !publicIdentifier.toLowerCase().startsWith("acoaa") &&
+    !["unknown", "null", "undefined"].includes(publicIdentifier.toLowerCase())
+  ) {
+    return `https://www.linkedin.com/in/${publicIdentifier}/`;
+  }
+  return null;
 }
 
 function authorLead(input: {
@@ -109,9 +123,10 @@ function authorLead(input: {
   profileImageUrl?: string | null;
   metadata?: Record<string, unknown>;
 }): DiscoveredSignalLead | null {
-  const url = profileUrl(input.publicIdentifier || undefined, input.explicitProfileUrl || undefined);
   const name = input.name?.trim();
-  if (!url || !name) return null;
+  if (!name || isAnonymousLinkedInMember(name)) return null;
+  const url = profileUrl(input.publicIdentifier || undefined, input.explicitProfileUrl || undefined);
+  if (!url || isAnonymousOrInvalidLinkedInUrl(url)) return null;
   const providerId = input.id?.trim() || null;
   const fingerprint = evidenceFingerprint({
     monitorId: input.monitorId,
@@ -141,8 +156,9 @@ function authorLead(input: {
 }
 
 function searchPersonLead(monitorId: string, signalType: string, item: UnipileSearchPerson, snippet: string): DiscoveredSignalLead | null {
+  if (isAnonymousLinkedInMember(item.name)) return null;
   const url = profileUrl(item.public_identifier, item.profile_url || item.public_profile_url);
-  if (!url || !item.name) return null;
+  if (!url || !item.name || isAnonymousOrInvalidLinkedInUrl(url)) return null;
   const current = item.current_positions?.[0];
   return {
     linkedinUrl: url,
