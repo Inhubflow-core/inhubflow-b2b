@@ -529,7 +529,8 @@ export class SignalRadarService {
       const current = profile.work_experience?.find((item) => item.current) || profile.work_experience?.[0];
       const headline = profile.headline || candidate.headline || current?.position || null;
       const company = current?.company || candidate.company || extractCompanyFromHeadline(headline) || null;
-      const resolvedUrl = profile.public_profile_url || profile.profile_url || canonical;
+      const vanityUrl = profile.public_identifier ? `https://www.linkedin.com/in/${profile.public_identifier}/` : null;
+      const resolvedUrl = profile.public_profile_url || vanityUrl || profile.profile_url || canonical;
       if (isAnonymousOrInvalidLinkedInUrl(resolvedUrl)) return null;
 
       return {

@@ -99,10 +99,11 @@ function profileUrl(publicIdentifier?: string, explicit?: string): string | null
   if (normalized && !isAnonymousOrInvalidLinkedInUrl(normalized)) return normalized;
   if (
     publicIdentifier &&
-    !publicIdentifier.toLowerCase().startsWith("acoaa") &&
     !["unknown", "null", "undefined"].includes(publicIdentifier.toLowerCase())
   ) {
-    return `https://www.linkedin.com/in/${publicIdentifier}/`;
+    const rawId = publicIdentifier.trim();
+    const id = rawId.startsWith("ACoAA") ? rawId : rawId.toLowerCase();
+    return `https://www.linkedin.com/in/${id}/`;
   }
   return null;
 }
@@ -303,7 +304,10 @@ function parseReactionLead(
   const authorName = (
     authorObj.name || `${authorObj.first_name || ""} ${authorObj.last_name || ""}`.trim()
   )?.trim();
-  const profileUrlVal = authorObj.profile_url || authorObj.public_profile_url || null;
+  const profileUrlVal =
+    authorObj.profile_url ||
+    authorObj.public_profile_url ||
+    (authorObj.id ? `https://www.linkedin.com/in/${authorObj.id}/` : null);
   const headlineVal = authorObj.headline || null;
   const reactionKind = reaction.value || reaction.reaction_type || "LIKE";
   const snippet = fallbackSnippet || `Reaccionó (${reactionKind}) a la publicación`;
@@ -317,7 +321,7 @@ function parseReactionLead(
     occurredAt: new Date().toISOString(),
     snippet,
     id: authorObj.id || null,
-    publicIdentifier: authorObj.public_identifier || null,
+    publicIdentifier: authorObj.public_identifier || authorObj.id || null,
     name: authorName,
     headline: headlineVal,
     explicitProfileUrl: profileUrlVal,
@@ -339,6 +343,7 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
   const postsToScan = targetUrls.slice(0, 15);
   const limitPerPost = Math.max(10, Math.floor(context.limit / Math.max(1, postsToScan.length)));
+  const reactionLimitPerPost = Math.min(50, Math.max(35, limitPerPost * 2));
   const leads: DiscoveredSignalLead[] = [];
   const seenFingerprints = new Set<string>();
 
@@ -354,7 +359,7 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
         ? fetchPostItemsWithFallback((u) => client.getPostComments(u, context.remoteAccountId, limitPerPost), urn)
         : Promise.resolve({ items: [] }),
       shouldFetchReactions
-        ? fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, limitPerPost), urn)
+        ? fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, reactionLimitPerPost), urn)
         : Promise.resolve({ items: [] }),
     ]);
 
@@ -451,7 +456,7 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
     if (!postUrn) continue;
     const [comments, reactions] = await Promise.all([
       fetchPostItemsWithFallback((u) => client.getPostComments(u, context.remoteAccountId, Math.min(context.limit, 25)), postUrn),
-      fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, Math.min(context.limit, 25)), postUrn),
+      fetchPostItemsWithFallback((u) => client.getPostReactions(u, context.remoteAccountId, Math.min(50, Math.max(25, context.limit))), postUrn),
     ]);
     for (const comment of comments.items || []) {
       const lead = parseCommentLead(

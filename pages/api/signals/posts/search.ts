@@ -319,12 +319,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const splitKeywords = rawKeywords
         .split(/[,;\n]+/)
-        .map((k) => k.trim().toLowerCase())
+        .map((k) => k.trim())
         .filter(Boolean);
 
+      const matchesKeywordTerm = (text: string, kw: string): boolean => {
+        if (!text || !kw) return false;
+        const trimmed = kw.trim();
+        if (trimmed.includes(" ")) {
+          return text.toLowerCase().includes(trimmed.toLowerCase());
+        }
+        const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`(^|[^a-záéíóúüñ0-9_])${escaped}([^a-záéíóúüñ0-9_]|$)`, "i");
+        return regex.test(text);
+      };
+
       let matchedPosts: DiscoveredPostItem[] = (postsRaw as any[]).map((post) => {
-        const text = (post.text || "").toLowerCase();
-        const matchedKws = splitKeywords.filter((k) => text.includes(k));
+        const text = post.text || "";
+        const matchedKws = splitKeywords.filter((k) => matchesKeywordTerm(text, k));
         const isMatch = splitKeywords.length === 0 || matchedKws.length > 0;
 
         let score = 60;
@@ -364,8 +375,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Si se indicaron palabras clave, filtrar estrictamente para que contengan al menos una
       if (splitKeywords.length > 0) {
         matchedPosts = matchedPosts.filter((p) => {
-          const t = (p.text || "").toLowerCase();
-          return splitKeywords.some((k) => t.includes(k));
+          const t = p.text || "";
+          return splitKeywords.some((k) => matchesKeywordTerm(t, k));
         });
       }
 

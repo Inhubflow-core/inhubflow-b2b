@@ -17,11 +17,14 @@ export function canonicalLinkedInProfileUrl(value: string): string | null {
     if (!/(^|\.)linkedin\.com$/i.test(url.hostname)) return null;
     const match = url.pathname.match(/\/in\/([^/]+)/i);
     if (!match?.[1]) return null;
-    const identifier = decodeURIComponent(match[1]).toLowerCase();
-    // Descartar URLs con hashes privados o anónimos que dan 404 en LinkedIn
-    if (identifier.startsWith("acoaa") || ["unknown", "null", "undefined"].includes(identifier)) {
+    const rawIdentifier = decodeURIComponent(match[1]).trim();
+    const lower = rawIdentifier.toLowerCase();
+    // Descartar URLs explícitamente desconocidas o nulas
+    if (["unknown", "null", "undefined"].includes(lower)) {
       return null;
     }
+    // Si es un provider ID de LinkedIn (ACoAA...), preservar el case exacto porque es sensible a mayúsculas/minúsculas en la API
+    const identifier = rawIdentifier.startsWith("ACoAA") ? rawIdentifier : lower;
     return `https://www.linkedin.com/in/${identifier}/`;
   } catch {
     return null;
@@ -46,7 +49,6 @@ export function isAnonymousLinkedInMember(name: string | null | undefined): bool
 export function isAnonymousOrInvalidLinkedInUrl(url: string | null | undefined): boolean {
   if (!url) return true;
   const n = url.trim().toLowerCase();
-  if (/\/in\/acoaa[a-z0-9_-]+/i.test(n)) return true;
   if (/\/in\/(unknown|null|undefined)\b/i.test(n)) return true;
   return false;
 }
