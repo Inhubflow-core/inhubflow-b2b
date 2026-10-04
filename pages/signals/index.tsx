@@ -478,10 +478,18 @@ export default function SignalsPage({
 
   const selectedCountryOption = COUNTRIES_LIST.find((c) => c.name === icpCountry) || COUNTRIES_LIST[0];
 
-  const icpTitles = icpTitle
-    .split(/[,;]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const isAllTitlesSelected =
+    !icpTitle.trim() ||
+    icpTitle.toLowerCase().includes("todos") ||
+    icpTitle.toLowerCase().includes("cualquier cargo") ||
+    icpTitle.toLowerCase().includes("cualquiera");
+
+  const icpTitles = isAllTitlesSelected
+    ? ["Todos"]
+    : icpTitle
+        .split(/[,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
   const icpLocations = (() => {
     const locs: string[] = [];
@@ -2525,28 +2533,52 @@ export default function SignalsPage({
 
                     {/* Cargo / Título Profesional */}
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                        {t("signalRadar.wizard.step1.titleLabel")} <span className="text-brand-500">*</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          {t("signalRadar.wizard.step1.titleLabel")} <span className="text-brand-500">*</span>
+                        </label>
+                        {isAllTitlesSelected && (
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            ✓ Se capturarán todos los perfiles sin filtrar por cargo
+                          </span>
+                        )}
+                      </div>
                       <div className="relative">
                         <RiBriefcaseLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
                         <input
                           type="text"
                           value={icpTitle}
                           onChange={(e) => setIcpTitle(e.target.value)}
-                          placeholder={t("signalRadar.wizard.step1.titlePlaceholder")}
+                          placeholder="Ej: CEO, Director, o escribe 'Todos' para no filtrar cargo"
                           className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                         />
                       </div>
-                      {/* Sugerencias de cargos (Pills idénticos a Lead Finder) */}
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      {/* Sugerencias de cargos con opción de Todos */}
+                      <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                        <button
+                          type="button"
+                          onClick={() => setIcpTitle(isAllTitlesSelected ? "" : "Todos / Cualquier Cargo")}
+                          className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                            isAllTitlesSelected
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-xs"
+                              : "bg-emerald-50/80 border-emerald-300 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+                          }`}
+                        >
+                          {isAllTitlesSelected ? "✓ 🌐 Todos (Sin filtrar cargo)" : "+ 🌐 Todos (Sin filtrar cargo)"}
+                        </button>
                         {SAMPLE_TITLES.map((st) => {
-                          const active = isPillActive(icpTitle, st);
+                          const active = !isAllTitlesSelected && isPillActive(icpTitle, st);
                           return (
                             <button
                               key={st}
                               type="button"
-                              onClick={() => setIcpTitle(toggleOrAppendPill(icpTitle, st))}
+                              onClick={() => {
+                                if (isAllTitlesSelected) {
+                                  setIcpTitle(st);
+                                } else {
+                                  setIcpTitle(toggleOrAppendPill(icpTitle, st));
+                                }
+                              }}
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
                                 active
                                   ? "bg-brand-500 border-brand-500 text-white shadow-xs"

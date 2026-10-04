@@ -668,11 +668,19 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
     && lead.evidence.metadata?.identityVerified === true;
 
   // 2. Cargos: con expansión semántica inteligente (inglés/español)
-  if (icp.titles?.length && lead.headline) {
-    const expandedTitles = expandTitleCriteria(icp.titles);
-    const matchesTitle = containsAny(lead.headline, expandedTitles);
-    if (!matchesTitle && !isDirectPostSignal) {
-      return false;
+  if (icp.titles?.length) {
+    const isAllTitles = icp.titles.some((t) => {
+      const n = normalize(t);
+      return n === "todos" || n === "all" || n === "cualquiera" || n === "cualquier cargo" || n.includes("todos");
+    });
+
+    if (!isAllTitles) {
+      if (!lead.headline) return false;
+      const expandedTitles = expandTitleCriteria(icp.titles);
+      const matchesTitle = containsAny(lead.headline, expandedTitles);
+      if (!matchesTitle) {
+        return false;
+      }
     }
   }
 
