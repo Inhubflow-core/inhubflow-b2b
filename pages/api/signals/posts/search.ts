@@ -269,6 +269,151 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       unipileDatePosted = undefined;
     }
 
+    // 1. Si se especificó un competidor (ID seleccionado o nombre), buscar directamente sus publicaciones
+    const competitorId = typeof req.body?.competitor_id === "string" ? req.body.competitor_id.trim() : "";
+    const competitorIsCompany = Boolean(req.body?.competitor_is_company);
+    const competitorName = typeof req.body?.competitor_name === "string" ? req.body.competitor_name.trim() : rawCompetitor;
+
+    let targetEntityId = competitorId;
+    let targetIsCompany = competitorIsCompany;
+
+    if (!targetEntityId && rawCompetitor) {
+      // Auto-resolver si sólo viene el nombre en texto
+      const [compRes, peopleRes] = await Promise.allSettled([
+        unipile.searchLinkedIn({
+          account_id: resolved.unipileAccountId,
+          api: "classic",
+          category: "companies",
+          keywords: rawCompetitor,
+          limit: 1,
+        }),
+        unipile.searchLinkedIn({
+          account_id: resolved.unipileAccountId,
+          api: "classic",
+          category: "people",
+          keywords: rawCompetitor,
+          limit: 1,
+        }),
+      ]);
+
+      const foundComp = compRes.status === "fulfilled" ? (compRes.value?.items || [])[0] as any : null;
+      const foundPerson = peopleRes.status === "fulfilled" ? (peopleRes.value?.items || [])[0] as any : null;
+
+      if (foundComp?.id && foundComp?.name) {
+        targetEntityId = String(foundComp.id);
+        targetIsCompany = true;
+      } else if (foundPerson?.id && foundPerson?.name) {
+        targetEntityId = String(foundPerson.id);
+        targetIsCompany = false;
+      }
+    }
+
+    if (targetEntityId) {
+      // Obtener publicaciones reales del perfil o empresa
+      const postsRaw = await unipile.getUserPosts({
+        account_id: resolved.unipileAccountId,
+        identifier: targetEntityId,
+        is_company: targetIsCompany,
+        limit: Math.max(30, numericLimit),
+      });
+
+      const splitKeywords = rawKeywords
+        .split(/[,;\n]+/)
+        .map((k) => k.trim().toLowerCase())
+        .filter(Boolean);
+
+      let matchedPosts: DiscoveredPostItem[] = (postsRaw as any[]).map((post) => {
+        const text = (post.text || "").toLowerCase();
+        const matchedKws = splitKeywords.filter((k) => text.includes(k));
+        const isMatch = splitKeywords.length === 0 || matchedKws.length > 0;
+
+        let score = 60;
+        if (matchedKws.length > 0) {
+          score += 25 + Math.min(15, matchedKws.length * 5);
+        }
+
+        const reasons: string[] = [];
+        if (matchedKws.length > 0) {
+          reasons.push(`Contiene palabra clave: ${matchedKws.join(", ")}`);
+        }
+        reasons.push(`Publicación oficial de ${post.author?.name || competitorName}`);
+
+        return {
+          id: post.id || post.social_id || "",
+          shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
+          text: post.text || "",
+          date: post.date || null,
+          parsedDatetime: post.parsed_datetime || null,
+          reactionCount: Number(post.reaction_counter) || 0,
+          commentCount: Number(post.comment_counter) || 0,
+          repostCount: Number(post.repost_counter) || 0,
+          author: {
+            id: post.author?.id || targetEntityId,
+            name: post.author?.name || competitorName || "Competidor",
+            headline: post.author?.headline || null,
+            profilePictureUrl: post.author?.profile_picture_url || null,
+            publicIdentifier: post.author?.public_identifier || null,
+            isCompany: Boolean(post.author?.is_company ?? targetIsCompany),
+          },
+          relevanceScore: score,
+          isIcpMatch: isMatch,
+          relevanceReasons: reasons,
+        };
+      });
+
+      // Si se indicaron palabras clave, filtrar estrictamente para que contengan al menos una
+      if (splitKeywords.length > 0) {
+        matchedPosts = matchedPosts.filter((p) => {
+          const t = (p.text || "").toLowerCase();
+          return splitKeywords.some((k) => t.includes(k));
+        });
+      }
+
+      // Filtrar por fecha si se seleccionó past_24h, past_week o past_month
+      if (unipileDatePosted && matchedPosts.length > 0) {
+        const now = Date.now();
+        const maxAgeMs =
+          unipileDatePosted === "past_24h"
+            ? 24 * 60 * 60 * 1000
+            : unipileDatePosted === "past_week"
+            ? 7 * 24 * 60 * 60 * 1000
+            : 31 * 24 * 60 * 60 * 1000;
+
+        const dateFiltered = matchedPosts.filter((p) => {
+          if (!p.parsedDatetime) return true;
+          const postTime = new Date(p.parsedDatetime).getTime();
+          return !isNaN(postTime) && now - postTime <= maxAgeMs;
+        });
+        if (dateFiltered.length > 0) {
+          matchedPosts = dateFiltered;
+        }
+      }
+
+      // Ordenar resultados
+      if (sort_by === "engagement") {
+        matchedPosts.sort((a, b) => (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2));
+      } else {
+        matchedPosts.sort((a, b) => {
+          const timeA = a.parsedDatetime ? new Date(a.parsedDatetime).getTime() : 0;
+          const timeB = b.parsedDatetime ? new Date(b.parsedDatetime).getTime() : 0;
+          return timeB - timeA;
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        entity: {
+          id: targetEntityId,
+          name: competitorName,
+          is_company: targetIsCompany,
+        },
+        query: `Publicaciones de ${competitorName}${rawKeywords ? ` con "${rawKeywords}"` : ""}`,
+        count: matchedPosts.length,
+        posts: matchedPosts,
+        items: matchedPosts,
+      });
+    }
+
     const candidateQueries = buildSearchQueries(rawKeywords, rawCompetitor, rawCountry);
 
     const executeSearch = async (q: string, dPosted?: "past_24h" | "past_week" | "past_month") => {

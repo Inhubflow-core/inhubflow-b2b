@@ -48,6 +48,7 @@ import {
   RiTimeLine,
   RiEditLine,
   RiUserAddLine,
+  RiUserLine,
   RiArrowUpLine,
   RiEyeLine,
   RiMegaphoneLine,
@@ -524,6 +525,32 @@ export default function SignalsPage({
   // Buscador Inteligente de Posts en LinkedIn
   const [postSearchMode, setPostSearchMode] = useState<"search" | "manual">("search");
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
+  const [selectedCompetitorEntity, setSelectedCompetitorEntity] = useState<{
+    id: string;
+    name: string;
+    type: "company" | "person";
+    is_company: boolean;
+    headline: string;
+    pictureUrl: string | null;
+    publicIdentifier: string | null;
+    profileUrl: string | null;
+    followers?: number | null;
+  } | null>(null);
+  const [competitorSuggestions, setCompetitorSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    type: "company" | "person";
+    is_company: boolean;
+    headline: string;
+    pictureUrl: string | null;
+    publicIdentifier: string | null;
+    profileUrl: string | null;
+    followers?: number | null;
+  }>>([]);
+  const [isSearchingCompetitor, setIsSearchingCompetitor] = useState(false);
+  const [showCompetitorDropdown, setShowCompetitorDropdown] = useState(false);
+  const competitorDropdownRef = useRef<HTMLDivElement>(null);
+
   const [postSearchKeywords, setPostSearchKeywords] = useState("");
   const [postSearchDate, setPostSearchDate] = useState<"past_24h" | "past_week" | "past_month">("past_month");
   const [postSearchSortBy, setPostSearchSortBy] = useState<"engagement" | "date">("engagement");
@@ -592,13 +619,59 @@ export default function SignalsPage({
     setKeywordsList(keywordsList.filter((item) => item !== k));
   };
 
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        competitorDropdownRef.current &&
+        !competitorDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowCompetitorDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Búsqueda de autocompletado para competidores / empresas / creadores
+  useEffect(() => {
+    const q = postSearchCompetitor.trim();
+    if (!q || selectedCompetitorEntity?.name.toLowerCase() === q.toLowerCase()) {
+      setCompetitorSuggestions([]);
+      setShowCompetitorDropdown(false);
+      return;
+    }
+    if (!selectedAccountId) return;
+
+    const timer = setTimeout(async () => {
+      setIsSearchingCompetitor(true);
+      try {
+        const res = await fetch(
+          `/api/signals/entities/search?q=${encodeURIComponent(q)}&account_id=${selectedAccountId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const items = data.items || [];
+          setCompetitorSuggestions(items);
+          setShowCompetitorDropdown(items.length > 0);
+        }
+      } catch {
+        // Silencioso en sugerencias
+      } finally {
+        setIsSearchingCompetitor(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [postSearchCompetitor, selectedAccountId, selectedCompetitorEntity]);
+
   // Búsqueda de posts en LinkedIn
   const handleSearchLinkedInPosts = async () => {
     if (!selectedAccountId) {
       toast.error("Selecciona una cuenta de LinkedIn conectada");
       return;
     }
-    const queryComp = postSearchCompetitor.trim() || newCompetitor.trim();
+    const queryComp = selectedCompetitorEntity?.name || postSearchCompetitor.trim() || newCompetitor.trim();
     const queryKw = postSearchKeywords.trim();
     if (!queryComp && !queryKw) {
       toast.error("Ingresa el nombre del competidor o al menos una palabra clave");
@@ -612,6 +685,9 @@ export default function SignalsPage({
         body: JSON.stringify({
           account_id: selectedAccountId,
           competitor: queryComp,
+          competitor_id: selectedCompetitorEntity?.id,
+          competitor_is_company: selectedCompetitorEntity?.is_company,
+          competitor_name: queryComp,
           keywords: queryKw,
           date_posted: postSearchDate,
           sort_by: postSearchSortBy,
@@ -766,6 +842,9 @@ export default function SignalsPage({
     setSignalLevelFilter("ALL");
     setNewCompetitor("");
     setPostSearchCompetitor("");
+    setSelectedCompetitorEntity(null);
+    setCompetitorSuggestions([]);
+    setShowCompetitorDropdown(false);
     setNewTargetUrl("");
     setSelectedPostUrls([]);
     setDiscoveredPosts([]);
@@ -2845,20 +2924,145 @@ export default function SignalsPage({
                             <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {/* Campo 1: Competidor o Marca */}
-                                <div>
-                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                                    Competidor, Marca o Creador
+                                <div className="relative" ref={competitorDropdownRef}>
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center justify-between">
+                                    <span>Competidor, Marca o Creador</span>
+                                    {isSearchingCompetitor && (
+                                      <span className="text-[10px] text-brand-600 dark:text-brand-400 flex items-center gap-1 font-normal normal-case">
+                                        <RiRefreshLine className="animate-spin" size={11} /> Buscando en LinkedIn...
+                                      </span>
+                                    )}
                                   </label>
-                                  <input
-                                    type="text"
-                                    value={postSearchCompetitor}
-                                    onChange={(e) => {
-                                      setPostSearchCompetitor(e.target.value);
-                                      setNewCompetitor(e.target.value);
-                                    }}
-                                    placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                    className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                                  />
+
+                                  {selectedCompetitorEntity ? (
+                                    <div className="flex items-center justify-between p-2 rounded-xl border border-brand-500/60 bg-brand-50/50 dark:bg-brand-950/20 shadow-xs">
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        {selectedCompetitorEntity.pictureUrl ? (
+                                          <img
+                                            src={selectedCompetitorEntity.pictureUrl}
+                                            alt={selectedCompetitorEntity.name}
+                                            className="w-8 h-8 rounded-lg object-cover border border-gray-200 dark:border-gray-700 shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-300 flex items-center justify-center shrink-0">
+                                            {selectedCompetitorEntity.is_company ? <RiBuildingLine size={16} /> : <RiUserLine size={16} />}
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                                              {selectedCompetitorEntity.name}
+                                            </p>
+                                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                              selectedCompetitorEntity.is_company
+                                                ? "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                                                : "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                            }`}>
+                                              {selectedCompetitorEntity.is_company ? "Empresa" : "Creador"}
+                                            </span>
+                                          </div>
+                                          <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                                            {selectedCompetitorEntity.headline || (selectedCompetitorEntity.is_company ? "Página oficial" : "Perfil profesional")}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedCompetitorEntity(null);
+                                          setPostSearchCompetitor("");
+                                          setNewCompetitor("");
+                                        }}
+                                        className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shrink-0 cursor-pointer"
+                                        title="Cambiar competidor o creador"
+                                      >
+                                        <RiCloseLine size={16} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="relative">
+                                      <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
+                                      <input
+                                        type="text"
+                                        value={postSearchCompetitor}
+                                        onChange={(e) => {
+                                          setPostSearchCompetitor(e.target.value);
+                                          setNewCompetitor(e.target.value);
+                                        }}
+                                        onFocus={() => {
+                                          if (competitorSuggestions.length > 0) setShowCompetitorDropdown(true);
+                                        }}
+                                        placeholder="Ej: HubSpot, Lemlist, Salesforce..."
+                                        className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-8 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                                      />
+                                      {postSearchCompetitor && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setPostSearchCompetitor("");
+                                            setNewCompetitor("");
+                                            setCompetitorSuggestions([]);
+                                            setShowCompetitorDropdown(false);
+                                          }}
+                                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                        >
+                                          <RiCloseLine size={15} />
+                                        </button>
+                                      )}
+
+                                      {/* Dropdown de autocompletado */}
+                                      {showCompetitorDropdown && competitorSuggestions.length > 0 && (
+                                        <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl divide-y divide-gray-100 dark:divide-gray-700/60 animate-in fade-in zoom-in-95 duration-100">
+                                          <div className="px-3 py-1.5 bg-gray-50 dark:bg-gray-900/50 text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                                            <span>Selecciona la cuenta oficial</span>
+                                            <span>{competitorSuggestions.length} encontradas</span>
+                                          </div>
+                                          {competitorSuggestions.map((item) => (
+                                            <button
+                                              key={`${item.type}-${item.id}`}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedCompetitorEntity(item);
+                                                setPostSearchCompetitor(item.name);
+                                                setNewCompetitor(item.name);
+                                                setShowCompetitorDropdown(false);
+                                              }}
+                                              className="w-full text-left p-2.5 hover:bg-brand-50/60 dark:hover:bg-brand-950/30 flex items-center gap-2.5 transition-colors cursor-pointer"
+                                            >
+                                              {item.pictureUrl ? (
+                                                <img
+                                                  src={item.pictureUrl}
+                                                  alt={item.name}
+                                                  className="w-7 h-7 rounded-md object-cover border border-gray-200 dark:border-gray-700 shrink-0"
+                                                />
+                                              ) : (
+                                                <div className="w-7 h-7 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 flex items-center justify-center shrink-0">
+                                                  {item.is_company ? <RiBuildingLine size={14} /> : <RiUserLine size={14} />}
+                                                </div>
+                                              )}
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                    {item.name}
+                                                  </span>
+                                                  <span className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${
+                                                    item.is_company
+                                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                                                      : "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                                  }`}>
+                                                    {item.is_company ? "Empresa" : "Creador"}
+                                                  </span>
+                                                </div>
+                                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                                                  {item.headline}
+                                                </p>
+                                              </div>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Campo 2: Fecha de Publicación */}

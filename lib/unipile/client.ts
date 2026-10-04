@@ -281,11 +281,21 @@ export class UnipileClient {
   }
 
   /**
-   * Obtiene las publicaciones recientes de un perfil de LinkedIn
+   * Obtiene las publicaciones recientes de un perfil de usuario o página de empresa en LinkedIn
    */
-  async getUserPosts(params: { account_id: string; identifier: string; limit?: number }): Promise<UnipilePostItem[]> {
-    const limit = params.limit ?? 5;
-    const url = `/api/v1/users/${encodeURIComponent(params.identifier)}/posts?account_id=${encodeURIComponent(params.account_id)}&limit=${limit}`;
+  async getUserPosts(params: {
+    account_id: string;
+    identifier: string;
+    limit?: number;
+    is_company?: boolean;
+  }): Promise<UnipilePostItem[]> {
+    const limit = params.limit ?? 10;
+    const query = new URLSearchParams({
+      account_id: params.account_id,
+      limit: String(limit),
+      ...(params.is_company ? { is_company: 'true' } : {}),
+    });
+    const url = `/api/v1/users/${encodeURIComponent(params.identifier)}/posts?${query.toString()}`;
     try {
       const res = await this.request<UnipileUserPostsResponse | UnipilePostItem[]>(url, { method: 'GET' });
       if (Array.isArray(res)) return res;
