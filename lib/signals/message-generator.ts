@@ -154,7 +154,11 @@ Sólo puedes mencionar un evento concreto de funding/noticia/adquisición/evento
 No reveles vigilancia, tracking, likes, comentarios, visitas ni el mecanismo que detectó la señal.
 Usa la señal sólo para elegir un tema natural. No inventes cifras, clientes, funcionalidades, promesas ni información del prospecto.
 Usa approved_knowledge para cualquier afirmación del producto y devuelve sus citation_id; si no hay conocimiento, limita el mensaje a una pregunta genuina sin claims.
-Respeta objetivo, tono, idioma y max_words. No incluyas markdown ni asunto.`,
+Adapta el estilo estrictamente al tono solicitado:
+- Si tone es 'consultive': Estilo consultivo y experto. Empático, reflexivo y estratégico. Plantea preguntas abiertas sobre prioridades y desafíos del negocio sin presionar ni vender de golpe.
+- Si tone es 'professional': Estilo profesional y directo. Formal, ejecutivo, sobrio y conciso. Va directo al grano con respeto y foco en eficiencia y valor corporativo.
+- Si tone es 'direct': Estilo cercano y casual. Amigable, fresco, dinámico y conversacional, con el trato cálido de un colega del sector que invita a una charla sin formalismos pesados.
+Respeta objetivo, idioma y max_words. No incluyas markdown ni asunto.`,
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,
           temperature: 0.25,

@@ -74,49 +74,99 @@ export function deterministicAntiStalkerMessage(
   let message: string;
 
   if (language === "en") {
-    if (objective === "demo") message = `Hi ${firstName}, teams like ${company} often look for practical ways to improve ${topic}. Would a brief 10-minute overview be useful?`;
-    else if (objective === "resource") message = `Hi ${firstName}, ${topic} seems relevant to your role. We prepared a practical B2B guide. Would you like me to share it here?`;
-    else message = `Hi ${firstName}, how is ${company} approaching ${topic} today? I would be glad to connect and exchange practical ideas.`;
+    if (objective === "demo") {
+      if (tone === "direct") message = `Hey ${firstName}! Looks like ${topic} is big for ${company} right now. We have a super agile setup for this. Up for a quick 10-minute chat this week?`;
+      else if (tone === "professional") message = `Dear ${firstName}, I assist leaders optimizing ${topic} across your industry. Would you have 10 minutes this week for a brief corporate overview?`;
+      else message = `Hi ${firstName}, teams like ${company} often look for strategic ways to improve ${topic}. Would a brief 10-minute consultation be useful?`;
+    } else if (objective === "resource") {
+      if (tone === "direct") message = `Hey ${firstName}! Saw ${topic} is gaining traction. We put together a no-fluff, hands-on guide about this. Mind if I send it over here?`;
+      else if (tone === "professional") message = `Dear ${firstName}, we compiled a technical benchmark report regarding ${topic} for organizations like ${company}. Please let me know if you would like to review it.`;
+      else message = `Hi ${firstName}, ${topic} seems relevant to your current focus. We prepared a practical B2B guide with industry lessons. Would you like me to share it here?`;
+    } else {
+      if (tone === "direct") message = `Hey ${firstName}! Great to connect. Really like what you're driving at ${company} around ${topic}. Let's connect and catch up!`;
+      else if (tone === "professional") message = `Dear ${firstName}, I follow ${company}'s progress closely in ${topic}. I would welcome the opportunity to connect and exchange professional insights.`;
+      else message = `Hi ${firstName}, ${topic} is becoming quite relevant across the sector. How is ${company} approaching this challenge currently? Would love to connect and exchange perspectives.`;
+    }
   } else if (language === "pt-BR") {
-    if (objective === "demo") message = `Olá ${firstName}, equipes como a ${company} costumam buscar formas práticas de melhorar ${topic}. Faria sentido ver uma demonstração breve de 10 minutos?`;
-    else if (objective === "resource") message = `Olá ${firstName}, ${topic} parece relevante para sua área. Preparamos um guia B2B prático. Posso compartilhar por aqui?`;
-    else message = `Olá ${firstName}, como a ${company} está trabalhando ${topic} atualmente? Gostaria de conectar e trocar ideias práticas.`;
+    if (objective === "demo") {
+      if (tone === "direct") message = `Oi ${firstName}! Vejo que o tema de ${topic} está forte na ${company}. Temos uma solução bem ágil para isso. Topa um café virtual rápido de 10 minutos esta semana?`;
+      else if (tone === "professional") message = `Prezado(a) ${firstName}, colaboro com gestores na otimização de ${topic}. Teria 10 minutos esta semana para uma breve demonstração executiva?`;
+      else message = `Olá ${firstName}, equipes como a ${company} costumam buscar formas estratégicas de aprimorar ${topic}. Faria sentido uma breve sessão consultiva de 10 minutos?`;
+    } else if (objective === "resource") {
+      if (tone === "direct") message = `Oi ${firstName}! Preparamos um material direto ao ponto sobre ${topic}. Quer que eu compartilhe por aqui?`;
+      else if (tone === "professional") message = `Prezado(a) ${firstName}, elaboramos um estudo técnico sobre ${topic} aplicável à ${company}. Fico à disposição caso deseje recebê-lo.`;
+      else message = `Olá ${firstName}, ${topic} parece muito relevante para a sua área. Preparamos um guia B2B com boas práticas. Posso compartilhar por aqui?`;
+    } else {
+      if (tone === "direct") message = `Oi ${firstName}! Que bom te encontrar por aqui. Parabéns pelas iniciativas na ${company} com ${topic}. Vamos nos conectar!`;
+      else if (tone === "professional") message = `Prezado(a) ${firstName}, acompanho com atenção a atuação da ${company} em ${topic}. Gostaria de conectar para compartilhar visões de mercado.`;
+      else message = `Olá ${firstName}, como a ${company} está trabalhando ${topic} atualmente? Gostaria de conectar e trocar ideias práticas.`;
+    }
   } else if (monitor.type === "funding_round") {
-    message = objective === "demo"
-      ? `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. En etapas de expansión suele ser clave escalar el pipeline comercial sin aumentar la carga operativa. ¿Te gustaría ver un enfoque práctico en 10 minutos?`
-      : `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. ¿Cómo están pensando escalar la generación de oportunidades en esta nueva etapa? Me gustaría conectar.`;
-  } else if (monitor.type === "acquisition_event") {
-    message = `Hola ${firstName}, felicidades por el reciente movimiento estratégico de ${company}. En procesos de integración suele ser importante alinear rápido el desarrollo comercial. Me gustaría conectar e intercambiar ideas.`;
-  } else if (monitor.type === "industry_event") {
-    message = `Hola ${firstName}, veo que ${company} está participando activamente en conversaciones del sector. ¿Qué prioridades comerciales están explorando actualmente? Me gustaría conectar.`;
-  } else if (monitor.type === "company_news") {
-    message = `Hola ${firstName}, felicidades por las novedades recientes de ${company}. En momentos de expansión suele ser útil revisar cómo escalar la prospección. Me gustaría conectar e intercambiar ideas.`;
+    if (objective === "demo") {
+      if (tone === "direct") message = `¡Hola ${firstName}! ¡Tremenda noticia la ronda de ${company}! Para escalar rápido sin enredar al equipo, tenemos algo muy práctico. ¿Te cuadra un café virtual rápido de 10 min?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, le felicito por la ronda de capital de ${company}. Si evalúan optimizar la infraestructura de prospección comercial, quedo a su disposición para una breve presentación.`;
+      else message = `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. En etapas de expansión suele ser clave escalar el pipeline sin aumentar la carga operativa. ¿Te gustaría ver un enfoque práctico en 10 minutos?`;
+    } else {
+      if (tone === "direct") message = `¡Hola ${firstName}! Felicitaciones por el hito de inversión en ${company}. ¡Mucho éxito en esta etapa! Conectemos por aquí para charlar cuando gustes.`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, mis felicitaciones por el financiamiento obtenido por ${company}. Me pongo a su disposición para intercambiar perspectivas de crecimiento en el sector.`;
+      else message = `Hola ${firstName}, felicidades por la ronda anunciada por ${company}. ¿Cómo están pensando escalar la generación de oportunidades en esta nueva etapa? Me gustaría conectar.`;
+    }
   } else if (isRole) {
-    message = objective === "demo"
-      ? `Hola ${firstName}, felicidades por tu nueva etapa en ${company}. En los primeros meses suele ser clave acelerar resultados comerciales. ¿Te gustaría ver en 10 minutos un enfoque práctico para hacerlo?`
-      : `Hola ${firstName}, felicidades por tu nueva etapa en ${company}. ¿Están revisando cómo escalar la prospección comercial durante estos primeros meses? Me gustaría conectar e intercambiar ideas.`;
+    if (objective === "demo") {
+      if (tone === "direct") message = `¡Hola ${firstName}! ¡Muchos éxitos en tu nuevo rol en ${company}! Cuando te acomodes un poco, ¿te cuadra una charla rápida de 10 min para ver cómo podemos sumar a tus metas comerciales?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, le felicito por su reciente nombramiento en ${company}. Si entre sus prioridades está acelerar resultados comerciales, ¿dispondría de 10 minutos para una breve sesión informativa?`;
+      else message = `Hola ${firstName}, felicidades por tu nueva etapa en ${company}. En los primeros meses suele ser clave acelerar resultados comerciales sin fricción. ¿Te gustaría ver en 10 minutos un enfoque práctico para lograrlo?`;
+    } else if (objective === "resource") {
+      if (tone === "direct") message = `¡Hola ${firstName}! Felicitaciones por el nuevo cargo en ${company}. Armamos un checklist express con las prioridades de otros líderes en sus primeros meses. ¿Te lo paso?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, enhorabuena por su nuevo nombramiento en ${company}. Hemos preparado un informe técnico para líderes en sus primeros 90 días. Quedo a su disposición si desea recibirlo.`;
+      else message = `Hola ${firstName}, felicidades por tu nombramiento en ${company}. Preparamos un recurso con las prioridades clave de líderes del sector en sus primeros 90 días. ¿Te gustaría que te lo comparta?`;
+    } else {
+      if (tone === "direct") message = `¡Hola ${firstName}! ¡Felicitaciones por asumir el rol en ${company}! Muy buena trayectoria. Conectemos por aquí para estar en contacto y charlar cuando gustes.`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, le felicito por su designación en ${company}. Me pongo a su entera disposición y le invito a conectar para compartir buenas prácticas profesionales.`;
+      else message = `Hola ${firstName}, felicidades por tu nueva etapa en ${company}. ¿Cómo visualizas los principales retos de tu área durante estos primeros meses? Me gustaría conectar e intercambiar ideas.`;
+    }
   } else if (isGrowth) {
-    message = objective === "demo"
-      ? `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. Cuando el equipo comercial se expande, reducir la curva de aprendizaje suele ser prioritario. ¿Te interesaría ver una demo breve de nuestro enfoque?`
-      : `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. ¿Cómo están organizando la prospección y el onboarding del equipo comercial en esta etapa? Me gustaría conectar.`;
+    if (objective === "demo") {
+      if (tone === "direct") message = `¡Hola ${firstName}! ¡Qué buen ritmo de crecimiento lleva ${company}! Escalar equipo es genial pero retador. ¿Te hace sentido un café virtual rápido de 10 min para ver cómo ayudamos a simplificar la prospección?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, felicitaciones por el crecimiento de ${company}. Si buscan mantener la eficiencia operativa mientras expanden equipo comercial, me complacería coordinar una breve demostración corporativa.`;
+      else message = `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. Al expandir equipo comercial, reducir la curva de aprendizaje suele ser prioritario. ¿Te interesaría ver una demo breve de 10 minutos de nuestro enfoque?`;
+    } else if (objective === "resource") {
+      if (tone === "direct") message = `¡Hola ${firstName}! Qué bueno ver el crecimiento de ${company}. Tenemos un resumen express con 3 aprendizajes de otros equipos en plena expansión. ¿Te late que te lo pase por aquí?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, enhorabuena por la expansión de ${company}. Hemos compilado un documento de trabajo sobre mejores prácticas de escalamiento comercial. ¿Desea que se lo comparta?`;
+      else message = `Hola ${firstName}, felicidades por la expansión de ${company}. Preparamos una guía con aprendizajes clave para equipos comerciales en fase de crecimiento. ¿Te gustaría que te la comparta?`;
+    } else {
+      if (tone === "direct") message = `¡Hola ${firstName}! Veo que están creciendo con todo en ${company}, ¡felicitaciones! Me encantaría conectar por aquí para seguir de cerca lo que están construyendo.`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, sigo con atención la trayectoria de expansión de ${company}. Le invito a conectar para intercambiar visiones sobre escalamiento comercial en el sector.`;
+      else message = `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. ¿Cómo están organizando la prospección y el onboarding del equipo comercial en esta etapa? Me gustaría conectar.`;
+    }
   } else if (isPostEngagement) {
     if (objective === "resource") {
-      message = `Hola ${firstName}, sigo de cerca las conversaciones sobre ${topic}. Preparamos un recurso práctico sobre este tema, ¿te gustaría que te lo comparta por aquí?`;
+      if (tone === "direct") message = `¡Hola ${firstName}! Justo vi que el tema de ${topic} viene generando bastante conversación. Armamos una guía súper práctica y al grano sobre esto. ¿Te gustaría que te la pase por aquí?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, sigo de cerca las iniciativas vinculadas a ${topic}. Hemos elaborado un informe técnico y práctico aplicable a organizaciones como ${company}. Quedo a su disposición si desea revisarlo.`;
+      else message = `Hola ${firstName}, sigo de cerca el debate sobre ${topic}. En base a las tendencias que vemos en el sector, preparamos un recurso estratégico con aprendizajes aplicables a ${company}. ¿Te interesaría que te lo comparta por aquí?`;
     } else if (objective === "demo") {
-      message = `Hola ${firstName}, veo que ${topic} es un tema clave en el sector. ¿Tendrías 10 minutos esta semana para ver cómo lo abordamos en ${company}?`;
+      if (tone === "direct") message = `¡Hola ${firstName}! Veo que están muy activos con el tema de ${topic}. Tenemos un modelo bastante ágil para resolver esto en empresas como ${company}. ¿Te cuadra un café virtual rápido de 10 minutos estos días?`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, colaboro con directivos optimizando procesos de ${topic} en su sector. ¿Dispondría de 10 minutos esta semana para evaluar brevemente nuestro enfoque aplicado a ${company}?`;
+      else message = `Hola ${firstName}, veo que ${topic} está siendo un punto de inflexión estratégico en el sector. ¿Tendrías 10 minutos esta semana para explorar cómo abordamos este reto en organizaciones como ${company}?`;
     } else {
-      message = `Hola ${firstName}, veo que ${topic} está cobrando bastante relevancia en el sector. ¿Cómo lo están viviendo en ${company}? Me encantaría conectar e intercambiar ideas.`;
+      if (tone === "direct") message = `¡Hola ${firstName}! Qué bueno coincidir por aquí. Me pareció genial lo que vienen impulsando en ${company} en torno a ${topic}. ¡Conectemos y charlamos un rato!`;
+      else if (tone === "professional") message = `Estimado/a ${firstName}, sigo con atención la trayectoria de ${company} en el ámbito de ${topic}. Me pongo en contacto para conectar e intercambiar perspectivas profesionales sobre el sector.`;
+      else message = `Hola ${firstName}, veo que ${topic} está cobrando bastante relevancia en el sector. ¿Cómo lo están viviendo y priorizando actualmente en ${company}? Me encantaría conectar e intercambiar visiones.`;
     }
   } else if (objective === "resource") {
-    message = `Hola ${firstName}, veo que ${topic} es relevante para tu área. Preparamos una guía práctica con ideas aplicables a equipos B2B. ¿Te gustaría que te la comparta por aquí?`;
+    if (tone === "direct") message = `¡Hola ${firstName}! En torno a ${topic} armamos una guía práctica con ideas súper aplicables a empresas como ${company}. ¿Te la paso por aquí?`;
+    else if (tone === "professional") message = `Estimado/a ${firstName}, hemos desarrollado un documento de trabajo sobre ${topic} para organizaciones de su sector. Quedo a su disposición si resulta de su interés.`;
+    else message = `Hola ${firstName}, veo que ${topic} es relevante para tu área. Preparamos una guía práctica con ideas aplicables a equipos B2B como ${company}. ¿Te gustaría que te la comparta por aquí?`;
   } else if (objective === "demo") {
-    message = `Hola ${firstName}, trabajo con equipos que buscan mejorar ${topic} sin aumentar la carga operativa. ¿Tendrías 10 minutos esta semana para ver una demostración breve?`;
+    if (tone === "direct") message = `¡Hola ${firstName}! Trabajamos ayudando a equipos a resolver ${topic} de forma ágil y sin rodeos. ¿Te cuadra una llamada breve de 10 min para mostrártelo?`;
+    else if (tone === "professional") message = `Estimado/a ${firstName}, colaboramos con directivos mejorando la gestión de ${topic} con alta rentabilidad operativa. ¿Tendría 10 minutos esta semana para una sesión demostrativa?`;
+    else message = `Hola ${firstName}, trabajo con equipos que buscan mejorar ${topic} sin aumentar la carga operativa. ¿Tendrías 10 minutos esta semana para ver una demostración breve?`;
   } else if (tone === "direct") {
-    message = `Hola ${firstName}, ¿cómo están gestionando actualmente ${topic} en ${company}? Me gustaría conectar y compartir algunas ideas concretas.`;
+    message = `¡Hola ${firstName}! Qué bueno encontrar tu perfil en ${company}. Me parece muy interesante lo que hacen en ${topic}. ¡Conectemos por aquí!`;
   } else if (tone === "professional") {
-    message = `Hola ${firstName}, sigo el trabajo de ${company} y me gustaría conectar para intercambiar buenas prácticas sobre ${topic}.`;
+    message = `Estimado/a ${firstName}, sigo el desarrollo de ${company} y me gustaría conectar para intercambiar buenas prácticas profesionales sobre ${topic}.`;
   } else {
-    message = `Hola ${firstName}, veo que ${topic} es un tema relevante para equipos como el de ${company}. ¿Cómo lo están abordando actualmente? Me encantaría conectar.`;
+    message = `Hola ${firstName}, veo que ${topic} es un tema relevante para equipos como el de ${company}. ¿Cómo lo están abordando actualmente? Me encantaría conectar e intercambiar ideas.`;
   }
 
   const maxWords = Math.max(20, Math.min(config.max_words || 90, 180));

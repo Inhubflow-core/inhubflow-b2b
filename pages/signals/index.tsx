@@ -694,7 +694,11 @@ export default function SignalsPage({
   // Paso 4: Lanzamiento & Configuración
   const [newName, setNewName] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || "");
+  const [listsState, setListsState] = useState(lists);
   const [newTargetList, setNewTargetList] = useState(lists[0]?.id || "");
+  const [isCreatingInlineList, setIsCreatingInlineList] = useState(false);
+  const [inlineListName, setInlineListName] = useState("");
+  const [isCreatingListLoading, setIsCreatingListLoading] = useState(false);
   const [newTargetWorkflow, setNewTargetWorkflow] = useState(workflows[0]?.id || "");
   const [newMode, setNewMode] = useState<"review" | "autopilot">("review");
   const [scanIntervalMinutes, setScanIntervalMinutes] = useState(360);
@@ -711,6 +715,41 @@ export default function SignalsPage({
     checklist: Array<{ key: string; label: string; ok: boolean }>;
   } | null>(null);
   const [editingMonitorId, setEditingMonitorId] = useState<string | null>(null);
+
+  const handleCreateInlineList = async () => {
+    const trimmed = inlineListName.trim();
+    if (!trimmed) {
+      toast.error("Por favor ingresa un nombre para la nueva lista");
+      return;
+    }
+    setIsCreatingListLoading(true);
+    try {
+      const monitorTitle = newName.trim() || "Radar de Señales";
+      const res = await fetch("/api/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmed,
+          description: `Prospectos detectados por el Monitor de Señales: "${monitorTitle}"`,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Error al crear la lista");
+      }
+      const created = await res.json();
+      setListsState((prev) => [created, ...prev]);
+      setNewTargetList(created.id);
+      setTargetListId(created.id);
+      setIsCreatingInlineList(false);
+      setInlineListName("");
+      toast.success(`Lista "${created.name}" creada y seleccionada para el monitor`);
+    } catch (err: any) {
+      toast.error(err.message || "Error al crear la lista");
+    } finally {
+      setIsCreatingListLoading(false);
+    }
+  };
 
   const handleAddKeyword = (kw: string) => {
     const k = kw.trim();
@@ -1439,9 +1478,32 @@ export default function SignalsPage({
       effectiveType = selectedIcpSignals[0] || "new_in_role";
     }
 
+    let targetListIdToUse = newTargetList;
+    if (isCreatingInlineList && inlineListName.trim()) {
+      try {
+        const listRes = await fetch("/api/lists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: inlineListName.trim(),
+            description: `Prospectos detectados por el Monitor de Señales: "${newName.trim() || 'Radar de Señales'}"`,
+          }),
+        });
+        if (listRes.ok) {
+          const createdList = await listRes.json();
+          setListsState((prev) => [createdList, ...prev]);
+          targetListIdToUse = createdList.id;
+          setNewTargetList(createdList.id);
+          setTargetListId(createdList.id);
+          setIsCreatingInlineList(false);
+          setInlineListName("");
+        }
+      } catch {}
+    }
+
     const def = SIGNAL_DEFINITIONS.find((d) => d.id === effectiveType) || SIGNAL_DEFINITIONS.find((d) => d.id === newType);
     if (!selectedAccountId) { toast.error("Selecciona una cuenta de LinkedIn"); return; }
-    if (!newTargetList) { toast.error("Selecciona una lista de destino"); return; }
+    if (!targetListIdToUse) { toast.error("Selecciona o crea una lista de destino"); return; }
     if (accountCapabilities && !accountCapabilities.supportedSignals.includes(effectiveType) && effectiveType !== "super_monitor") {
       toast.error("La cuenta seleccionada no es compatible con esta señal");
       return;
@@ -1506,7 +1568,7 @@ export default function SignalsPage({
             },
             mode: newMode,
             account_id: selectedAccountId || undefined,
-            target_list_id: newTargetList || undefined,
+            target_list_id: targetListIdToUse || undefined,
             target_workflow_id: newTargetWorkflow || null,
             scan_interval_minutes: scanIntervalMinutes,
             message_config: {
@@ -1561,7 +1623,7 @@ export default function SignalsPage({
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
-          target_list_id: newTargetList || undefined,
+          target_list_id: targetListIdToUse || undefined,
           target_workflow_id: newTargetWorkflow || undefined,
           scan_interval_minutes: scanIntervalMinutes,
           message_config: {
@@ -5238,19 +5300,68 @@ export default function SignalsPage({
                     {/* 4. Lista y campaña destino */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                          Lista de Destino <span className="text-brand-500">*</span>
-                        </label>
-                        <select
-                          value={newTargetList}
-                          onChange={(e) => setNewTargetList(e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                        >
-                          <option value="">Selecciona una lista</option>
-                          {lists.map((list) => (
-                            <option key={list.id} value={list.id}>{list.name} ({list.target_count} contactos)</option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            Lista de Destino <span className="text-brand-500">*</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !isCreatingInlineList;
+                              setIsCreatingInlineList(next);
+                              if (next && !inlineListName.trim()) {
+                                const defaultName = newName.trim()
+                                  ? `Leads: ${newName.trim()}`
+                                  : `Leads Radar - ${new Date().toLocaleDateString("es-ES", { month: "short", day: "numeric" })}`;
+                                setInlineListName(defaultName);
+                              }
+                            }}
+                            className="text-xs text-brand-600 dark:text-brand-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            {isCreatingInlineList ? (
+                              <>← Seleccionar existente</>
+                            ) : (
+                              <><RiAddLine size={14} /> Crear nueva lista</>
+                            )}
+                          </button>
+                        </div>
+
+                        {isCreatingInlineList ? (
+                          <div className="space-y-2 p-3 bg-brand-50/60 dark:bg-brand-950/30 rounded-xl border border-brand-200 dark:border-brand-800/60">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={inlineListName}
+                                onChange={(e) => setInlineListName(e.target.value)}
+                                placeholder="Nombre de la nueva lista (ej: Leads Radar)"
+                                className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 shadow-xs focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                              />
+                              <button
+                                type="button"
+                                disabled={isCreatingListLoading}
+                                onClick={handleCreateInlineList}
+                                className="px-3 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-xs"
+                              >
+                                {isCreatingListLoading ? <RiRefreshLine className="animate-spin" size={14} /> : <RiCheckLine size={14} />}
+                                Crear y Usar
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              Se guardará en el módulo de Listas con la descripción: <em>«Prospectos detectados por el Monitor de Señales»</em>.
+                            </p>
+                          </div>
+                        ) : (
+                          <select
+                            value={newTargetList}
+                            onChange={(e) => setNewTargetList(e.target.value)}
+                            className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
+                          >
+                            <option value="">Selecciona una lista</option>
+                            {listsState.map((list) => (
+                              <option key={list.id} value={list.id}>{list.name} ({list.target_count || 0} contactos)</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
@@ -5465,9 +5576,9 @@ export default function SignalsPage({
                   onChange={(e) => setTargetListId(e.target.value)}
                   className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs md:text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
                 >
-                  {lists.map((l) => (
+                  {listsState.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.name} ({l.target_count} contactos actuales)
+                      {l.name} ({l.target_count || 0} contactos actuales)
                     </option>
                   ))}
                 </select>
