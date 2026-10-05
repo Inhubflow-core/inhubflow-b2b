@@ -46,8 +46,11 @@ export function deterministicAntiStalkerMessage(
   if (!topic && lead.signal_snippet) {
     const quoteMatch = lead.signal_snippet.match(/[“"]([^”"]+)[”"]/);
     if (quoteMatch) {
-      const rawQuote = quoteMatch[1].trim();
-      const words = rawQuote.split(/\s+/).slice(0, 5).join(" ");
+      const rawQuote = quoteMatch[1]
+        .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+        .replace(/^(an[uú]ncio\s+importante|atenci[oó]n|urgente|comunicado|aviso|noticia)[:!\s]*/i, "")
+        .trim();
+      const words = rawQuote.split(/\s+/).filter(Boolean).slice(0, 5).join(" ");
       if (words.length > 3) topic = words;
     }
   }

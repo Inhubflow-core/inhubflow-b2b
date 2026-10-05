@@ -29,6 +29,7 @@ import {
 import { isExperienceThrottled } from "./scanners/identity";
 import type { UnipileProfile } from "@/lib/unipile/types";
 import { generateSignalMessage } from "./message-generator";
+import { deterministicAntiStalkerMessage } from "./message-template";
 import { promoteSignalLead, signalAutopilotReadiness } from "./promotion";
 import { planSignalResearch } from "./research-planner";
 
@@ -644,11 +645,20 @@ export class SignalRadarService {
     for (const leadId of [...new Set(touched)]) {
       let lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(leadId) as SignalLead;
       if (!lead.icebreaker_preview || lead.message_generation_state !== "generated") {
-        const generation = await this.messageGenerator(db, monitor, lead);
-        db.prepare(`
-          UPDATE signal_leads SET icebreaker_preview = ?, message_generation_state = 'generated',
-            message_metadata_json = ?, updated_at = datetime('now') WHERE id = ?
-        `).run(generation.body, JSON.stringify(generation), lead.id);
+        try {
+          const generation = await this.messageGenerator(db, monitor, lead);
+          const body = (generation?.body || deterministicAntiStalkerMessage(monitor, lead)).trim();
+          db.prepare(`
+            UPDATE signal_leads SET icebreaker_preview = ?, message_generation_state = 'generated',
+              message_metadata_json = ?, updated_at = datetime('now') WHERE id = ?
+          `).run(body, JSON.stringify(generation || {}), lead.id);
+        } catch (err) {
+          const fallback = deterministicAntiStalkerMessage(monitor, lead);
+          db.prepare(`
+            UPDATE signal_leads SET icebreaker_preview = ?, message_generation_state = 'generated',
+              message_metadata_json = ?, updated_at = datetime('now') WHERE id = ?
+          `).run(fallback, JSON.stringify({ mode: "deterministic_fallback", error: String(err) }), lead.id);
+        }
         lead = db.prepare("SELECT * FROM signal_leads WHERE id = ?").get(lead.id) as SignalLead;
       }
       if (monitor.mode === "autopilot") {

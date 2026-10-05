@@ -459,6 +459,27 @@ const ASK_AI_TEMPLATES = [
   },
 ];
 
+function getLeadIcebreaker(lead: SignalLead): string {
+  if (lead.icebreaker_preview && lead.icebreaker_preview.trim()) {
+    return lead.icebreaker_preview.trim();
+  }
+  const rawFirst = (lead.full_name || "").trim().split(/\s+/)[0] || "";
+  const firstName = /^(usu[aá]rio|usuario|linkedin|miembro|member)$/i.test(rawFirst) ? "" : rawFirst;
+  const company = lead.company || "tu empresa";
+  const salutation = firstName ? `Hola ${firstName}` : "Hola";
+
+  if (lead.signal_type === "post_comment" || lead.signal_type === "high_intent_comments") {
+    return `${salutation}, vi tu comentario reciente en la publicación sobre estrategias y desafíos del sector. Me pareció muy acertado tu punto de vista y me encantaría conectar para intercambiar experiencias.`;
+  }
+  if (lead.signal_type === "job_change" || lead.signal_type === "new_in_role") {
+    return `${salutation}, felicitaciones por tu nuevo rol en ${company}. Me pareció muy interesante tu trayectoria y me gustaría conectar contigo por aquí.`;
+  }
+  if (lead.signal_type === "hiring_spree") {
+    return `${salutation}, vi que están expandiendo el equipo en ${company}. En momentos de crecimiento suele ser clave optimizar procesos; me encantaría conectar y compartir ideas sobre el sector.`;
+  }
+  return `${salutation}, vi tu interacción en LinkedIn y me pareció muy relevante tu perfil en ${company}. Me gustaría conectar para seguir en contacto e intercambiar visiones.`;
+}
+
 export default function SignalsPage({
   initialMonitors,
   lists,
@@ -472,6 +493,7 @@ export default function SignalsPage({
   const [monitors, setMonitors] = useState<SignalMonitor[]>(initialMonitors);
   const [leads, setLeads] = useState<SignalLead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
+  const [scanningMonitorName, setScanningMonitorName] = useState<string | null>(null);
   const [selectedMonitorFilter, setSelectedMonitorFilter] = useState<string>("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
   const [searchQuery] = useState<string>("");
@@ -1366,13 +1388,14 @@ export default function SignalsPage({
 
   // Manejar Escaneo de Monitor
   const handleScanMonitor = async (id: string, name: string) => {
+    setScanningMonitorName(name);
     const toastId = toast.loading(`Escaneando señales para "${name}"...`);
     try {
       const res = await fetch(`/api/signals/${id}/scan`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message || "Escaneo completado", { id: toastId });
-        fetchLeads();
+        await fetchLeads();
         // refrescar monitores
         const mRes = await fetch("/api/signals");
         const mData = await mRes.json();
@@ -1382,6 +1405,8 @@ export default function SignalsPage({
       }
     } catch {
       toast.error("Error de conexión al escanear señal", { id: toastId });
+    } finally {
+      setScanningMonitorName(null);
     }
   };
 
@@ -1555,7 +1580,17 @@ export default function SignalsPage({
         setShowNewModal(false);
         setWizardStep(1);
         setNewName("");
-        // Auto-escanear para poblar prospectos iniciales
+
+        // 1. Actualizar inmediatamente la lista de monitores en memoria para que no quede en blanco
+        setMonitors((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
+        setSelectedMonitorFilter("all");
+
+        fetch("/api/signals")
+          .then((r) => r.json())
+          .then((d) => { if (d.items) setMonitors(d.items); })
+          .catch(() => {});
+
+        // 2. Auto-escanear para poblar prospectos iniciales
         handleScanMonitor(created.id, created.name);
       } else {
         const err = await res.json();
@@ -2215,7 +2250,25 @@ export default function SignalsPage({
             </div>
 
             {/* Listado de Prospectos */}
-            {leadsLoading ? (
+            {scanningMonitorName && (
+              <div className="p-5 mb-4 bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-950/40 dark:to-purple-950/20 rounded-2xl border border-brand-200 dark:border-brand-800/50 flex items-center gap-4 shadow-sm animate-pulse">
+                <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
+                  <span className="absolute w-full h-full rounded-full bg-brand-500/20 animate-ping" />
+                  <RiRadarLine className="text-brand-600 dark:text-brand-400 relative z-10" size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+                    <span>Escaneando señales en tiempo real</span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    Monitor activo: <strong className="font-semibold text-brand-700 dark:text-brand-300">"{scanningMonitorName}"</strong>. Conectando con LinkedIn y analizando publicaciones. Los prospectos aparecerán automáticamente aquí al finalizar el escaneo.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {leadsLoading && !scanningMonitorName ? (
               <div className="p-12 text-center text-gray-500 dark:text-gray-400 space-y-2">
                 <RiRefreshLine className="animate-spin mx-auto text-brand-500" size={28} />
                 <p className="text-sm">Cargando señales detectadas...</p>
@@ -2241,184 +2294,189 @@ export default function SignalsPage({
                 {leads.map((lead) => (
                   <div
                     key={lead.id}
-                    className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-brand-500/40 dark:hover:border-brand-500/40"
+                    className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-gray-700 shadow-theme-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all hover:border-brand-500/40 dark:hover:border-brand-500/40"
                   >
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedLeadIds.includes(lead.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedLeadIds([...selectedLeadIds, lead.id]);
-                            } else {
-                              setSelectedLeadIds(selectedLeadIds.filter((id) => id !== lead.id));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                        />
-                        <ProspectAvatar
-                          imageUrl={lead.profile_image_url}
-                          name={lead.full_name}
-                          size="sm"
-                        />
-                        <h4 className="font-bold text-sm text-gray-900 dark:text-white">
-                          {lead.full_name}
-                        </h4>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {lead.company ? `@ ${lead.company}` : ""}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
-                          {lead.signal_type === "post_comment" || lead.signal_type === "high_intent_comments"
-                            ? "Comentó en Post"
-                            : lead.signal_type === "post_reaction" || lead.signal_type === "competitor_reactions"
-                            ? "Reaccionó a Post"
-                            : lead.signal_type === "job_change" || lead.signal_type === "new_in_role"
-                            ? "Nuevo en el Cargo (<90d)"
-                            : lead.signal_type === "internal_promotion"
-                            ? "Ascenso Interno"
-                            : lead.signal_type === "competitor_audience"
-                            ? "Seguidor de Competidor"
-                            : lead.signal_type === "active_poster"
-                            ? "Creador Activo (<30d)"
-                            : lead.signal_type === "keyword_intent"
-                            ? "Palabras Clave de Compra"
-                            : lead.signal_type === "hiring_spree"
-                            ? "Contratación Activa (Hiring)"
-                            : lead.signal_type === "company_growth"
-                            ? "Empresa en Expansión"
-                            : "Señal de Intención"}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                          {lead.score}% ICP Fit
-                        </span>
+                    <div className="space-y-2.5 flex-1 min-w-0">
+                      {/* Cabecera con datos del contacto y botón LinkedIn en la esquina superior */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeadIds([...selectedLeadIds, lead.id]);
+                              } else {
+                                setSelectedLeadIds(selectedLeadIds.filter((id) => id !== lead.id));
+                              }
+                            }}
+                            className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <ProspectAvatar
+                            imageUrl={lead.profile_image_url}
+                            name={lead.full_name}
+                            size="sm"
+                          />
+                          <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                            {lead.full_name}
+                          </h4>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {lead.company ? `@ ${lead.company}` : ""}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-xs font-bold bg-brand-100 text-brand-800 dark:bg-brand-950/60 dark:text-brand-300">
+                            {lead.signal_type === "post_comment" || lead.signal_type === "high_intent_comments"
+                              ? "Comentó en Post"
+                              : lead.signal_type === "post_reaction" || lead.signal_type === "competitor_reactions"
+                              ? "Reaccionó a Post"
+                              : lead.signal_type === "job_change" || lead.signal_type === "new_in_role"
+                              ? "Nuevo en el Cargo (<90d)"
+                              : lead.signal_type === "internal_promotion"
+                              ? "Ascenso Interno"
+                              : lead.signal_type === "competitor_audience"
+                              ? "Seguidor de Competidor"
+                              : lead.signal_type === "active_poster"
+                              ? "Creador Activo (<30d)"
+                              : lead.signal_type === "keyword_intent"
+                              ? "Palabras Clave de Compra"
+                              : lead.signal_type === "hiring_spree"
+                              ? "Contratación Activa (Hiring)"
+                              : lead.signal_type === "company_growth"
+                              ? "Empresa en Expansión"
+                              : "Señal de Intención"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            {lead.score}% ICP Fit
+                          </span>
+                        </div>
+
+                        {/* Botón LinkedIn en la esquina superior del card */}
+                        {lead.linkedin_url && (
+                          <a
+                            href={lead.linkedin_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 hover:text-brand-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors shrink-0"
+                            title="Ver perfil en LinkedIn"
+                          >
+                            <RiExternalLinkLine size={13} /> LinkedIn
+                          </a>
+                        )}
                       </div>
 
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         {lead.headline} {lead.location ? `• ${lead.location}` : ""}
                       </p>
 
-                      {(lead.signal_snippet || lead.icebreaker_preview) && (
-                        <div className="flex flex-col md:flex-row gap-2.5">
-                          {lead.signal_snippet && (
-                            <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 md:flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                                <span className="font-bold">Contexto de la Señal:</span>
-                                {(() => {
-                                  try {
-                                    const meta = lead.metadata_json ? JSON.parse(lead.metadata_json) : null;
-                                    const intent = meta?.latestEvidence?.commentIntent || meta?.commentIntent;
-                                    if (intent?.level === "high") {
-                                      return (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border border-amber-300 dark:border-amber-700" title={intent.reasons?.join(", ")}>
-                                          🔥 {intent.label || "Alta Intención"}
-                                        </span>
-                                      );
-                                    }
-                                    if (intent?.level === "medium") {
-                                      return (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-200 border border-blue-300 dark:border-blue-700" title={intent.reasons?.join(", ")}>
-                                          💬 {intent.label || "Opinión"}
-                                        </span>
-                                      );
-                                    }
-                                    if (intent?.level === "low") {
-                                      return (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700" title={intent.reasons?.join(", ")}>
-                                          👍 {intent.label || "Breve"}
-                                        </span>
-                                      );
-                                    }
-                                  } catch {}
-                                  return null;
-                                })()}
-                              </div>
-                              <p className="line-clamp-3">{lead.signal_snippet}</p>
+                      {/* Contexto de la Señal y Mensaje sugerido con amplio espacio 50/50 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        {/* Box 1: Contexto de la Señal */}
+                        <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                              <span className="font-bold">Contexto de la Señal:</span>
+                              {(() => {
+                                try {
+                                  const meta = lead.metadata_json ? JSON.parse(lead.metadata_json) : null;
+                                  const intent = meta?.latestEvidence?.commentIntent || meta?.commentIntent;
+                                  if (intent?.level === "high") {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border border-amber-300 dark:border-amber-700" title={intent.reasons?.join(", ")}>
+                                        🔥 {intent.label || "Alta Intención"}
+                                      </span>
+                                    );
+                                  }
+                                  if (intent?.level === "medium") {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-200 border border-blue-300 dark:border-blue-700" title={intent.reasons?.join(", ")}>
+                                        💬 {intent.label || "Opinión"}
+                                      </span>
+                                    );
+                                  }
+                                  if (intent?.level === "low") {
+                                    return (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700" title={intent.reasons?.join(", ")}>
+                                        👍 {intent.label || "Breve"}
+                                      </span>
+                                    );
+                                  }
+                                } catch {}
+                                return null;
+                              })()}
                             </div>
-                          )}
+                            <p className="line-clamp-4 leading-relaxed">
+                              {lead.signal_snippet || "Interacción en publicación relevante de LinkedIn"}
+                            </p>
+                          </div>
+                        </div>
 
-                          {lead.icebreaker_preview && (
-                            <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 space-y-2 md:flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-brand-600 dark:text-brand-400">Mensaje personalizado sugerido</span>
-                                {lead.status === "pending" && editingLeadId !== lead.id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setEditingLeadId(lead.id); setEditingDraft(lead.icebreaker_preview || ""); }}
-                                    className="text-xs text-brand-600 hover:underline whitespace-nowrap"
-                                  >
-                                    Editar antes de aprobar
-                                  </button>
-                                )}
+                        {/* Box 2: Mensaje personalizado sugerido (SIEMPRE GARANTIZADO) */}
+                        <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-300 space-y-2 flex flex-col justify-between">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-brand-600 dark:text-brand-400">Mensaje personalizado sugerido</span>
+                            {lead.status === "pending" && editingLeadId !== lead.id && (
+                              <button
+                                type="button"
+                                onClick={() => { setEditingLeadId(lead.id); setEditingDraft(getLeadIcebreaker(lead)); }}
+                                className="text-xs text-brand-600 hover:underline whitespace-nowrap cursor-pointer"
+                              >
+                                Editar antes de aprobar
+                              </button>
+                            )}
+                          </div>
+                          {editingLeadId === lead.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingDraft}
+                                onChange={(event) => setEditingDraft(event.target.value)}
+                                rows={4}
+                                className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-900"
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button type="button" onClick={() => setEditingLeadId(null)} className="px-2 py-1 text-gray-500">Cancelar</button>
+                                <button type="button" onClick={() => handleSaveLeadDraft(lead.id)} className="px-3 py-1 rounded-lg bg-brand-500 text-white font-medium">Guardar</button>
                               </div>
-                              {editingLeadId === lead.id ? (
-                                <div className="space-y-2">
-                                  <textarea
-                                    value={editingDraft}
-                                    onChange={(event) => setEditingDraft(event.target.value)}
-                                    rows={4}
-                                    className="w-full rounded-lg border border-gray-300 bg-white p-2 text-xs dark:border-gray-700 dark:bg-gray-900"
-                                  />
-                                  <div className="flex gap-2 justify-end">
-                                    <button type="button" onClick={() => setEditingLeadId(null)} className="px-2 py-1 text-gray-500">Cancelar</button>
-                                    <button type="button" onClick={() => handleSaveLeadDraft(lead.id)} className="px-3 py-1 rounded-lg bg-brand-500 text-white">Guardar</button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <p>"{lead.icebreaker_preview}"</p>
-                              )}
                             </div>
+                          ) : (
+                            <p className="leading-relaxed">"{getLeadIcebreaker(lead)}"</p>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
-                    <div className="flex flex-row md:flex-col items-end justify-between gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100 dark:border-gray-800">
-                      <div className="flex items-center gap-1.5">
-                        {lead.status === "pending" ? (
-                          <>
-                            <button
-                              onClick={() => handleUpdateLeadStatus(lead.id, "approved")}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors"
-                            >
-                              <RiCheckLine size={14} /> Aprobar
-                            </button>
-                            <button
-                              onClick={() => handleUpdateLeadStatus(lead.id, "rejected")}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 transition-colors"
-                            >
-                              <RiCloseLine size={14} /> Descartar
-                            </button>
-                          </>
-                        ) : lead.status === "approved" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300">
-                            <RiCheckLine size={14} /> Aprobado
-                          </span>
-                        ) : lead.status === "enrolled" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 dark:bg-purple-950/50 dark:text-purple-300">
-                            Enrolado en Campaña
-                          </span>
-                        ) : lead.status === "imported" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-blue-700 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300">
-                            Importado a Lista
-                          </span>
-                        ) : lead.status === "failed" ? (
-                          <span className="text-xs text-red-500" title={lead.promotion_error || undefined}>Error de promoción</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">Descartado</span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={lead.linkedin_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-gray-500 hover:text-brand-500 dark:text-gray-400 inline-flex items-center gap-1"
-                        >
-                          <RiExternalLinkLine size={14} /> LinkedIn
-                        </a>
-                      </div>
+                    {/* Columna derecha: Aprobar y Descartar apilados verticalmente */}
+                    <div className="flex flex-row lg:flex-col items-stretch justify-center gap-2 shrink-0 lg:w-32 border-t lg:border-t-0 pt-3 lg:pt-0 border-gray-100 dark:border-gray-800">
+                      {lead.status === "pending" ? (
+                        <>
+                          <button
+                            onClick={() => handleUpdateLeadStatus(lead.id, "approved")}
+                            className="flex-1 lg:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40 transition-colors shadow-xs"
+                          >
+                            <RiCheckLine size={15} /> Aprobar
+                          </button>
+                          <button
+                            onClick={() => handleUpdateLeadStatus(lead.id, "rejected")}
+                            className="flex-1 lg:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 border border-gray-200/60 dark:border-gray-700/60 transition-colors shadow-xs"
+                          >
+                            <RiCloseLine size={15} /> Descartar
+                          </button>
+                        </>
+                      ) : lead.status === "approved" ? (
+                        <span className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/60">
+                          <RiCheckLine size={15} /> Aprobado
+                        </span>
+                      ) : lead.status === "enrolled" ? (
+                        <span className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-purple-700 bg-purple-50 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200/60 text-center">
+                          Enrolado en Campaña
+                        </span>
+                      ) : lead.status === "imported" ? (
+                        <span className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/60 text-center">
+                          Importado a Lista
+                        </span>
+                      ) : lead.status === "failed" ? (
+                        <span className="text-xs text-red-500 text-center" title={lead.promotion_error || undefined}>Error de promoción</span>
+                      ) : (
+                        <span className="text-xs text-gray-400 text-center py-2">Descartado</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -4750,6 +4808,7 @@ export default function SignalsPage({
                                 title: t("signalRadar.wizard.definitions.company_growth.title"),
                                 badge: t("signalRadar.wizard.definitions.company_growth.badge"),
                                 desc: t("signalRadar.wizard.definitions.company_growth.desc"),
+                                requiresSalesNav: true,
                               },
                               {
                                 id: "profile_viewers",
@@ -4757,6 +4816,7 @@ export default function SignalsPage({
                                 title: t("signalRadar.wizard.definitions.profile_viewers.title"),
                                 badge: t("signalRadar.wizard.definitions.profile_viewers.badge"),
                                 desc: t("signalRadar.wizard.definitions.profile_viewers.desc"),
+                                requiresSalesNav: true,
                               },
                               {
                                 id: "active_poster",
@@ -4782,7 +4842,12 @@ export default function SignalsPage({
                                   <div>
                                     <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                       <Icon className="text-gray-700 dark:text-gray-300 shrink-0" size={18} />
-                                      <div className="flex items-center gap-1.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                        {sig.requiresSalesNav && (
+                                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                                            🔒 Requiere Sales Nav
+                                          </span>
+                                        )}
                                         <span className="text-xs font-normal px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                                           {sig.badge}
                                         </span>
@@ -4803,6 +4868,11 @@ export default function SignalsPage({
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
                                       {sig.desc}
                                     </p>
+                                    {sig.requiresSalesNav && (
+                                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2 font-medium bg-amber-50 dark:bg-amber-950/30 p-1.5 rounded-lg border border-amber-200/60 dark:border-amber-800/40">
+                                        ⚠️ Para usar este disparador necesitas tener LinkedIn Sales Navigator en tu cuenta.
+                                      </p>
+                                    )}
                                   </div>
                                 </button>
                               );
