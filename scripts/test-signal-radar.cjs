@@ -532,6 +532,50 @@ async function run() {
     assert.equal(passesIcp(employeeLead, { exclude_author_employees: true }), false, "Empleado de HubSpot debe ser descartado por anti-auto-bombo");
     assert.equal(passesIcp(externalLead, { exclude_author_employees: true }), true, "Lead externo debe pasar filtro");
     assert.equal(passesIcp(employeeLead, { exclude_author_employees: false }), true, "Sin filtro anti-auto-bombo debe pasar");
+
+    // Caso real: Stevenson Marcello (BDR na Prospectme) y Renan Rodrigues Ribeiro (Cofundador Prospectme)
+    const stevensonLead = {
+      fullName: "Stevenson Marcello",
+      linkedinUrl: "https://www.linkedin.com/in/stevenson-marcello/",
+      headline: "BDR na Prospectme • São Paulo, São Paulo, Brazil",
+      company: null,
+      signalType: "post_engagement",
+      evidence: {
+        fingerprint: "fp_stevenson",
+        sourceType: "post_reaction",
+        snippet: "Reaccionó (LIKE) al post de Prospectme",
+        metadata: {
+          postAuthor: "Prospectme",
+          postAuthorCompany: "Prospectme",
+          competitorName: "Prospectme",
+        },
+      },
+    };
+
+    const renanLead = {
+      fullName: "Renan Rodrigues Ribeiro",
+      linkedinUrl: "https://www.linkedin.com/in/renan-rodrigues/",
+      headline: "Cofundador Prospectme (B2B SaaS) | IA & Automação de Prospecção | Mentor de Vendas & Liderança | Escalando Operações de Receita | Ex-iugu & Bradesco • São Paulo, São Paulo, Brazil",
+      company: "Ex-iugu & Bradesco",
+      signalType: "post_engagement",
+      evidence: {
+        fingerprint: "fp_renan",
+        sourceType: "post_reaction",
+        snippet: "Reaccionó (LIKE) al post de Prospectme",
+        metadata: {
+          postAuthor: "Prospectme",
+          postAuthorCompany: "Prospectme",
+          competitorName: "Prospectme",
+        },
+      },
+    };
+
+    assert.equal(extractCompanyFromHeadline(stevensonLead.headline), "Prospectme", "extractCompanyFromHeadline debe extraer Prospectme con preposición 'na'");
+    assert.equal(extractCompanyFromHeadline(renanLead.headline), "Prospectme", "extractCompanyFromHeadline debe extraer Prospectme para 'Cofundador Prospectme'");
+    assert.equal(passesIcp(stevensonLead, { exclude_author_employees: true }), false, "BDR na Prospectme debe ser descartado por anti-auto-bombo");
+    assert.equal(passesIcp(renanLead, { exclude_author_employees: true }), false, "Cofundador Prospectme debe ser descartado por anti-auto-bombo");
+    assert.equal(passesIcp(stevensonLead, { exclude_author_employees: false }), true, "Sin filtro anti-auto-bombo debe permitirse");
+    console.log("▶ Anti-Auto-Bombo descarta con precisión a empleados ('BDR na...') y cofundadores del autor");
   }
 
   {

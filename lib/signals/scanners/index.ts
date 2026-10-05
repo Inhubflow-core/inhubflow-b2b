@@ -409,11 +409,14 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
       }
     }
 
-    const postAuthorName = (postData?.author as { name?: string })?.name || "";
+    const isCompanyAuthor = Boolean((postData?.author as any)?.is_company);
+    const postAuthorName = (postData?.author as { name?: string })?.name?.trim() || "";
     const postAuthorCompany =
+      (isCompanyAuthor && postAuthorName ? postAuthorName : null) ||
       (postData?.author as any)?.company ||
       extractCompanyFromHeadline((postData?.author as any)?.headline) ||
-      context.monitor.competitor_name ||
+      context.monitor.competitor_name?.trim() ||
+      (postAuthorName && !postAuthorName.includes(" ") ? postAuthorName : null) ||
       null;
     const postText = (postData?.text || postData?.content || "").replace(/\s+/g, " ").trim();
     const postExcerpt = postText.length > 140 ? `${postText.slice(0, 140)}…` : postText;
@@ -444,6 +447,7 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
           ...lead.evidence.metadata,
           postAuthor: postAuthorName || null,
           postAuthorCompany: postAuthorCompany || null,
+          competitorName: context.monitor.competitor_name?.trim() || postAuthorCompany || postAuthorName || null,
           postExcerpt: postExcerpt || null,
           postText: postText.slice(0, 500) || null,
           commentText: commentText || null,
@@ -467,6 +471,7 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
           ...lead.evidence.metadata,
           postAuthor: postAuthorName || null,
           postAuthorCompany: postAuthorCompany || null,
+          competitorName: context.monitor.competitor_name?.trim() || postAuthorCompany || postAuthorName || null,
           postExcerpt: postExcerpt || null,
           postText: postText.slice(0, 500) || null,
         };
@@ -574,6 +579,11 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
         `Comentó en contenido relacionado con ${subject}`
       );
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        lead.evidence.metadata = {
+          ...lead.evidence.metadata,
+          competitorName: subject,
+          postAuthorCompany: subject,
+        };
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }
@@ -589,6 +599,11 @@ async function scanCompetitorAudience(client: SignalScannerClient, context: Sign
         `Interactuó con contenido relacionado con ${subject}`
       );
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        lead.evidence.metadata = {
+          ...lead.evidence.metadata,
+          competitorName: subject,
+          postAuthorCompany: subject,
+        };
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }

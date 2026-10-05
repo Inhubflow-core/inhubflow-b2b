@@ -82,11 +82,22 @@ export function evidenceFingerprint(input: {
 export function extractCompanyFromHeadline(headline: string | null | undefined): string | null {
   if (!headline) return null;
   const cleaned = headline.trim();
-  const atMatch = cleaned.match(/(?:^|\s)(?:at|en|@)\s+([^|•,\n/-]+)/i);
+
+  // 1. Preposiciones de pertenencia: "at Google", "en Mercado Libre", "na Prospectme", "no Nubank", "em Itaú", "@ Meta"
+  const atMatch = cleaned.match(/(?:^|\s)(?:at|en|@|na|no|em)\s+([^|•,\n/-]+)/i);
   if (atMatch?.[1]?.trim()) {
     const candidate = atMatch[1].trim();
     if (candidate.length >= 2 && candidate.length <= 60) return candidate;
   }
+
+  // 2. Roles seguidos directamente de empresa sin preposición: "Cofundador Prospectme", "Founder Acme", "CEO Inhubflow", "BDR Prospectme"
+  const roleMatch = cleaned.match(/(?:^|\s)(?:co-?founder|co-?fundador|founder|fundador|ceo|cto|coo|cmo|cro|bdr|sdr)\s+([A-Za-z0-9_.-]+)/i);
+  if (roleMatch?.[1]?.trim()) {
+    const candidate = roleMatch[1].trim();
+    if (candidate.length >= 2 && candidate.length <= 60) return candidate;
+  }
+
+  // 3. Separadores estándar (| o -)
   const pipeMatch = cleaned.match(/\|\s*([^|•,\n]+)$/);
   if (pipeMatch?.[1]?.trim()) {
     const candidate = pipeMatch[1].trim();
@@ -810,6 +821,76 @@ export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilter
   };
 }
 
+export function isAuthorEmployeeOrAffiliate(
+  lead: DiscoveredSignalLead,
+  metadata?: Record<string, unknown> | null
+): boolean {
+  const meta = metadata || lead.evidence?.metadata || {};
+  const rawTargets = [
+    meta.postAuthorCompany,
+    meta.competitorName,
+    meta.postAuthor,
+  ];
+
+  const targetEntities: string[] = [];
+  for (const raw of rawTargets) {
+    if (typeof raw === "string" && raw.trim().length >= 2) {
+      const clean = raw.trim();
+      if (!targetEntities.some((t) => t.toLowerCase() === clean.toLowerCase())) {
+        targetEntities.push(clean);
+      }
+    }
+  }
+
+  if (targetEntities.length === 0) return false;
+
+  const effectiveCompany = lead.company || extractCompanyFromHeadline(lead.headline);
+  const headlineNorm = normalize(lead.headline);
+  const nameNorm = normalize(lead.fullName);
+
+  for (const target of targetEntities) {
+    // 1. Coincidencia directa de empresa con companyMatches
+    if (effectiveCompany && companyMatches(effectiveCompany, target)) {
+      return true;
+    }
+    if (lead.company && companyMatches(lead.company, target)) {
+      return true;
+    }
+
+    // 2. Coincidencia textual en el titular / headline del lead (ej: "BDR na Prospectme", "Cofundador Prospectme")
+    const targetNorm = normalize(target);
+    if (targetNorm.length >= 3) {
+      if (headlineNorm.includes(targetNorm)) {
+        return true;
+      }
+      const escaped = targetNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const boundaryRegex = new RegExp(`(^|[^a-z0-9_])${escaped}([^a-z0-9_]|$)`, "i");
+      if (boundaryRegex.test(headlineNorm)) {
+        return true;
+      }
+    }
+
+    // 3. Coincidencia si el lead es el autor mismo
+    if (nameNorm && targetNorm && (nameNorm.includes(targetNorm) || targetNorm.includes(nameNorm))) {
+      if (targetNorm.length >= 4) {
+        return true;
+      }
+    }
+
+    // 4. Coincidencia en experiencia laboral (work_experience en metadata si fue enriquecida)
+    const workExperience = (lead.evidence?.metadata?.resolvedProfile as any)?.work_experience;
+    if (Array.isArray(workExperience)) {
+      const matchesWork = workExperience.some((exp: any) => {
+        const comp = exp?.company || exp?.companyName || "";
+        return comp && companyMatches(comp, target);
+      });
+      if (matchesWork) return true;
+    }
+  }
+
+  return false;
+}
+
 export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): boolean {
   // Descartar automáticamente perfiles anónimos (LinkedIn Member / Usuário do LinkedIn) y URLs inválidas
   if (isAnonymousLinkedInMember(lead.fullName) || isAnonymousOrInvalidLinkedInUrl(lead.linkedinUrl)) {
@@ -903,16 +984,7 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
 
   // 6. Anti-Auto-Bombo: Excluir empleados del autor del post o de su empresa
   if (icp.exclude_author_employees) {
-    const authorCompany = (lead.evidence.metadata?.postAuthorCompany as string) || (lead.evidence.metadata?.competitorName as string) || null;
-    const postAuthor = (lead.evidence.metadata?.postAuthor as string) || null;
-
-    if (authorCompany && effectiveCompany && companyMatches(effectiveCompany, authorCompany)) {
-      return false;
-    }
-    if (postAuthor && effectiveCompany && companyMatches(effectiveCompany, postAuthor)) {
-      return false;
-    }
-    if (authorCompany && lead.headline && containsAny(lead.headline, [authorCompany])) {
+    if (isAuthorEmployeeOrAffiliate(lead)) {
       return false;
     }
   }

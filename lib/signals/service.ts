@@ -22,6 +22,7 @@ import {
   extractCompanyFromHeadline,
   isAnonymousLinkedInMember,
   isAnonymousOrInvalidLinkedInUrl,
+  isAuthorEmployeeOrAffiliate,
   passesIcp,
   scoreSignalLead,
   signalIdentity,
@@ -285,7 +286,43 @@ export class SignalRadarService {
       SELECT sl.* FROM signal_leads sl ${where}
       ORDER BY datetime(sl.last_detected_at) DESC LIMIT ? OFFSET ?
     `).all(...params, limit, offset) as SignalLead[];
-    return { items, total };
+
+    // Si algún monitor tiene activo exclude_author_employees, proteger la vista del dashboard y auto-limpiar
+    let filteredItems = items;
+    try {
+      filteredItems = items.filter((leadItem) => {
+        const mon = db.prepare("SELECT icp_filters_json, competitor_name FROM signal_monitors WHERE id = ?").get(leadItem.monitor_id) as { icp_filters_json?: string; competitor_name?: string } | undefined;
+        if (!mon?.icp_filters_json) return true;
+        try {
+          const icp = JSON.parse(mon.icp_filters_json);
+          if (icp?.exclude_author_employees) {
+            let meta: any = {};
+            try { meta = JSON.parse(leadItem.metadata_json || "{}"); } catch {}
+            const latestEv = meta?.latestEvidence || meta || {};
+            const mappedLead: any = {
+              fullName: leadItem.full_name,
+              headline: leadItem.headline,
+              company: leadItem.company,
+              evidence: {
+                metadata: {
+                  ...latestEv,
+                  competitorName: mon.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany,
+                },
+              },
+            };
+            if (isAuthorEmployeeOrAffiliate(mappedLead)) {
+              if (leadItem.status === "pending") {
+                db.prepare("UPDATE signal_leads SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(leadItem.id);
+              }
+              return false;
+            }
+          }
+        } catch {}
+        return true;
+      });
+    } catch {}
+
+    return { items: filteredItems, total: Math.min(total, filteredItems.length) };
   }
 
   getLead(id: string, actor?: ApiActor | SignalActorScope): SignalLead | null {
@@ -441,6 +478,35 @@ export class SignalRadarService {
       }
 
       const persisted = await this.persistDiscoveredLeads(monitor, enriched, scanRunId, icp);
+
+      // Si el monitor tiene activo "Excluir empleados del autor", depurar cualquier prospecto que pertenezca a la empresa del autor
+      if (icp.exclude_author_employees) {
+        try {
+          const pendingLeads = db.prepare("SELECT * FROM signal_leads WHERE monitor_id = ? AND status = 'pending'").all(monitor.id) as SignalLead[];
+          for (const pl of pendingLeads) {
+            let meta: any = {};
+            try { meta = JSON.parse(pl.metadata_json || "{}"); } catch {}
+            const latestEv = meta?.latestEvidence || meta || {};
+            const mappedLead: any = {
+              fullName: pl.full_name,
+              headline: pl.headline,
+              company: pl.company,
+              evidence: {
+                metadata: {
+                  ...latestEv,
+                  competitorName: monitor.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany,
+                },
+              },
+            };
+            if (isAuthorEmployeeOrAffiliate(mappedLead)) {
+              db.prepare("UPDATE signal_leads SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(pl.id);
+            }
+          }
+        } catch (cleanErr) {
+          console.warn("[SignalRadar] Error al depurar empleados del autor existentes:", cleanErr);
+        }
+      }
+
       const completedAt = new Date(this.now()).toISOString();
       const next = nextScanAt(monitor.scan_interval_minutes, this.now());
       const state = enriched.length === 0 ? "no_results" : "completed";
