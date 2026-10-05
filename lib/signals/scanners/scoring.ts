@@ -105,6 +105,163 @@ function containsAny(value: string | null | undefined, expected: string[]): bool
   return expected.some((item) => normalized.includes(normalize(item)));
 }
 
+const CORPORATE_SUFFIXES = new Set([
+  "inc", "llc", "ltd", "ltda", "sa", "sas", "sl", "srl", "spa", "plc",
+  "corp", "corporation", "company", "co", "gmbh", "eirl", "group", "holding",
+  "tech", "technologies", "technology", "solutions", "chile", "mexico", "colombia",
+  "espana", "spain", "argentina", "peru", "brasil", "brazil", "latam", "global", "international",
+  "health", "lab", "labs", "s", "a",
+]);
+
+function companyNormalize(value: string | null | undefined): string {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/\b([a-zA-Z])\.([a-zA-Z])(?:\.([a-zA-Z]))?(?:\.([a-zA-Z]))?/g, "$1$2$3$4")
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|ltda|sa|sas|sl|srl|spa|plc|corp|corporation|company|co|gmbh|eirl)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function companyTokens(name: string): string[] {
+  const norm = companyNormalize(name);
+  return norm.split(/\s+/).filter((w) => w.length > 0 && !CORPORATE_SUFFIXES.has(w));
+}
+
+export function companyMatches(profileCompany: string | null | undefined, expected: string): boolean {
+  if (!profileCompany || !expected) return false;
+  const actualNorm = companyNormalize(profileCompany);
+  const wantedNorm = companyNormalize(expected);
+  if (!actualNorm || !wantedNorm) return false;
+
+  // 1. Coincidencia exacta directa
+  if (actualNorm === wantedNorm) return true;
+
+  const wantedTokens = companyTokens(expected);
+  const actualTokens = companyTokens(profileCompany);
+  if (wantedTokens.length === 0 || actualTokens.length === 0) {
+    return actualNorm === wantedNorm;
+  }
+
+  const wantedCore = wantedTokens.join(" ");
+  const actualCore = actualTokens.join(" ");
+  if (wantedCore === actualCore) return true;
+
+  // 2. Si la empresa esperada tiene una sola palabra (ej: "Integral", "NotCo", "Stripe"):
+  if (wantedTokens.length === 1) {
+    if (actualTokens.length === 1 && actualTokens[0] === wantedTokens[0]) return true;
+    if (actualTokens.length <= 2 && actualTokens[0] === wantedTokens[0]) {
+      return true;
+    }
+    return false;
+  }
+
+  // 3. Para empresas de 2 o más palabras clave:
+  const allWantedInActual = wantedTokens.every((t) => actualTokens.includes(t));
+  if (allWantedInActual && actualTokens.length <= wantedTokens.length + 1) {
+    return true;
+  }
+  const allActualInWanted = actualTokens.every((t) => wantedTokens.includes(t));
+  if (allActualInWanted && wantedTokens.length <= actualTokens.length + 1) {
+    return true;
+  }
+
+  return false;
+}
+
+export type CommentIntentLevel = "high" | "medium" | "low";
+
+export interface CommentIntentClassification {
+  level: CommentIntentLevel;
+  label: string;
+  scoreBonus: number;
+  reasons: string[];
+}
+
+const LOW_INTENT_GENERIC_PHRASES = new Set([
+  "felicidades", "felicitaciones", "felicitaciones equipo", "buen post", "gran post",
+  "excelente", "totalmente", "de acuerdo", "top", "crack", "genial", "saludos",
+  "exitos", "éxitos", "parabens", "parabéns", "muito bom", "congrats", "congratulations",
+  "great post", "agree", "totally", "well done", "awesome", "interesante", "interessante",
+  "interesting", "clap", "bravo", "gracias por compartir", "gracias",
+]);
+
+export function classifyCommentIntent(commentText: string | null | undefined): CommentIntentClassification {
+  const text = (commentText || "").trim();
+  if (!text) {
+    return {
+      level: "low",
+      label: "Sin comentario",
+      scoreBonus: 0,
+      reasons: ["Comentario vacío o ausente"],
+    };
+  }
+
+  // 1. Detectar emojis puros o casi puros
+  const textWithoutEmoji = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s\p{Punctuation}]/gu, "").trim();
+  if (textWithoutEmoji.length === 0) {
+    return {
+      level: "low",
+      label: "Reacción breve (Emoji)",
+      scoreBonus: 0,
+      reasons: ["Comentario compuesto únicamente de emojis"],
+    };
+  }
+
+  const norm = normalize(text);
+  if (LOW_INTENT_GENERIC_PHRASES.has(norm)) {
+    return {
+      level: "low",
+      label: "Felicitación genérica",
+      scoreBonus: 2,
+      reasons: ["Frase de cortesía o felicitación genérica"],
+    };
+  }
+
+  // 2. Evaluar alta intención (preguntas, dolor, solicitud de recursos / demos)
+  const matchedHighReasons: string[] = [];
+  if (/[?¿]/.test(text)) {
+    matchedHighReasons.push("Formula pregunta activa");
+  }
+  if (/\b(c[oó]mo|cu[aá]ndo|cu[aá]nto|d[oó]nde|por\s*qu[eé]|how|when|why|where|como\s+fazer)\b/i.test(text)) {
+    matchedHighReasons.push("Pregunta sobre implementación o funcionamiento");
+  }
+  if (/\b(me\s+interesa|info|informaci[oó]n|envi[aá]|compartir|link|enlace|gu[ií]a|recurso|demo|precio|costo|cotizaci[oó]n|interested|send\s+me|pricing|quiero\s+ver)\b/i.test(text)) {
+    matchedHighReasons.push("Solicita información, demo o recurso");
+  }
+  if (/\b(necesito|busco|buscamos|reto|problema|dificultad|desaf[ií]o|fallo|costoso|complicado|need|looking\s+for|struggling|challenge|issue|dificuldade|preciso)\b/i.test(text)) {
+    matchedHighReasons.push("Expresa dolor o necesidad activa");
+  }
+
+  if (matchedHighReasons.length > 0) {
+    return {
+      level: "high",
+      label: "Alta Intención (Dolor / Pregunta)",
+      scoreBonus: 18,
+      reasons: matchedHighReasons,
+    };
+  }
+
+  // 3. Evaluar longitud y sustancia
+  const wordCount = text.split(/\s+/).length;
+  if (wordCount >= 6) {
+    return {
+      level: "medium",
+      label: "Opinión / Aporte sustancial",
+      scoreBonus: 8,
+      reasons: ["Comentario elaborado con perspectiva propia"],
+    };
+  }
+
+  return {
+    level: "low",
+    label: "Reacción breve",
+    scoreBonus: 2,
+    reasons: ["Comentario breve de baja elaboración"],
+  };
+}
+
 export interface SignalScore {
   total: number;
   breakdown: {
@@ -623,13 +780,28 @@ export function scoreSignalLead(lead: DiscoveredSignalLead, icp: SignalIcpFilter
   const occurredAt = lead.evidence.occurredAt ? Date.parse(lead.evidence.occurredAt) : Number.NaN;
   const ageHours = Number.isFinite(occurredAt) ? Math.max(0, (nowMs - occurredAt) / 3_600_000) : null;
   const recency = ageHours == null ? 5 : ageHours <= 48 ? 15 : ageHours <= 168 ? 10 : 4;
+
+  // Bonus por intención del comentario (clasificación IA / léxica)
+  let intentBonus = 0;
+  let commentIntent = lead.evidence.metadata?.commentIntent as CommentIntentClassification | undefined;
+  if (!commentIntent && lead.evidence.sourceType === "post_comment") {
+    const rawSnippet = lead.evidence.snippet || "";
+    const cleanComment = rawSnippet.replace(/^Comentó:\s*[“"]?|[”"]?$/g, "").trim();
+    commentIntent = classifyCommentIntent(cleanComment);
+    if (!lead.evidence.metadata) lead.evidence.metadata = {};
+    lead.evidence.metadata.commentIntent = commentIntent;
+  }
+  if (commentIntent) {
+    intentBonus = commentIntent.scoreBonus;
+  }
+
   const breakdown = {
-    signal: SIGNAL_BASE[lead.signalType] || 25,
+    signal: Math.min(50, (SIGNAL_BASE[lead.signalType] || 25) + intentBonus),
     title: titleMatch === true ? 22 : titleMatch === false ? 4 : 8,
     location: locationMatch === true ? 14 : locationMatch === false ? 0 : 5,
     companySize: companySizeMatch === true ? 11 : companySizeMatch === false ? 0 : 5,
     recency,
-    evidenceQuality: lead.evidence.metadata?.identityVerified === true ? 10 : 0,
+    evidenceQuality: lead.evidence.metadata?.identityVerified === true ? 10 : (commentIntent?.level === "high" ? 6 : 0),
   };
   return {
     total: Math.max(0, Math.min(100, Object.values(breakdown).reduce((sum, value) => sum + value, 0))),
@@ -726,6 +898,22 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
       || containsAny(lead.evidence.snippet, targetIndustries);
     if (!matchesIndustry && (effectiveCompany || lead.headline)) {
       if (!isDirectPostSignal) return false;
+    }
+  }
+
+  // 6. Anti-Auto-Bombo: Excluir empleados del autor del post o de su empresa
+  if (icp.exclude_author_employees) {
+    const authorCompany = (lead.evidence.metadata?.postAuthorCompany as string) || (lead.evidence.metadata?.competitorName as string) || null;
+    const postAuthor = (lead.evidence.metadata?.postAuthor as string) || null;
+
+    if (authorCompany && effectiveCompany && companyMatches(effectiveCompany, authorCompany)) {
+      return false;
+    }
+    if (postAuthor && effectiveCompany && companyMatches(effectiveCompany, postAuthor)) {
+      return false;
+    }
+    if (authorCompany && lead.headline && containsAny(lead.headline, [authorCompany])) {
+      return false;
     }
   }
 

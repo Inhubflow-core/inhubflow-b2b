@@ -27,7 +27,7 @@ const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/sc
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
-const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch } = require("../lib/signals/scanners/scoring.ts");
+const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch, classifyCommentIntent, passesIcp } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -473,6 +473,65 @@ async function run() {
     assert.equal(hasConflictingCountry("Our headquarters in Berlin is expanding", "VP Growth Berlin", "Alemania"), false);
     assert.equal(hasConflictingCountry("Nouveau poste à Moscou en Russie", "Directeur Commercial", "Francia"), true);
     assert.equal(hasConflictingCountry("Expansion commerciale à Paris et Lyon", "Directeur Commercial", "Francia"), false);
+
+    // Clasificación de intención en comentarios
+    const high1 = classifyCommentIntent("¿Cómo resuelven la integración con HubSpot? Me interesa probarlo");
+    assert.equal(high1.level, "high", "Preguntas con 'cómo' e 'interesa' deben ser alta intención");
+    assert.ok(high1.scoreBonus >= 15);
+
+    const high2 = classifyCommentIntent("Por favor envíame el link con la plantilla y el precio");
+    assert.equal(high2.level, "high", "Solicitud de link y precio debe ser alta intención");
+
+    const high3 = classifyCommentIntent("We need a solution for this challenge in our sales team");
+    assert.equal(high3.level, "high", "Expresión de dolor en inglés debe ser alta intención");
+
+    const medium = classifyCommentIntent("Considero que este enfoque es interesante para empresas medianas pero requiere buen onboarding");
+    assert.equal(medium.level, "medium", "Comentario elaborado sin pregunta directa debe ser media intención");
+
+    const lowEmoji = classifyCommentIntent("👏🔥🙌");
+    assert.equal(lowEmoji.level, "low", "Emojis puros deben ser baja intención");
+
+    const lowPraise = classifyCommentIntent("Felicitaciones equipo!!");
+    assert.equal(lowPraise.level, "low", "Felicitación genérica debe ser baja intención");
+
+    // Filtro Anti-Auto-Bombo (Excluir empleados del autor)
+    const employeeLead = {
+      fullName: "Ana García",
+      linkedinUrl: "https://www.linkedin.com/in/anagarcia/",
+      headline: "Account Executive at HubSpot",
+      company: "HubSpot",
+      signalType: "post_engagement",
+      evidence: {
+        fingerprint: "fp1",
+        sourceType: "post_comment",
+        snippet: "Excelente iniciativa equipo",
+        metadata: {
+          postAuthor: "Dharmesh Shah",
+          postAuthorCompany: "HubSpot",
+        },
+      },
+    };
+
+    const externalLead = {
+      fullName: "Carlos Mendoza",
+      linkedinUrl: "https://www.linkedin.com/in/carlosmendoza/",
+      headline: "Director Comercial en TechCorp",
+      company: "TechCorp",
+      signalType: "post_engagement",
+      evidence: {
+        fingerprint: "fp2",
+        sourceType: "post_comment",
+        snippet: "¿Tienen integración con Salesforce?",
+        metadata: {
+          postAuthor: "Dharmesh Shah",
+          postAuthorCompany: "HubSpot",
+        },
+      },
+    };
+
+    assert.equal(passesIcp(employeeLead, { exclude_author_employees: true }), false, "Empleado de HubSpot debe ser descartado por anti-auto-bombo");
+    assert.equal(passesIcp(externalLead, { exclude_author_employees: true }), true, "Lead externo debe pasar filtro");
+    assert.equal(passesIcp(employeeLead, { exclude_author_employees: false }), true, "Sin filtro anti-auto-bombo debe pasar");
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

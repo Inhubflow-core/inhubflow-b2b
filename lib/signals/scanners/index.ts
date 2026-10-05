@@ -21,6 +21,7 @@ import {
   expandTitleCriteria,
   isAnonymousLinkedInMember,
   isAnonymousOrInvalidLinkedInUrl,
+  classifyCommentIntent,
 } from "./scoring";
 import { scanWebSignals } from "./web";
 
@@ -409,6 +410,11 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
     }
 
     const postAuthorName = (postData?.author as { name?: string })?.name || "";
+    const postAuthorCompany =
+      (postData?.author as any)?.company ||
+      extractCompanyFromHeadline((postData?.author as any)?.headline) ||
+      context.monitor.competitor_name ||
+      null;
     const postText = (postData?.text || postData?.content || "").replace(/\s+/g, " ").trim();
     const postExcerpt = postText.length > 140 ? `${postText.slice(0, 140)}…` : postText;
 
@@ -426,20 +432,23 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
     const signalTypeComment = context.monitor.type === "post_engagement" ? "post_engagement" : "high_intent_comments";
     for (const comment of comments.items || []) {
+      const commentText = comment.text || "";
+      const commentIntent = classifyCommentIntent(commentText);
       const fallbackSnippet = postAuthorName && postExcerpt
         ? `Comentó en la publicación de ${postAuthorName}: "${postExcerpt}"`
         : (postExcerpt ? `Comentó en la publicación: "${postExcerpt}"` : "Comentó en la publicación");
 
       const lead = parseCommentLead(comment, context.monitor.id, signalTypeComment, "post_comment", postUrl, fallbackSnippet);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
-        if (postData) {
-          lead.evidence.metadata = {
-            ...lead.evidence.metadata,
-            postAuthor: postAuthorName || null,
-            postExcerpt: postExcerpt || null,
-            postText: postText.slice(0, 500) || null,
-          };
-        }
+        lead.evidence.metadata = {
+          ...lead.evidence.metadata,
+          postAuthor: postAuthorName || null,
+          postAuthorCompany: postAuthorCompany || null,
+          postExcerpt: postExcerpt || null,
+          postText: postText.slice(0, 500) || null,
+          commentText: commentText || null,
+          commentIntent,
+        };
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }
@@ -454,18 +463,29 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
       const lead = parseReactionLead(reaction, context.monitor.id, signalTypeReaction, "post_reaction", urn, postUrl, fallbackSnippet);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
-        if (postData) {
-          lead.evidence.metadata = {
-            ...lead.evidence.metadata,
-            postAuthor: postAuthorName || null,
-            postExcerpt: postExcerpt || null,
-            postText: postText.slice(0, 500) || null,
-          };
-        }
+        lead.evidence.metadata = {
+          ...lead.evidence.metadata,
+          postAuthor: postAuthorName || null,
+          postAuthorCompany: postAuthorCompany || null,
+          postExcerpt: postExcerpt || null,
+          postText: postText.slice(0, 500) || null,
+        };
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }
     }
+  }
+
+  // Priorizar comentarios con alta intención de compra / preguntas antes que reacciones o comentarios breves
+  if (context.icp.prioritize_high_intent_comments !== false && leads.length > 1) {
+    const intentWeights: Record<string, number> = { high: 3, medium: 2, low: 1 };
+    leads.sort((a, b) => {
+      const aLevel = (a.evidence.metadata?.commentIntent as any)?.level;
+      const bLevel = (b.evidence.metadata?.commentIntent as any)?.level;
+      const aWeight = aLevel ? intentWeights[aLevel] || 0 : (a.evidence.sourceType === "post_comment" ? 1 : 0);
+      const bWeight = bLevel ? intentWeights[bLevel] || 0 : (b.evidence.sourceType === "post_comment" ? 1 : 0);
+      return bWeight - aWeight;
+    });
   }
 
   if (leads.length === 0 && targetUrls.length > 0) {

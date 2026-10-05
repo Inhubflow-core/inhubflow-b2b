@@ -1,7 +1,7 @@
 import type { SignalIcpFilters } from "../schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { evidenceFingerprint, extractCompanyFromHeadline } from "./scoring";
+import { evidenceFingerprint, extractCompanyFromHeadline, companyMatches } from "./scoring";
 import { type SignalScannerClient, resolveLocationIds } from "./index";
 import type { WebSearchClient, WebSearchResult } from "@/lib/serper/client";
 import type { UnipileSearchPerson } from "@/lib/unipile/types";
@@ -161,62 +161,8 @@ function titleMatches(headline: string | null | undefined, titles: string[], sig
   return effTitles.some((title) => normalized.includes(normalize(title)));
 }
 
-const CORPORATE_SUFFIXES = new Set([
-  "inc", "llc", "ltd", "ltda", "sa", "sas", "sl", "srl", "spa", "plc",
-  "corp", "corporation", "company", "co", "gmbh", "eirl", "group", "holding",
-  "tech", "technologies", "technology", "solutions", "chile", "mexico", "colombia",
-  "espana", "spain", "argentina", "peru", "brasil", "brazil", "latam", "global", "international",
-  "health", "lab", "labs", "s", "a",
-]);
+export { companyMatches };
 
-function companyTokens(name: string): string[] {
-  const norm = normalize(name);
-  return norm.split(/\s+/).filter((w) => w.length > 0 && !CORPORATE_SUFFIXES.has(w));
-}
-
-export function companyMatches(profileCompany: string | null | undefined, expected: string): boolean {
-  if (!profileCompany || !expected) return false;
-  const actualNorm = normalize(profileCompany);
-  const wantedNorm = normalize(expected);
-  if (!actualNorm || !wantedNorm) return false;
-
-  // 1. Coincidencia exacta directa
-  if (actualNorm === wantedNorm) return true;
-
-  const wantedTokens = companyTokens(expected);
-  const actualTokens = companyTokens(profileCompany);
-  if (wantedTokens.length === 0 || actualTokens.length === 0) {
-    return actualNorm === wantedNorm;
-  }
-
-  const wantedCore = wantedTokens.join(" ");
-  const actualCore = actualTokens.join(" ");
-  if (wantedCore === actualCore) return true;
-
-  // 2. Si la empresa esperada tiene una sola palabra (ej: "Integral", "NotCo", "Stripe"):
-  // No permitir coincidencias con empresas que añaden palabras no corporativas ("Tapiz Decoración Integral")
-  if (wantedTokens.length === 1) {
-    // Si los tokens centrales son exactamente iguales
-    if (actualTokens.length === 1 && actualTokens[0] === wantedTokens[0]) return true;
-    // O si la empresa empieza exactamente con ese nombre y sólo añade 1 token corporativo/secundario (ej: "Betterfly Health")
-    if (actualTokens.length <= 2 && actualTokens[0] === wantedTokens[0]) {
-      return true;
-    }
-    return false;
-  }
-
-  // 3. Para empresas de 2 o más palabras clave:
-  const allWantedInActual = wantedTokens.every((t) => actualTokens.includes(t));
-  if (allWantedInActual && actualTokens.length <= wantedTokens.length + 1) {
-    return true;
-  }
-  const allActualInWanted = actualTokens.every((t) => wantedTokens.includes(t));
-  if (allActualInWanted && wantedTokens.length <= actualTokens.length + 1) {
-    return true;
-  }
-
-  return false;
-}
 
 function personCandidate(item: unknown): item is UnipileSearchPerson {
   return Boolean(item && typeof item === "object" && (item as { type?: string }).type === "PEOPLE");

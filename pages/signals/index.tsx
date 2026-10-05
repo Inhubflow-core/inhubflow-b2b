@@ -96,6 +96,7 @@ interface SignalLead {
   signal_snippet: string | null;
   icebreaker_preview: string | null;
   status: "pending" | "approved" | "rejected" | "imported" | "enrolled" | "failed";
+  metadata_json?: string | null;
   message_metadata_json?: string | null;
   promotion_state?: "pending" | "promoting" | "imported" | "enrolled" | "blocked" | "failed";
   promotion_error?: string | null;
@@ -548,6 +549,8 @@ export default function SignalsPage({
   const [myPostsLoaded, setMyPostsLoaded] = useState<boolean>(false);
   const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string; pictureUrl?: string | null; is_company?: boolean } | null>(null);
   const [manualMyPostUrl, setManualMyPostUrl] = useState<string>("");
+  const [excludeAuthorEmployees, setExcludeAuthorEmployees] = useState<boolean>(true);
+  const [prioritizeHighIntent, setPrioritizeHighIntent] = useState<boolean>(true);
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
   const [selectedCompetitorEntity, setSelectedCompetitorEntity] = useState<{
     id: string;
@@ -929,6 +932,8 @@ export default function SignalsPage({
     setCustomTemplate("");
     setNewMode("review");
     setScanIntervalMinutes(60);
+    setExcludeAuthorEmployees(true);
+    setPrioritizeHighIntent(true);
     setShowNewModal(true);
   };
 
@@ -1053,6 +1058,8 @@ export default function SignalsPage({
         setIcpTitle(Array.isArray(icp.titles) && icp.titles.length > 0 ? icp.titles.join(", ") : "");
         setIcpSizes(Array.isArray(icp.company_sizes) ? icp.company_sizes : []);
         setIcpCompany(icp.company || (Array.isArray(icp.industries) && icp.industries.length > 0 ? icp.industries.join(", ") : ""));
+        setExcludeAuthorEmployees(icp.exclude_author_employees !== false);
+        setPrioritizeHighIntent(icp.prioritize_high_intent_comments !== false);
         setTimeWindowDays(icp.time_window_days || 90);
         setSourceStrategy(icp.source_strategy || "linkedin");
 
@@ -1083,6 +1090,8 @@ export default function SignalsPage({
         setIcpCity("");
         setIcpSizes([]);
         setIcpCompany("");
+        setExcludeAuthorEmployees(true);
+        setPrioritizeHighIntent(true);
       }
     } else {
       setIcpTitle("");
@@ -1090,6 +1099,8 @@ export default function SignalsPage({
       setIcpCity("");
       setIcpSizes([]);
       setIcpCompany("");
+      setExcludeAuthorEmployees(true);
+      setPrioritizeHighIntent(true);
     }
 
     // Parsear message_config_json
@@ -1297,6 +1308,8 @@ export default function SignalsPage({
               event_kinds: signalCategoryTab === "icp_triggers"
                 ? selectedIcpSignals
                 : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
+              exclude_author_employees: excludeAuthorEmployees,
+              prioritize_high_intent_comments: prioritizeHighIntent,
             },
             mode: newMode,
             account_id: selectedAccountId || undefined,
@@ -1351,6 +1364,8 @@ export default function SignalsPage({
             event_kinds: signalCategoryTab === "icp_triggers"
               ? selectedIcpSignals
               : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
+            exclude_author_employees: excludeAuthorEmployees,
+            prioritize_high_intent_comments: prioritizeHighIntent,
           },
           mode: newMode,
           account_id: selectedAccountId || undefined,
@@ -2120,8 +2135,38 @@ export default function SignalsPage({
                         <div className="flex flex-col md:flex-row gap-2.5">
                           {lead.signal_snippet && (
                             <div className="p-2.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 md:flex-1 min-w-0">
-                              <span className="font-bold">Contexto de la Señal: </span>
-                              {lead.signal_snippet}
+                              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                                <span className="font-bold">Contexto de la Señal:</span>
+                                {(() => {
+                                  try {
+                                    const meta = lead.metadata_json ? JSON.parse(lead.metadata_json) : null;
+                                    const intent = meta?.latestEvidence?.commentIntent || meta?.commentIntent;
+                                    if (intent?.level === "high") {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200 border border-amber-300 dark:border-amber-700" title={intent.reasons?.join(", ")}>
+                                          🔥 {intent.label || "Alta Intención"}
+                                        </span>
+                                      );
+                                    }
+                                    if (intent?.level === "medium") {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-200 border border-blue-300 dark:border-blue-700" title={intent.reasons?.join(", ")}>
+                                          💬 {intent.label || "Opinión"}
+                                        </span>
+                                      );
+                                    }
+                                    if (intent?.level === "low") {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700" title={intent.reasons?.join(", ")}>
+                                          👍 {intent.label || "Breve"}
+                                        </span>
+                                      );
+                                    }
+                                  } catch {}
+                                  return null;
+                                })()}
+                              </div>
+                              <p className="line-clamp-3">{lead.signal_snippet}</p>
                             </div>
                           )}
 
@@ -3862,6 +3907,55 @@ export default function SignalsPage({
                             </p>
                           </div>
                         )}
+
+                        {/* Filtros Inteligentes de Calidad: Anti-Auto-Bombo y Clasificación de Intención */}
+                        <div className="p-3.5 rounded-xl bg-gray-50/90 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/80 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                              <RiShieldCheckLine className="text-brand-600 dark:text-brand-400" size={15} />
+                              Filtros Inteligentes de Post
+                            </span>
+                            <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold bg-brand-50 dark:bg-brand-950/60 px-2 py-0.5 rounded-full border border-brand-200 dark:border-brand-800">
+                              ⭐ Calidad Anti-Spam
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 cursor-pointer select-none hover:border-brand-300 transition-colors shadow-2xs">
+                              <input
+                                type="checkbox"
+                                checked={excludeAuthorEmployees}
+                                onChange={(e) => setExcludeAuthorEmployees(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded text-brand-600 border-gray-300 focus:ring-brand-500 cursor-pointer"
+                              />
+                              <div className="min-w-0">
+                                <span className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  Excluir empleados del autor
+                                </span>
+                                <span className="block text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
+                                  Evita auto-bombo: descarta a personas que trabajan en la misma empresa que publicó el post.
+                                </span>
+                              </div>
+                            </label>
+
+                            <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 cursor-pointer select-none hover:border-brand-300 transition-colors shadow-2xs">
+                              <input
+                                type="checkbox"
+                                checked={prioritizeHighIntent}
+                                onChange={(e) => setPrioritizeHighIntent(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded text-brand-600 border-gray-300 focus:ring-brand-500 cursor-pointer"
+                              />
+                              <div className="min-w-0">
+                                <span className="block text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  Priorizar intención alta
+                                </span>
+                                <span className="block text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5">
+                                  Prioriza comentarios con dolor explícito, preguntas o solicitudes de info antes que simples emojis.
+                                </span>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     )}
 

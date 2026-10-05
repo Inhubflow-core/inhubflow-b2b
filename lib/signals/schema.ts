@@ -41,6 +41,8 @@ export interface SignalIcpFilters {
   result_limit?: number;
   source_strategy?: "linkedin" | "web" | "hybrid";
   event_kinds?: string[];
+  exclude_author_employees?: boolean;
+  prioritize_high_intent_comments?: boolean;
 }
 
 export interface SignalMessageConfig {
