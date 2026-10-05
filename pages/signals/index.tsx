@@ -3405,17 +3405,13 @@ export default function SignalsPage({
                                       <div className="flex flex-wrap items-center gap-1.5">
                                         <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">Temas recomendados:</span>
                                         {suggestedChips.map((sug) => {
-                                          const isChipActive = postSearchKeywords.trim().toLowerCase() === sug.toLowerCase();
+                                          const isChipActive = isPillActive(postSearchKeywords, sug);
                                           return (
                                             <button
                                               key={sug}
                                               type="button"
                                               onClick={() => {
-                                                if (isChipActive) {
-                                                  setPostSearchKeywords("");
-                                                } else {
-                                                  setPostSearchKeywords(sug);
-                                                }
+                                                setPostSearchKeywords(toggleOrAppendPill(postSearchKeywords, sug));
                                               }}
                                               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                                                 isChipActive
@@ -4127,38 +4123,12 @@ export default function SignalsPage({
                       </div>
                     )}
 
-                    {/* =========================================================
-                        PESTAÑA 2: PALABRAS CLAVE, COMPETIDORES Y NOTICIAS
+                     {/* =========================================================
+                        PESTAÑA 2: PALABRAS CLAVE Y EVENTOS DE MERCADO
                        ========================================================= */}
                     {signalCategoryTab === "keywords" && (
                       <div className="space-y-5 animate-in fade-in duration-150">
-                        {/* 1. Empresa o Competidor a Vigilar */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                              Empresa, Competidor o Referente <span className="text-gray-400 font-normal">(Opcional)</span>
-                            </label>
-                            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Sin URLs necesarias</span>
-                          </div>
-                          <div className="relative">
-                            <RiBuildingLine className="absolute left-3.5 top-3 text-gray-400" size={16} />
-                            <input
-                              type="text"
-                              value={newCompetitor}
-                              onChange={(e) => {
-                                setNewCompetitor(e.target.value);
-                                setPostSearchCompetitor(e.target.value);
-                              }}
-                              placeholder="Ej: HubSpot, Salesforce, Lemlist, Apollo, Deel..."
-                              className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                            />
-                          </div>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            InHubFlow rastreará automáticamente discusiones públicas, menciones y personas que interactúen alrededor de este competidor.
-                          </p>
-                        </div>
-
-                        {/* 2. Palabras Clave de Intención de Compra */}
+                        {/* 1. Palabras Clave de Intención de Compra */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
