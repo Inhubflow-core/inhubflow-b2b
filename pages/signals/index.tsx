@@ -546,7 +546,7 @@ export default function SignalsPage({
   }>>([]);
   const [isLoadingMyPosts, setIsLoadingMyPosts] = useState<boolean>(false);
   const [myPostsLoaded, setMyPostsLoaded] = useState<boolean>(false);
-  const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string } | null>(null);
+  const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string; pictureUrl?: string | null } | null>(null);
   const [manualMyPostUrl, setManualMyPostUrl] = useState<string>("");
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
   const [selectedCompetitorEntity, setSelectedCompetitorEntity] = useState<{
@@ -3543,25 +3543,28 @@ export default function SignalsPage({
                         {/* MODO MIS PROPIOS POSTS (INBOUND) */}
                         {postSearchMode === "my_posts" && (
                           <div className="space-y-4 animate-in fade-in duration-150">
+                            {/* 1. Tarjeta de Usuario/Perfil Conectado */}
                             <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
                               <div className="flex items-center justify-between gap-3 flex-wrap">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-300 flex items-center justify-center shrink-0">
-                                    <RiUserHeartLine size={20} />
-                                  </div>
+                                <div className="flex items-center gap-3">
+                                  <ProspectAvatar
+                                    imageUrl={myAccountInfo?.pictureUrl || null}
+                                    name={myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || "Tu perfil"}
+                                    size="md"
+                                    badge="linkedin"
+                                    className="ring-2 ring-brand-500/20 shadow-xs"
+                                  />
                                   <div>
                                     <div className="flex items-center gap-2">
                                       <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                        Tus Publicaciones en LinkedIn
+                                        {myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || "Tu perfil de LinkedIn"}
                                       </h4>
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                         Prospección Inbound
                                       </span>
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                                      {myAccountInfo?.name
-                                        ? `Cuenta conectada: ${myAccountInfo.name}`
-                                        : "Monitorea a los usuarios que interactúan con tus publicaciones para iniciar charlas cálidas."}
+                                      Tus publicaciones en Linkedin
                                     </p>
                                   </div>
                                 </div>
@@ -3646,6 +3649,44 @@ export default function SignalsPage({
                                   </span>
                                 </div>
                               )}
+                            </div>
+
+                            {/* 3. ENTRADA RÁPIDA DE ENLACE DE PUBLICACIÓN ESPECÍFICA */}
+                            <div className="p-3.5 rounded-xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/80 space-y-2">
+                              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                ¿Tienes el enlace de una publicación específica tuya?
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={manualMyPostUrl}
+                                  onChange={(e) => setManualMyPostUrl(e.target.value)}
+                                  placeholder="https://www.linkedin.com/feed/update/urn:li:activity:..."
+                                  className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 shadow-2xs placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const trimmed = manualMyPostUrl.trim();
+                                    if (!trimmed || !trimmed.startsWith("http")) {
+                                      toast.error("Ingresa una URL válida de LinkedIn");
+                                      return;
+                                    }
+                                    if (!selectedPostUrls.includes(trimmed)) {
+                                      const next = [...selectedPostUrls, trimmed];
+                                      setSelectedPostUrls(next);
+                                      setNewTargetUrl(next.join("\n"));
+                                      toast.success("Publicación añadida al monitoreo");
+                                    } else {
+                                      toast.info("Esta publicación ya está en la lista");
+                                    }
+                                    setManualMyPostUrl("");
+                                  }}
+                                  className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer"
+                                >
+                                  + Añadir a Monitoreo
+                                </button>
+                              </div>
                             </div>
 
                             {/* CARGANDO POSTS */}
@@ -3756,44 +3797,6 @@ export default function SignalsPage({
                                 </p>
                               </div>
                             )}
-
-                            {/* ENTRADA RÁPIDA DE ENLACE DE PUBLICACIÓN PROPIA */}
-                            <div className="p-3.5 rounded-xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/80 space-y-2">
-                              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                ¿Tienes el enlace de una publicación específica tuya?
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={manualMyPostUrl}
-                                  onChange={(e) => setManualMyPostUrl(e.target.value)}
-                                  placeholder="https://www.linkedin.com/feed/update/urn:li:activity:..."
-                                  className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 shadow-2xs placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const trimmed = manualMyPostUrl.trim();
-                                    if (!trimmed || !trimmed.startsWith("http")) {
-                                      toast.error("Ingresa una URL válida de LinkedIn");
-                                      return;
-                                    }
-                                    if (!selectedPostUrls.includes(trimmed)) {
-                                      const next = [...selectedPostUrls, trimmed];
-                                      setSelectedPostUrls(next);
-                                      setNewTargetUrl(next.join("\n"));
-                                      toast.success("Publicación añadida al monitoreo");
-                                    } else {
-                                      toast.info("Esta publicación ya está en la lista");
-                                    }
-                                    setManualMyPostUrl("");
-                                  }}
-                                  className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer"
-                                >
-                                  + Añadir a Monitoreo
-                                </button>
-                              </div>
-                            </div>
                           </div>
                         )}
 

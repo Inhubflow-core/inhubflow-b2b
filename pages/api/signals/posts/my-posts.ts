@@ -77,10 +77,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
+    // Obtener imagen de perfil y nombre real del usuario conectado
+    let profilePictureUrl: string | null = null;
+    let accountName: string = resolved.account?.name || "Tu perfil";
+
+    try {
+      const ownProfile = await unipile.getOwnProfile(resolved.unipileAccountId).catch(() => null);
+      if (ownProfile) {
+        profilePictureUrl =
+          ownProfile.profile_picture_url_large ||
+          ownProfile.profile_picture_url ||
+          (ownProfile as any).picture_url ||
+          null;
+        const fullName = `${ownProfile.first_name || ""} ${ownProfile.last_name || ""}`.trim();
+        if (fullName) {
+          accountName = fullName;
+        }
+      }
+    } catch {
+      // Ignorar fallback
+    }
+
+    if (!profilePictureUrl) {
+      profilePictureUrl =
+        (imParams?.pictureUrl as string) ||
+        (imParams?.picture_url as string) ||
+        (imParams?.profile_picture_url as string) ||
+        (imParams?.avatar as string) ||
+        (fullAcc?.connection_params as any)?.pictureUrl ||
+        null;
+    }
+
     return res.status(200).json({
       account: {
-        name: resolved.account?.name || "Tu perfil",
+        name: accountName,
         publicIdentifier,
+        pictureUrl: profilePictureUrl,
       },
       posts,
     });
