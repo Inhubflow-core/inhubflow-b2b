@@ -2859,7 +2859,7 @@ export default function SignalsPage({
                           01
                         </span>
                         <div className="min-w-0">
-                          <span className="block leading-tight font-bold text-xs truncate">Posts en LinkedIn</span>
+                          <span className="block leading-tight font-bold text-xs truncate">Post en Linkedin</span>
                           <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">Likes y Comentarios</span>
                         </div>
                       </button>
@@ -2951,7 +2951,7 @@ export default function SignalsPage({
                                   : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
                               }`}
                             >
-                              <RiUserHeartLine size={13} /> Mis Propios Posts (Inbound)
+                              <RiUserHeartLine size={13} /> Mis propios Posts (Inbound)
                             </button>
                             <button
                               type="button"
@@ -2965,7 +2965,7 @@ export default function SignalsPage({
                                   : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
                               }`}
                             >
-                              <RiFileList3Line size={13} /> Pegar URL(s) Manualmente
+                              <RiFileList3Line size={13} /> Posts especificos (URL manual)
                             </button>
                           </div>
                         </div>
