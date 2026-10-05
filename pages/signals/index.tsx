@@ -880,6 +880,7 @@ export default function SignalsPage({
           competitor_id: selectedCompetitorEntity?.id,
           competitor_is_company: selectedCompetitorEntity?.is_company,
           competitor_name: queryComp,
+          competitor_picture_url: selectedCompetitorEntity?.pictureUrl,
           keywords: queryKw,
           date_posted: postSearchDate,
           sort_by: postSearchSortBy,
@@ -3687,8 +3688,13 @@ export default function SignalsPage({
 
                               {/* Palabras clave de búsqueda */}
                               <div>
-                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                                  Palabras Clave en la Publicación <span className="text-brand-500">*</span>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center justify-between">
+                                  <span>Palabras Clave en la Publicación {selectedCompetitorEntity ? <span className="text-gray-400 font-normal normal-case">(Opcional)</span> : <span className="text-brand-500">*</span>}</span>
+                                  {selectedCompetitorEntity && (
+                                    <span className="text-[10px] text-gray-400 font-normal normal-case">
+                                      Opcional si ya elegiste una cuenta oficial
+                                    </span>
+                                  )}
                                 </label>
                                 <div className="flex gap-2">
                                   <div className="relative flex-1">
@@ -3703,7 +3709,11 @@ export default function SignalsPage({
                                           handleSearchLinkedInPosts();
                                         }
                                       }}
-                                      placeholder="Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
+                                      placeholder={
+                                        selectedCompetitorEntity
+                                          ? `Opcional: filtra las publicaciones de ${selectedCompetitorEntity.name} por tema...`
+                                          : "Ej: Prospección, IA, Automatización, Ventas B2B, Cold Email..."
+                                      }
                                       className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-8 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                                     />
                                     {postSearchKeywords && (

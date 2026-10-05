@@ -579,7 +579,7 @@ async function run() {
   }
 
   {
-    const { matchesKeywordTerm, normalizeText } = require("../pages/api/signals/posts/search.ts");
+    const { matchesKeywordTerm, normalizeText, isAuthorMatchingCompetitor } = require("../pages/api/signals/posts/search.ts");
     assert.equal(normalizeText("Prospecção"), "prospeccao");
     assert.equal(normalizeText("Gestão"), "gestao");
     assert.equal(normalizeText("Estratégia"), "estrategia");
@@ -595,7 +595,21 @@ async function run() {
     assert.equal(matchesKeywordTerm(samplePostGeneric, "prospeccao"), false, "No debe coincidir si no contiene el lema");
     assert.equal(matchesKeywordTerm(samplePost1, "prospeccao"), true, "Debe tolerar tildes y cedillas en Prospecção");
     assert.equal(matchesKeywordTerm(samplePost1, "prospecção"), true, "Debe coincidir con tilde original");
+
+    // Validar aislamiento de autor del competidor
+    const authorOfficial = { id: "urn:li:organization:12345", name: "Prospectme", isCompany: true, headline: null, profilePictureUrl: null, publicIdentifier: "prospectme" };
+    const authorDavid = { id: "urn:li:person:999", name: "David Magdale Batista", isCompany: false, headline: "Consultor", profilePictureUrl: null, publicIdentifier: "david" };
+    const authorRenan = { id: "urn:li:person:888", name: "Renan Rodrigues Ribeiro", isCompany: false, headline: "Cofundador Prospectme", profilePictureUrl: null, publicIdentifier: "renan" };
+    const authorFora = { id: "urn:li:organization:777", name: "Fora da Terra", isCompany: true, headline: null, profilePictureUrl: null, publicIdentifier: "fora" };
+
+    assert.equal(isAuthorMatchingCompetitor(authorOfficial, "Prospectme"), true, "Autor oficial debe coincidir");
+    assert.equal(isAuthorMatchingCompetitor(authorDavid, "Prospectme"), false, "David Magdale no debe coincidir como autor de Prospectme");
+    assert.equal(isAuthorMatchingCompetitor(authorRenan, "Prospectme"), false, "Cofundador personal no debe sustituir la cuenta oficial de Prospectme");
+    assert.equal(isAuthorMatchingCompetitor(authorFora, "Prospectme"), false, "Otra empresa (Fora da Terra) debe ser rechazada");
+    assert.equal(isAuthorMatchingCompetitor(authorOfficial, "Prospectme", "urn:li:organization:12345"), true, "Debe coincidir por ID de entidad");
+
     console.log("▶ Coincidencia tolerante a acentos y lemas en posts de competidores validada");
+    console.log("▶ Aislamiento estricto de posts del competidor (descarte de autores ajenos) validado");
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

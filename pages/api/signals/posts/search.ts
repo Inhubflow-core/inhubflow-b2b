@@ -53,6 +53,26 @@ export function normalizeText(str: string): string {
     .toLowerCase();
 }
 
+export function isAuthorMatchingCompetitor(
+  author: DiscoveredPostItem["author"] | undefined,
+  competitorName: string,
+  targetEntityId?: string,
+  targetIsCompany?: boolean
+): boolean {
+  if (!author) return false;
+  if (targetEntityId && author.id && String(author.id) === String(targetEntityId)) return true;
+  if (!competitorName) return false;
+
+  const normAuthor = normalizeText(author.name || "");
+  const normComp = normalizeText(competitorName);
+  if (!normAuthor || !normComp) return false;
+
+  if (normAuthor === normComp) return true;
+  if (normAuthor.includes(normComp) || normComp.includes(normAuthor)) return true;
+
+  return false;
+}
+
 export function matchesKeywordTerm(text: string, kw: string): boolean {
   if (!text || !kw) return false;
   const normText = normalizeText(text);
@@ -361,6 +381,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .map((k) => k.trim())
           .filter(Boolean);
 
+        const competitorPictureUrl = typeof req.body?.competitor_picture_url === "string" ? req.body.competitor_picture_url : null;
+
         competitorOfficialPosts = (postsRaw as any[]).map((post) => {
           const text = post.text || "";
           const matchedKws = splitKeywords.filter((k) => matchesKeywordTerm(text, k));
@@ -392,7 +414,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               id: post.author?.id || targetEntityId,
               name: post.author?.name || competitorName || "Competidor",
               headline: post.author?.headline || null,
-              profilePictureUrl: post.author?.profile_picture_url || null,
+              profilePictureUrl: post.author?.profile_picture_url || competitorPictureUrl || null,
               publicIdentifier: post.author?.public_identifier || null,
               isCompany: Boolean(post.author?.is_company ?? targetIsCompany),
             },
@@ -480,46 +502,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     };
 
-    let validSearchPosts: DiscoveredPostItem[] = [];
     let executedQuery = candidateQueries[0] || rawKeywords || rawCompetitor;
+    const isTargetingSpecificCompetitor = Boolean(targetEntityId || rawCompetitor || competitorName);
 
-    if (candidateQueries.length > 0) {
-      for (const q of candidateQueries) {
-        executedQuery = q;
-        let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
-        let filtered = formatAndFilter(raw);
-
-        if (filtered.length === 0 && unipileDatePosted) {
-          raw = await executeSearch(q, undefined).catch(() => []);
-          filtered = formatAndFilter(raw);
-        }
-
-        if (filtered.length > 0) {
-          validSearchPosts = filtered;
-          break;
-        }
-      }
-    }
-
-    // Combinar posts oficiales del competidor y posts de búsqueda general
+    // Combinar o seleccionar publicaciones según el modo de búsqueda
     const seenPostIds = new Set<string>();
     const allCombinedPosts: DiscoveredPostItem[] = [];
 
-    // 1. Agregar publicaciones oficiales del competidor (prioritarias)
-    for (const p of competitorOfficialPosts) {
-      const key = p.id || p.shareUrl;
-      if (key && !seenPostIds.has(key)) {
-        seenPostIds.add(key);
-        allCombinedPosts.push(p);
-      }
-    }
+    if (isTargetingSpecificCompetitor) {
+      // MODO COMPETIDOR/CREADOR ESPECÍFICO:
+      // Si obtuvimos las publicaciones oficiales de la entidad, USAR EXCLUSIVAMENTE esas publicaciones.
+      // Jamás mezclar publicaciones de autores externos o feed global.
+      if (competitorOfficialPosts.length > 0) {
+        for (const p of competitorOfficialPosts) {
+          const key = p.id || p.shareUrl;
+          if (key && !seenPostIds.has(key)) {
+            seenPostIds.add(key);
+            allCombinedPosts.push(p);
+          }
+        }
+      } else if (candidateQueries.length > 0) {
+        // Fallback: si no se obtuvieron posts oficiales vía getUserPosts (ej: empresa sin ID o sin posts recientes),
+        // buscar en LinkedIn pero filtrar ESTRICTAMENTE que el autor coincida con el competidor/creador buscado.
+        for (const q of candidateQueries) {
+          executedQuery = q;
+          let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
+          let filtered = formatAndFilter(raw);
 
-    // 2. Agregar posts de búsqueda general
-    for (const p of validSearchPosts) {
-      const key = p.id || p.shareUrl;
-      if (key && !seenPostIds.has(key)) {
-        seenPostIds.add(key);
-        allCombinedPosts.push(p);
+          if (filtered.length === 0 && unipileDatePosted) {
+            raw = await executeSearch(q, undefined).catch(() => []);
+            filtered = formatAndFilter(raw);
+          }
+
+          // Filtrar para descartar autores que no sean la entidad objetivo
+          const strictlyCompetitorPosts = filtered.filter((p) =>
+            isAuthorMatchingCompetitor(p.author, competitorName, targetEntityId, targetIsCompany)
+          );
+
+          if (strictlyCompetitorPosts.length > 0) {
+            for (const p of strictlyCompetitorPosts) {
+              const key = p.id || p.shareUrl;
+              if (key && !seenPostIds.has(key)) {
+                seenPostIds.add(key);
+                allCombinedPosts.push(p);
+              }
+            }
+            break;
+          }
+        }
+      }
+    } else {
+      // MODO EXPLORADOR VIRAL GENERAL (sin competidor específico):
+      // Buscar publicaciones virales en toda la red de LinkedIn según palabras clave e ICP
+      if (candidateQueries.length > 0) {
+        for (const q of candidateQueries) {
+          executedQuery = q;
+          let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
+          let filtered = formatAndFilter(raw);
+
+          if (filtered.length === 0 && unipileDatePosted) {
+            raw = await executeSearch(q, undefined).catch(() => []);
+            filtered = formatAndFilter(raw);
+          }
+
+          if (filtered.length > 0) {
+            for (const p of filtered) {
+              const key = p.id || p.shareUrl;
+              if (key && !seenPostIds.has(key)) {
+                seenPostIds.add(key);
+                allCombinedPosts.push(p);
+              }
+            }
+            break;
+          }
+        }
       }
     }
 
