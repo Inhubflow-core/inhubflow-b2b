@@ -3361,48 +3361,6 @@ export default function SignalsPage({
                           </p>
                         </div>
                       </div>
-
-                      {/* BANNER DINÁMICO: SUPER-MONITOR TODO EN UNO VS MONITOR ENFOCADO */}
-                      {isSuperMonitor ? (
-                        <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-brand-500/10 to-indigo-500/10 border border-purple-300/80 dark:border-purple-800/80 flex items-center justify-between text-xs gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-brand-500 text-white shadow-xs font-black text-sm shrink-0">
-                              ⚡
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-gray-900 dark:text-white font-bold leading-tight">
-                                Super-Monitor Todo en Uno Activo ({activeLevelsCount} de 3 Niveles Seleccionados)
-                              </p>
-                              <p className="text-gray-600 dark:text-gray-400 text-[11px] truncate">
-                                Escaneo simultáneo de {[
-                                  enabledLevels.posts && "Posts (Nivel 1)",
-                                  enabledLevels.keywords && "Palabras Clave (Nivel 2)",
-                                  enabledLevels.icp_triggers && "ICP Triggers (Nivel 3)"
-                                ].filter(Boolean).join(" + ")}. Todos los prospectos se unificarán en tu radar.
-                              </p>
-                            </div>
-                          </div>
-                          <span className="hidden sm:inline-block text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-800 shrink-0">
-                            Radar 360° Multiseñal
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="p-3 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-800 flex items-center justify-between text-xs gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-500 text-white shadow-xs font-bold text-sm shrink-0">
-                              🎯
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-gray-900 dark:text-white font-bold leading-tight">
-                                Monitor Enfocado (1 Nivel Activo: {enabledLevels.posts ? "Nivel 01 Post en Linkedin" : enabledLevels.keywords ? "Nivel 02 Palabras Clave" : "Nivel 03 ICP Triggers"})
-                              </p>
-                              <p className="text-gray-600 dark:text-gray-400 text-[11px] truncate">
-                                Marca las casillas de los otros niveles si quieres escanearlos juntos en un Super-Monitor.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* =========================================================
