@@ -549,6 +549,8 @@ export default function SignalsPage({
   const [myPostsLoaded, setMyPostsLoaded] = useState<boolean>(false);
   const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string; pictureUrl?: string | null; is_company?: boolean } | null>(null);
   const [manualMyPostUrl, setManualMyPostUrl] = useState<string>("");
+  const [manualPostInput, setManualPostInput] = useState<string>("");
+  const [showBulkPasteArea, setShowBulkPasteArea] = useState<boolean>(false);
   const [excludeAuthorEmployees, setExcludeAuthorEmployees] = useState<boolean>(true);
   const [prioritizeHighIntent, setPrioritizeHighIntent] = useState<boolean>(true);
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
@@ -644,6 +646,54 @@ export default function SignalsPage({
 
   const handleRemoveKeyword = (k: string) => {
     setKeywordsList(keywordsList.filter((item) => item !== k));
+  };
+
+  const handleAddManualPostUrl = (rawText?: string) => {
+    const text = (rawText !== undefined ? rawText : manualPostInput).trim();
+    if (!text) return;
+
+    // Detectar si son varias URLs (por saltos de línea, espacios o comas) o una sola
+    const matches = text.match(/https?:\/\/[^\s,]+/gi);
+    let urlsToAdd: string[] = [];
+
+    if (matches && matches.length > 0) {
+      urlsToAdd = matches.map((u) => u.trim());
+    } else if (text.includes("linkedin.com/")) {
+      urlsToAdd = [`https://${text.replace(/^https?:\/\//i, "")}`];
+    } else {
+      toast.error("Por favor ingresa un enlace válido de LinkedIn (https://www.linkedin.com/...)");
+      return;
+    }
+
+    const uniqueNew = urlsToAdd.filter((u) => !selectedPostUrls.includes(u));
+    if (uniqueNew.length === 0) {
+      toast.info("La(s) publicación(es) ya están en la lista");
+      setManualPostInput("");
+      return;
+    }
+
+    const nextUrls = [...selectedPostUrls, ...uniqueNew];
+    setSelectedPostUrls(nextUrls);
+    setNewTargetUrl(nextUrls.join("\n"));
+    setManualPostInput("");
+
+    if (uniqueNew.length === 1) {
+      toast.success("Publicación añadida a la lista");
+    } else {
+      toast.success(`${uniqueNew.length} publicaciones añadidas a la lista`);
+    }
+  };
+
+  const handleRemoveManualPostUrl = (indexToRemove: number) => {
+    const nextUrls = selectedPostUrls.filter((_, idx) => idx !== indexToRemove);
+    setSelectedPostUrls(nextUrls);
+    setNewTargetUrl(nextUrls.join("\n"));
+  };
+
+  const handleClearAllManualPostUrls = () => {
+    setSelectedPostUrls([]);
+    setNewTargetUrl("");
+    toast.info("Lista de publicaciones vaciada");
   };
 
   // Cerrar dropdown al hacer click fuera
@@ -909,6 +959,8 @@ export default function SignalsPage({
     setShowCompetitorDropdown(false);
     setNewTargetUrl("");
     setSelectedPostUrls([]);
+    setManualPostInput("");
+    setShowBulkPasteArea(false);
     setDiscoveredPosts([]);
     setIsAutoAllMyPosts(false);
     setPostSearchKeywords("");
@@ -1015,6 +1067,8 @@ export default function SignalsPage({
     }
     setSelectedPostUrls(urls);
     setNewTargetUrl(urls.join("\n"));
+    setManualPostInput("");
+    setShowBulkPasteArea(false);
     setDiscoveredPosts([]);
 
     if (monitor.type === "post_engagement") {
@@ -3016,7 +3070,7 @@ export default function SignalsPage({
                         </div>
 
                         {/* Publicaciones actualmente configuradas en el monitor */}
-                        {selectedPostUrls.length > 0 && (
+                        {selectedPostUrls.length > 0 && postSearchMode !== "manual" && (
                           <div className="p-4 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-300 dark:border-brand-800 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -3858,53 +3912,167 @@ export default function SignalsPage({
                           </div>
                         )}
 
-                        {/* MODO MANUAL (Pegar URLs) */}
+                        {/* MODO MANUAL (URL específica con lista abajo) */}
                         {postSearchMode === "manual" && (
-                          <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-4">
+                            {/* Tarjeta de Entrada de URL */}
+                            <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                               <div>
-                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-                                  Competidor o Referente <span className="text-gray-400 font-normal">(Opcional)</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={newCompetitor}
-                                  onChange={(e) => {
-                                    setNewCompetitor(e.target.value);
-                                    setPostSearchCompetitor(e.target.value);
-                                  }}
-                                  placeholder="Ej: HubSpot, Lemlist, Salesforce..."
-                                  className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
-                                />
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                    URL(s) de Publicaciones <span className="text-brand-500">*</span>
+                                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                    <RiLinkedinBoxFill className="text-brand-600" size={16} />
+                                    URL de la Publicación de LinkedIn <span className="text-brand-500">*</span>
                                   </label>
-                                  <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">
-                                    {selectedPostUrls.length} {selectedPostUrls.length === 1 ? "detectada" : "detectadas"}
-                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowBulkPasteArea(!showBulkPasteArea)}
+                                    className="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium cursor-pointer"
+                                  >
+                                    {showBulkPasteArea ? "Ocultar pegado en lote" : "Pegar varias URLs a la vez"}
+                                  </button>
                                 </div>
-                                <textarea
-                                  rows={3}
-                                  value={newTargetUrl}
-                                  onChange={(e) => {
-                                    setNewTargetUrl(e.target.value);
-                                    const urls = e.target.value
-                                      .split(/[\n,]+/)
-                                      .map((u) => u.trim())
-                                      .filter((u) => u.startsWith("http"));
-                                    setSelectedPostUrls(urls);
-                                  }}
-                                  placeholder="Pega una o más URLs de LinkedIn (una por línea)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
-                                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs text-gray-900 shadow-xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 font-mono"
-                                />
+
+                                {!showBulkPasteArea ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <input
+                                        type="url"
+                                        value={manualPostInput}
+                                        onChange={(e) => setManualPostInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleAddManualPostUrl();
+                                          }
+                                        }}
+                                        placeholder="Pega la URL del post... https://www.linkedin.com/posts/... o /feed/update/..."
+                                        className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-900 shadow-2xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 font-mono"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddManualPostUrl()}
+                                      disabled={!manualPostInput.trim()}
+                                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-600 text-white font-bold text-xs hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer shrink-0"
+                                    >
+                                      <RiAddLine size={15} />
+                                      Agregar
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      rows={4}
+                                      value={manualPostInput}
+                                      onChange={(e) => setManualPostInput(e.target.value)}
+                                      placeholder="Pega una o más URLs de LinkedIn (una por línea o separadas por comas)...&#10;https://www.linkedin.com/posts/...&#10;https://www.linkedin.com/feed/update/..."
+                                      className="w-full rounded-xl border border-gray-300 bg-white p-3 text-xs text-gray-900 shadow-2xs transition-all focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 font-mono"
+                                    />
+                                    <div className="flex justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddManualPostUrl()}
+                                        disabled={!manualPostInput.trim()}
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white font-bold text-xs hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer"
+                                      >
+                                        <RiAddLine size={15} />
+                                        Agregar Publicaciones en Lote
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+                                  💡 Puedes agregar una o varias publicaciones (ej: 5 o 6). Presiona <strong>Enter</strong> o haz clic en <strong>Agregar</strong> para ir sumándolas a la lista de abajo.
+                                </p>
                               </div>
                             </div>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">
-                              Puedes pegar publicaciones específicas de LinkedIn (ej: https://www.linkedin.com/posts/...). Se escanearán comentarios y reacciones de cada una.
-                            </p>
+
+                            {/* LISTA DE PUBLICACIONES ABAJO EN ESTA MISMA SECCIÓN */}
+                            <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
+                              <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white text-xs font-bold">
+                                    {selectedPostUrls.length}
+                                  </span>
+                                  <h4 className="text-xs font-bold text-gray-900 dark:text-white">
+                                    {selectedPostUrls.length === 1
+                                      ? "1 Publicación lista para escanear"
+                                      : `${selectedPostUrls.length} Publicaciones listas para escanear`}
+                                  </h4>
+                                  <span className="text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">
+                                    (Se extraerán likes y comentarios)
+                                  </span>
+                                </div>
+                                {selectedPostUrls.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={handleClearAllManualPostUrls}
+                                    className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer"
+                                  >
+                                    Limpiar todas
+                                  </button>
+                                )}
+                              </div>
+
+                              {selectedPostUrls.length > 0 ? (
+                                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                                  {selectedPostUrls.map((url, idx) => (
+                                    <div
+                                      key={url + idx}
+                                      className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 hover:border-brand-300 transition-colors shadow-2xs"
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                        <div className="w-7 h-7 rounded-lg bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 flex items-center justify-center text-brand-600 shrink-0">
+                                          <RiLinkedinBoxFill size={16} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-bold text-gray-400">
+                                              #{idx + 1}
+                                            </span>
+                                            <p className="font-mono text-xs text-gray-800 dark:text-gray-200 truncate" title={url}>
+                                              {url}
+                                            </p>
+                                          </div>
+                                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                            Publicación manual de LinkedIn
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <a
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 transition-colors"
+                                        >
+                                          Ver post <RiExternalLinkLine size={11} />
+                                        </a>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveManualPostUrl(idx)}
+                                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                                          title="Eliminar esta publicación"
+                                        >
+                                          <RiDeleteBinLine size={15} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="p-8 text-center rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 space-y-1.5">
+                                  <RiFileList3Line className="text-gray-400 mx-auto" size={24} />
+                                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    Aún no has agregado publicaciones a la lista
+                                  </p>
+                                  <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                    Pega arriba el enlace de un post de LinkedIn y haz clic en <strong>Agregar</strong> para sumarlo aquí.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
