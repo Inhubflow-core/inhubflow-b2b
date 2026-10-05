@@ -492,6 +492,25 @@ export class UnipileClient {
   }
 
   /**
+   * Obtiene una publicación específica de LinkedIn con su texto, autor y estadísticas
+   */
+  async getPost(postId: string, accountId?: string): Promise<UnipilePostItem | null> {
+    const query = new URLSearchParams();
+    if (accountId) query.set('account_id', accountId);
+
+    const safePostId = encodeURIComponent(postId).replace(/%3A/gi, ':');
+    try {
+      const post = await this.request<UnipilePostItem>(
+        `/api/v1/posts/${safePostId}?${query.toString()}`
+      );
+      return post || null;
+    } catch (err) {
+      console.warn(`[Unipile] No se pudo obtener el post ${postId}:`, err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  }
+
+  /**
    * Realiza una búsqueda avanzada en LinkedIn (personas, publicaciones, filtros)
    */
   async searchLinkedIn(params: UnipileLinkedInSearchParams): Promise<UnipileLinkedInSearchResponse> {

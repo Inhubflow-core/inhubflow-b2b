@@ -9,6 +9,7 @@ import type {
   UnipileSearchParameter,
   UnipileSearchPerson,
   UnipileSearchPost,
+  UnipilePostItem,
 } from "@/lib/unipile/types";
 import type { SignalType } from "@/lib/signals/schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
@@ -33,6 +34,7 @@ export interface SignalScannerClient {
   }): Promise<{ items: UnipileSearchParameter[] }>;
   getPostComments(postId: string, accountId?: string, limit?: number): Promise<{ items: UnipilePostComment[] }>;
   getPostReactions(postId: string, accountId?: string, limit?: number): Promise<{ items: UnipilePostReaction[] }>;
+  getPost?(postId: string, accountId?: string): Promise<UnipilePostItem | null>;
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
 }
 
@@ -351,6 +353,20 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
     const urn = postIdentifier(postUrl);
     if (!urn) continue;
 
+    // 1. Obtener detalles del post original (texto, autor, tema) para contextualizar el snippet y el mensaje
+    let postData: UnipilePostItem | null = null;
+    if (client.getPost) {
+      try {
+        postData = await client.getPost(urn, context.remoteAccountId);
+      } catch (err) {
+        console.warn(`[SignalRadar] No se pudo obtener post ${urn}:`, err);
+      }
+    }
+
+    const postAuthorName = (postData?.author as { name?: string })?.name || "";
+    const postText = (postData?.text || postData?.content || "").replace(/\s+/g, " ").trim();
+    const postExcerpt = postText.length > 140 ? `${postText.slice(0, 140)}…` : postText;
+
     const shouldFetchComments = context.monitor.type !== "competitor_reactions";
     const shouldFetchReactions = context.monitor.type !== "high_intent_comments";
 
@@ -365,8 +381,20 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
     const signalTypeComment = context.monitor.type === "post_engagement" ? "post_engagement" : "high_intent_comments";
     for (const comment of comments.items || []) {
-      const lead = parseCommentLead(comment, context.monitor.id, signalTypeComment, "post_comment", postUrl);
+      const fallbackSnippet = postAuthorName && postExcerpt
+        ? `Comentó en la publicación de ${postAuthorName}: "${postExcerpt}"`
+        : (postExcerpt ? `Comentó en la publicación: "${postExcerpt}"` : "Comentó en la publicación");
+
+      const lead = parseCommentLead(comment, context.monitor.id, signalTypeComment, "post_comment", postUrl, fallbackSnippet);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        if (postData) {
+          lead.evidence.metadata = {
+            ...lead.evidence.metadata,
+            postAuthor: postAuthorName || null,
+            postExcerpt: postExcerpt || null,
+            postText: postText.slice(0, 500) || null,
+          };
+        }
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }
@@ -374,8 +402,21 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 
     const signalTypeReaction = context.monitor.type === "post_engagement" ? "post_engagement" : "competitor_reactions";
     for (const reaction of reactions.items || []) {
-      const lead = parseReactionLead(reaction, context.monitor.id, signalTypeReaction, "post_reaction", urn, postUrl);
+      const reactionKind = reaction.value || reaction.reaction_type || "LIKE";
+      const fallbackSnippet = postAuthorName && postExcerpt
+        ? `Reaccionó (${reactionKind}) al post de ${postAuthorName}: "${postExcerpt}"`
+        : (postExcerpt ? `Reaccionó (${reactionKind}) a la publicación: "${postExcerpt}"` : `Reaccionó (${reactionKind}) a la publicación`);
+
+      const lead = parseReactionLead(reaction, context.monitor.id, signalTypeReaction, "post_reaction", urn, postUrl, fallbackSnippet);
       if (lead && !seenFingerprints.has(lead.evidence.fingerprint)) {
+        if (postData) {
+          lead.evidence.metadata = {
+            ...lead.evidence.metadata,
+            postAuthor: postAuthorName || null,
+            postExcerpt: postExcerpt || null,
+            postText: postText.slice(0, 500) || null,
+          };
+        }
         seenFingerprints.add(lead.evidence.fingerprint);
         leads.push(lead);
       }

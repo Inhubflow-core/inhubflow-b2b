@@ -40,10 +40,23 @@ export function deterministicAntiStalkerMessage(
   const config = parseSignalMessageConfig(monitor as Pick<SignalMonitor, "message_config_json">);
   const rawFirst = cleanFirstName(lead.full_name);
   const firstName = rawFirst || "";
-  const company = lead.company || "tu empresa";
-  let keywords: string[] = [];
+  const company = lead.company || "tu empresa";  let keywords: string[] = [];
   try { keywords = monitor.keywords_json ? JSON.parse(monitor.keywords_json) as string[] : []; } catch {}
-  const topic = keywords[0] || "prospección B2B";
+  let topic = keywords[0];
+  if (!topic && lead.signal_snippet) {
+    const quoteMatch = lead.signal_snippet.match(/[“"]([^”"]+)[”"]/);
+    if (quoteMatch) {
+      const rawQuote = quoteMatch[1].trim();
+      const words = rawQuote.split(/\s+/).slice(0, 5).join(" ");
+      if (words.length > 3) topic = words;
+    }
+  }
+  if (!topic && monitor.competitor_name) {
+    topic = monitor.competitor_name;
+  }
+  if (!topic) {
+    topic = "innovación y desarrollo B2B";
+  }
   const competitor = monitor.competitor_name || "soluciones del sector";
   if (config.custom_template?.trim()) {
     return fillTemplate(config.custom_template.trim(), lead, topic, competitor);
@@ -53,6 +66,7 @@ export function deterministicAntiStalkerMessage(
   const tone = config.tone || "consultive";
   const isRole = ["new_in_role", "job_changes", "internal_promotion"].includes(monitor.type);
   const isGrowth = ["hiring_spree", "company_growth"].includes(monitor.type);
+  const isPostEngagement = ["post_engagement", "high_intent_comments", "competitor_reactions"].includes(monitor.type);
   const language = config.language || "es";
   let message: string;
 
@@ -82,6 +96,14 @@ export function deterministicAntiStalkerMessage(
     message = objective === "demo"
       ? `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. Cuando el equipo comercial se expande, reducir la curva de aprendizaje suele ser prioritario. ¿Te interesaría ver una demo breve de nuestro enfoque?`
       : `Hola ${firstName}, enhorabuena por el crecimiento de ${company}. ¿Cómo están organizando la prospección y el onboarding del equipo comercial en esta etapa? Me gustaría conectar.`;
+  } else if (isPostEngagement) {
+    if (objective === "resource") {
+      message = `Hola ${firstName}, sigo de cerca las conversaciones sobre ${topic}. Preparamos un recurso práctico sobre este tema, ¿te gustaría que te lo comparta por aquí?`;
+    } else if (objective === "demo") {
+      message = `Hola ${firstName}, veo que ${topic} es un tema clave en el sector. ¿Tendrías 10 minutos esta semana para ver cómo lo abordamos en ${company}?`;
+    } else {
+      message = `Hola ${firstName}, veo que ${topic} está cobrando bastante relevancia en el sector. ¿Cómo lo están viviendo en ${company}? Me encantaría conectar e intercambiar ideas.`;
+    }
   } else if (objective === "resource") {
     message = `Hola ${firstName}, veo que ${topic} es relevante para tu área. Preparamos una guía práctica con ideas aplicables a equipos B2B. ¿Te gustaría que te la comparta por aquí?`;
   } else if (objective === "demo") {

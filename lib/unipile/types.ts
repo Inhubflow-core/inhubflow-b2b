@@ -404,11 +404,24 @@ export interface UnipilePostItem {
   id: string;
   social_id?: string;
   provider_id?: string;
+  share_url?: string;
   text?: string;
   content?: string;
   date?: string;
   created_at?: string;
   parsed_datetime?: string;
+  reaction_counter?: number;
+  comment_counter?: number;
+  repost_counter?: number;
+  author?: {
+    id?: string;
+    name?: string;
+    headline?: string;
+    public_identifier?: string;
+    profile_picture_url?: string;
+    is_company?: boolean;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
