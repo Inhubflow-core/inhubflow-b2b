@@ -46,6 +46,47 @@ function quoteTerm(t: string): string {
   return trimmed;
 }
 
+export function normalizeText(str: string): string {
+  return (str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+export function matchesKeywordTerm(text: string, kw: string): boolean {
+  if (!text || !kw) return false;
+  const normText = normalizeText(text);
+  const normKw = normalizeText(kw.trim().replace(/^#+/, ""));
+  if (!normKw) return false;
+
+  // 1. Coincidencia directa de subcadena normalizada
+  if (normText.includes(normKw)) return true;
+
+  // 2. Formato comprimido o hashtag (ej: "vendas b2b" -> "vendasb2b" coincide con "#VendasB2B")
+  const compressedKw = normKw.replace(/[^a-z0-9]/g, "");
+  const compressedText = normText.replace(/[^a-z0-9]/g, "");
+  if (compressedKw.length >= 3 && compressedText.includes(compressedKw)) return true;
+
+  // 3. Multi-palabra: verificar si todas las palabras principales están en el texto
+  const words = normKw.split(/\s+/).filter((w) => w.length >= 2);
+  if (words.length > 1) {
+    if (words.every((w) => normText.includes(w))) return true;
+  }
+
+  // 4. Raíces / lemas frecuentes en español y portugués
+  if (normKw.startsWith("prospec") && (normText.includes("prospec") || compressedText.includes("prospec"))) {
+    return true;
+  }
+  if (normKw.startsWith("venda") && (normText.includes("venda") || compressedText.includes("venda"))) {
+    return true;
+  }
+
+  // 5. Expresión regular con límites de palabra
+  const escaped = normKw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(^|[^a-z0-9_])${escaped}([^a-z0-9_]|$)`, "i");
+  return regex.test(normText);
+}
+
 function buildSearchQueries(keywords: string, competitor?: string, country?: string): string[] {
   const comp = (competitor || "").trim();
   const splitTerms = (keywords || "")
@@ -68,49 +109,39 @@ function buildSearchQueries(keywords: string, competitor?: string, country?: str
 
   const queries: string[] = [];
 
-  // Si hay país objetivo definido:
-  if (hasCountry && country) {
-    // 1. Frases exactas con el país (ej: "marketing b2b" Perú, "b2b marketing" Perú)
-    for (const v of uniqueVariants) {
-      if (comp) {
-        queries.push(`${quoteTerm(comp)} ${quoteTerm(v)} ${country}`);
-      } else {
-        queries.push(`${quoteTerm(v)} ${country}`);
-      }
-    }
+  // Si hay competidor definido
+  if (comp) {
+    // 1. Competidor solo (muy indexable en búsqueda de posts de LinkedIn)
+    queries.push(quoteTerm(comp));
+    queries.push(comp);
 
-    // 2. Frases exactas con la ciudad principal del país (ej: "marketing b2b" Lima, "b2b marketing" Lima)
-    if (primaryCity) {
-      for (const v of uniqueVariants) {
-        if (!comp) {
-          queries.push(`${quoteTerm(v)} ${primaryCity}`);
-        }
-      }
-    }
-
-    // 3. Búsqueda sin comillas con el país (para tolerancia semántica en LinkedIn)
+    // 2. Competidor + variante (sin comillas dobles rígidas que causan 0 resultados en LinkedIn)
     for (const v of uniqueVariants) {
       const unquoted = v.replace(/"/g, "").trim();
-      if (comp) {
-        queries.push(`${comp} ${unquoted} ${country}`);
-      } else {
-        queries.push(`${unquoted} ${country}`);
+      queries.push(`${comp} ${unquoted}`);
+    }
+  }
+
+  // Si hay país objetivo definido:
+  if (hasCountry && country) {
+    for (const v of uniqueVariants) {
+      const unquoted = v.replace(/"/g, "").trim();
+      queries.push(`${unquoted} ${country}`);
+      queries.push(`${quoteTerm(v)} ${country}`);
+    }
+
+    if (primaryCity) {
+      for (const v of uniqueVariants) {
+        queries.push(`${quoteTerm(v)} ${primaryCity}`);
       }
     }
   }
 
-  // 4. Frases exactas sin país (fallback estándar - se filtrará estrictamente por país/alfabeto a nivel post)
+  // Variantes individuales sin país
   for (const v of uniqueVariants) {
-    if (comp) {
-      queries.push(`${quoteTerm(comp)} ${quoteTerm(v)}`);
-    } else {
-      queries.push(quoteTerm(v));
-    }
-  }
-
-  // 5. Fallback: sólo competidor
-  if (comp) {
-    queries.push(quoteTerm(comp));
+    const unquoted = v.replace(/"/g, "").trim();
+    queries.push(unquoted);
+    queries.push(quoteTerm(v));
   }
 
   return Array.from(new Set(queries.filter(Boolean)));
@@ -144,8 +175,10 @@ function scorePost(
   // 3. Coincidencia con Ubicación / Territorio
   if (hasCountry) {
     const expandedLocs = expandLocationCriteria([country]);
+    const normText = normalizeText(text);
+    const normHeadline = normalizeText(headline);
     const matchLoc = Array.from(expandedLocs).find(
-      (loc) => loc.length >= 3 && (text.includes(loc.toLowerCase()) || headline.includes(loc.toLowerCase()))
+      (loc) => loc.length >= 3 && (normText.includes(normalizeText(loc)) || normHeadline.includes(normalizeText(loc)))
     );
     if (matchLoc) {
       score += 35;
@@ -167,8 +200,9 @@ function scorePost(
       .map((t) => t.trim())
       .filter(Boolean);
     const expanded = expandTitleCriteria(titleTokens);
+    const normHeadline = normalizeText(headline);
     const match = Array.from(expanded).find(
-      (tok) => tok.length >= 3 && headline.includes(tok.toLowerCase())
+      (tok) => tok.length >= 3 && normHeadline.includes(normalizeText(tok))
     );
     if (match) {
       score += 25;
@@ -179,12 +213,12 @@ function scorePost(
 
   // 5. Coincidencia con Palabras Clave
   for (const kw of icp.keywords) {
-    const clean = kw.toLowerCase().replace(/"/g, "").trim();
+    const clean = kw.replace(/"/g, "").trim();
     if (!clean) continue;
     const variants = getB2bTermVariants(clean);
-    const matchedVariant = variants.find((v) => text.includes(v.toLowerCase()));
-    if (matchedVariant) {
-      score += 20;
+    const matchedVariant = variants.find((v) => matchesKeywordTerm(text, v));
+    if (matchedVariant || matchesKeywordTerm(text, clean)) {
+      score += 25;
       reasons.push(`Menciona "${clean}"`);
       break;
     }
@@ -197,8 +231,10 @@ function scorePost(
       .split(/[,;\/]+/)
       .map((t) => t.trim())
       .filter(Boolean);
+    const normText = normalizeText(text);
+    const normHeadline = normalizeText(headline);
     const matchComp = compTokens.find(
-      (tok) => tok.length >= 3 && (text.includes(tok) || headline.includes(tok))
+      (tok) => tok.length >= 3 && (normText.includes(normalizeText(tok)) || normHeadline.includes(normalizeText(tok)))
     );
     if (matchComp) {
       score += 15;
@@ -308,121 +344,71 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    let competitorOfficialPosts: DiscoveredPostItem[] = [];
+
     if (targetEntityId) {
-      // Obtener publicaciones reales del perfil o empresa
-      const postsRaw = await unipile.getUserPosts({
-        account_id: resolved.unipileAccountId,
-        identifier: targetEntityId,
-        is_company: targetIsCompany,
-        limit: Math.max(30, numericLimit),
-      });
-
-      const splitKeywords = rawKeywords
-        .split(/[,;\n]+/)
-        .map((k) => k.trim())
-        .filter(Boolean);
-
-      const matchesKeywordTerm = (text: string, kw: string): boolean => {
-        if (!text || !kw) return false;
-        const trimmed = kw.trim();
-        if (trimmed.includes(" ")) {
-          return text.toLowerCase().includes(trimmed.toLowerCase());
-        }
-        const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`(^|[^a-záéíóúüñ0-9_])${escaped}([^a-záéíóúüñ0-9_]|$)`, "i");
-        return regex.test(text);
-      };
-
-      let matchedPosts: DiscoveredPostItem[] = (postsRaw as any[]).map((post) => {
-        const text = post.text || "";
-        const matchedKws = splitKeywords.filter((k) => matchesKeywordTerm(text, k));
-        const isMatch = splitKeywords.length === 0 || matchedKws.length > 0;
-
-        let score = 60;
-        if (matchedKws.length > 0) {
-          score += 25 + Math.min(15, matchedKws.length * 5);
-        }
-
-        const reasons: string[] = [];
-        if (matchedKws.length > 0) {
-          reasons.push(`Contiene palabra clave: ${matchedKws.join(", ")}`);
-        }
-        reasons.push(`Publicación oficial de ${post.author?.name || competitorName}`);
-
-        return {
-          id: post.id || post.social_id || "",
-          shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
-          text: post.text || "",
-          date: post.date || null,
-          parsedDatetime: post.parsed_datetime || null,
-          reactionCount: Number(post.reaction_counter) || 0,
-          commentCount: Number(post.comment_counter) || 0,
-          repostCount: Number(post.repost_counter) || 0,
-          author: {
-            id: post.author?.id || targetEntityId,
-            name: post.author?.name || competitorName || "Competidor",
-            headline: post.author?.headline || null,
-            profilePictureUrl: post.author?.profile_picture_url || null,
-            publicIdentifier: post.author?.public_identifier || null,
-            isCompany: Boolean(post.author?.is_company ?? targetIsCompany),
-          },
-          relevanceScore: score,
-          isIcpMatch: isMatch,
-          relevanceReasons: reasons,
-        };
-      });
-
-      // Si se indicaron palabras clave, filtrar estrictamente para que contengan al menos una
-      if (splitKeywords.length > 0) {
-        matchedPosts = matchedPosts.filter((p) => {
-          const t = p.text || "";
-          return splitKeywords.some((k) => matchesKeywordTerm(t, k));
-        });
-      }
-
-      // Filtrar por fecha si se seleccionó past_24h, past_week o past_month
-      if (unipileDatePosted && matchedPosts.length > 0) {
-        const now = Date.now();
-        const maxAgeMs =
-          unipileDatePosted === "past_24h"
-            ? 24 * 60 * 60 * 1000
-            : unipileDatePosted === "past_week"
-            ? 7 * 24 * 60 * 60 * 1000
-            : 31 * 24 * 60 * 60 * 1000;
-
-        const dateFiltered = matchedPosts.filter((p) => {
-          if (!p.parsedDatetime) return true;
-          const postTime = new Date(p.parsedDatetime).getTime();
-          return !isNaN(postTime) && now - postTime <= maxAgeMs;
-        });
-        if (dateFiltered.length > 0) {
-          matchedPosts = dateFiltered;
-        }
-      }
-
-      // Ordenar resultados
-      if (sort_by === "engagement") {
-        matchedPosts.sort((a, b) => (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2));
-      } else {
-        matchedPosts.sort((a, b) => {
-          const timeA = a.parsedDatetime ? new Date(a.parsedDatetime).getTime() : 0;
-          const timeB = b.parsedDatetime ? new Date(b.parsedDatetime).getTime() : 0;
-          return timeB - timeA;
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        entity: {
-          id: targetEntityId,
-          name: competitorName,
+      try {
+        // Obtener publicaciones reales del perfil o empresa
+        const postsRaw = await unipile.getUserPosts({
+          account_id: resolved.unipileAccountId,
+          identifier: targetEntityId,
           is_company: targetIsCompany,
-        },
-        query: `Publicaciones de ${competitorName}${rawKeywords ? ` con "${rawKeywords}"` : ""}`,
-        count: matchedPosts.length,
-        posts: matchedPosts,
-        items: matchedPosts,
-      });
+          limit: Math.max(30, numericLimit),
+        });
+
+        const splitKeywords = rawKeywords
+          .split(/[,;\n]+/)
+          .map((k) => k.trim())
+          .filter(Boolean);
+
+        competitorOfficialPosts = (postsRaw as any[]).map((post) => {
+          const text = post.text || "";
+          const matchedKws = splitKeywords.filter((k) => matchesKeywordTerm(text, k));
+          const hasKeywordMatch = matchedKws.length > 0;
+
+          let score = 70;
+          if (hasKeywordMatch) {
+            score = 90 + Math.min(10, matchedKws.length * 5);
+          } else if (splitKeywords.length === 0) {
+            score = 80;
+          }
+
+          const reasons: string[] = [];
+          if (hasKeywordMatch) {
+            reasons.push(`Contiene palabra clave: ${matchedKws.join(", ")}`);
+          }
+          reasons.push(`Publicación oficial de ${post.author?.name || competitorName}`);
+
+          return {
+            id: post.id || post.social_id || "",
+            shareUrl: post.share_url || `https://www.linkedin.com/feed/update/${post.social_id || post.id}`,
+            text: post.text || "",
+            date: post.date || null,
+            parsedDatetime: post.parsed_datetime || null,
+            reactionCount: Number(post.reaction_counter) || 0,
+            commentCount: Number(post.comment_counter) || 0,
+            repostCount: Number(post.repost_counter) || 0,
+            author: {
+              id: post.author?.id || targetEntityId,
+              name: post.author?.name || competitorName || "Competidor",
+              headline: post.author?.headline || null,
+              profilePictureUrl: post.author?.profile_picture_url || null,
+              publicIdentifier: post.author?.public_identifier || null,
+              isCompany: Boolean(post.author?.is_company ?? targetIsCompany),
+            },
+            relevanceScore: score,
+            isIcpMatch: splitKeywords.length === 0 || hasKeywordMatch,
+            relevanceReasons: reasons,
+          };
+        });
+
+        // Si se indicaron palabras clave, ordenar primero los posts con coincidencia directa
+        if (splitKeywords.length > 0) {
+          competitorOfficialPosts.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+        }
+      } catch (err) {
+        console.warn("[api/signals/posts/search] Error fetching target entity posts:", err);
+      }
     }
 
     const candidateQueries = buildSearchQueries(rawKeywords, rawCompetitor, rawCountry);
@@ -457,7 +443,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           title: rawTitle,
           country: rawCountry,
           company: rawCompany,
-          keywords: splitKwList.length > 0 ? splitKwList : [rawKeywords],
+          keywords: splitKwList.length > 0 ? splitKwList : (rawKeywords ? [rawKeywords] : []),
         });
 
         return {
@@ -494,46 +480,104 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     };
 
-    let validPosts: DiscoveredPostItem[] = [];
-    let executedQuery = candidateQueries[0] || rawKeywords;
+    let validSearchPosts: DiscoveredPostItem[] = [];
+    let executedQuery = candidateQueries[0] || rawKeywords || rawCompetitor;
 
-    for (const q of candidateQueries) {
-      executedQuery = q;
-      let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
-      let filtered = formatAndFilter(raw);
+    if (candidateQueries.length > 0) {
+      for (const q of candidateQueries) {
+        executedQuery = q;
+        let raw = await executeSearch(q, unipileDatePosted).catch(() => []);
+        let filtered = formatAndFilter(raw);
 
-      if (filtered.length === 0 && unipileDatePosted) {
-        raw = await executeSearch(q, undefined).catch(() => []);
-        filtered = formatAndFilter(raw);
-      }
+        if (filtered.length === 0 && unipileDatePosted) {
+          raw = await executeSearch(q, undefined).catch(() => []);
+          filtered = formatAndFilter(raw);
+        }
 
-      if (filtered.length > 0) {
-        validPosts = filtered;
-        break;
+        if (filtered.length > 0) {
+          validSearchPosts = filtered;
+          break;
+        }
       }
     }
 
-    // Ordenar por relevancia e interacción
+    // Combinar posts oficiales del competidor y posts de búsqueda general
+    const seenPostIds = new Set<string>();
+    const allCombinedPosts: DiscoveredPostItem[] = [];
+
+    // 1. Agregar publicaciones oficiales del competidor (prioritarias)
+    for (const p of competitorOfficialPosts) {
+      const key = p.id || p.shareUrl;
+      if (key && !seenPostIds.has(key)) {
+        seenPostIds.add(key);
+        allCombinedPosts.push(p);
+      }
+    }
+
+    // 2. Agregar posts de búsqueda general
+    for (const p of validSearchPosts) {
+      const key = p.id || p.shareUrl;
+      if (key && !seenPostIds.has(key)) {
+        seenPostIds.add(key);
+        allCombinedPosts.push(p);
+      }
+    }
+
+    // Filtrar por fecha con fallback seguro (no vaciar a 0 si las publicaciones disponibles son anteriores)
+    let filteredByDate = allCombinedPosts;
+    if (unipileDatePosted && allCombinedPosts.length > 0) {
+      const now = Date.now();
+      const maxAgeMs =
+        unipileDatePosted === "past_24h"
+          ? 24 * 60 * 60 * 1000
+          : unipileDatePosted === "past_week"
+          ? 7 * 24 * 60 * 60 * 1000
+          : 31 * 24 * 60 * 60 * 1000;
+
+      const dateFiltered = allCombinedPosts.filter((p) => {
+        if (!p.parsedDatetime) return true;
+        const postTime = new Date(p.parsedDatetime).getTime();
+        return !isNaN(postTime) && now - postTime <= maxAgeMs;
+      });
+      if (dateFiltered.length > 0) {
+        filteredByDate = dateFiltered;
+      }
+    }
+
+    // Ordenar resultados combinados
     if (sort_by === "engagement") {
-      validPosts.sort((a, b) => {
-        const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
-        if (relDiff !== 0 && Math.abs(relDiff) >= 15) return relDiff;
-        return (b.reactionCount + b.commentCount * 2) - (a.reactionCount + a.commentCount * 2);
+      filteredByDate.sort((a, b) => {
+        const scoreDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
+        if (scoreDiff !== 0 && Math.abs(scoreDiff) >= 15) return scoreDiff;
+        const engA = a.reactionCount + a.commentCount * 2 + a.repostCount * 3;
+        const engB = b.reactionCount + b.commentCount * 2 + b.repostCount * 3;
+        return engB - engA;
       });
-    } else if (sort_by === "date") {
-      validPosts.sort((a, b) => {
-        const relDiff = (b.relevanceScore || 0) - (a.relevanceScore || 0);
-        if (relDiff !== 0 && Math.abs(relDiff) >= 20) return relDiff;
-        return 0;
+    } else {
+      filteredByDate.sort((a, b) => {
+        const timeA = a.parsedDatetime ? new Date(a.parsedDatetime).getTime() : 0;
+        const timeB = b.parsedDatetime ? new Date(b.parsedDatetime).getTime() : 0;
+        return timeB - timeA;
       });
     }
+
+    const finalPosts = filteredByDate.slice(0, numericLimit);
 
     return res.status(200).json({
       success: true,
-      query: executedQuery,
-      count: validPosts.length,
-      posts: validPosts,
-      items: validPosts,
+      entity: targetEntityId
+        ? {
+            id: targetEntityId,
+            name: competitorName,
+            is_company: targetIsCompany,
+          }
+        : undefined,
+      query: competitorName
+        ? `Publicaciones de ${competitorName}${rawKeywords ? ` con "${rawKeywords}"` : ""}`
+        : executedQuery,
+      count: finalPosts.length,
+      posts: finalPosts,
+      items: finalPosts,
     });
   } catch (error) {
     console.error("[api/signals/posts/search] Error searching posts:", error);

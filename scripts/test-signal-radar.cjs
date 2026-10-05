@@ -534,6 +534,26 @@ async function run() {
     assert.equal(passesIcp(employeeLead, { exclude_author_employees: false }), true, "Sin filtro anti-auto-bombo debe pasar");
   }
 
+  {
+    const { matchesKeywordTerm, normalizeText } = require("../pages/api/signals/posts/search.ts");
+    assert.equal(normalizeText("Prospecção"), "prospeccao");
+    assert.equal(normalizeText("Gestão"), "gestao");
+    assert.equal(normalizeText("Estratégia"), "estrategia");
+
+    const samplePost0 = "🚨 ANÚNCIO IMPORTANTE! Sabia que 80% dos leads B2B vêm do LinkedIn... #Prospectme #VendasB2B #Networking";
+    const samplePost1 = "Ser a ferramenta escolhida... entregar tecnologia de ponta para quem quer vender de forma consultiva e eficiente. #Inovação #AutomaçãoDeVendas #Prospecção #B2B";
+    const samplePostGeneric = "🚨 ANÚNCIO IMPORTANTE! Sabia que 80% dos executivos usam automação... #Networking";
+
+    assert.equal(matchesKeywordTerm(samplePost0, "Vendas B2B"), true, "Debe coincidir con hashtag #VendasB2B");
+    assert.equal(matchesKeywordTerm(samplePost0, "vendas b2b"), true, "Debe ser insensible a mayúsculas");
+    assert.equal(matchesKeywordTerm(samplePost1, "Vendas B2B"), true, "Debe coincidir por términos multipalabra en ventas + b2b");
+    assert.equal(matchesKeywordTerm(samplePost0, "prospeccao"), true, "Debe coincidir con stem prospec en #Prospectme");
+    assert.equal(matchesKeywordTerm(samplePostGeneric, "prospeccao"), false, "No debe coincidir si no contiene el lema");
+    assert.equal(matchesKeywordTerm(samplePost1, "prospeccao"), true, "Debe tolerar tildes y cedillas en Prospecção");
+    assert.equal(matchesKeywordTerm(samplePost1, "prospecção"), true, "Debe coincidir con tilde original");
+    console.log("▶ Coincidencia tolerante a acentos y lemas en posts de competidores validada");
+  }
+
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");
 }
 
