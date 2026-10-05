@@ -108,11 +108,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         null;
     }
 
+    const isCompany =
+      Boolean((fullAcc?.connection_params as any)?.is_company) ||
+      Boolean((imParams as any)?.is_company) ||
+      (fullAcc?.connection_params as any)?.type === "ORGANIZATION" ||
+      (imParams as any)?.type === "COMPANY" ||
+      /agencia|agency|company|empresa|corp|inc|llc|s\.a|sl/i.test(accountName);
+
     return res.status(200).json({
       account: {
         name: accountName,
         publicIdentifier,
         pictureUrl: profilePictureUrl,
+        is_company: isCompany,
       },
       posts,
     });

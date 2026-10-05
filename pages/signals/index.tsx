@@ -546,7 +546,7 @@ export default function SignalsPage({
   }>>([]);
   const [isLoadingMyPosts, setIsLoadingMyPosts] = useState<boolean>(false);
   const [myPostsLoaded, setMyPostsLoaded] = useState<boolean>(false);
-  const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string; pictureUrl?: string | null } | null>(null);
+  const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string; pictureUrl?: string | null; is_company?: boolean } | null>(null);
   const [manualMyPostUrl, setManualMyPostUrl] = useState<string>("");
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
   const [selectedCompetitorEntity, setSelectedCompetitorEntity] = useState<{
@@ -3546,24 +3546,40 @@ export default function SignalsPage({
                             {/* 1. Tarjeta de Usuario/Perfil Conectado */}
                             <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
                               <div className="flex items-center justify-between gap-3 flex-wrap">
-                                <div className="flex items-center gap-3">
-                                  <ProspectAvatar
-                                    imageUrl={myAccountInfo?.pictureUrl || null}
-                                    name={myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || "Tu perfil"}
-                                    size="md"
-                                    badge="linkedin"
-                                    className="ring-2 ring-brand-500/20 shadow-xs"
-                                  />
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  {myAccountInfo?.pictureUrl ? (
+                                    <img
+                                      src={myAccountInfo.pictureUrl}
+                                      alt={myAccountInfo.name || "Tu perfil"}
+                                      className="w-8 h-8 rounded-lg object-cover border border-gray-200 dark:border-gray-700 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-lg bg-brand-100 dark:bg-brand-900/40 text-brand-600 dark:text-brand-300 flex items-center justify-center shrink-0">
+                                      {((myAccountInfo?.is_company ?? true) || /agencia|agency|company|empresa/i.test(myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || "")) ? (
+                                        <RiBuildingLine size={16} />
+                                      ) : (
+                                        <RiUserLine size={16} />
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate">
                                         {myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || "Tu perfil de LinkedIn"}
-                                      </h4>
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                        Prospección Inbound
+                                      </p>
+                                      <span
+                                        className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                          ((myAccountInfo?.is_company ?? true) || /agencia|agency|company|empresa/i.test(myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || ""))
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                                            : "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                        }`}
+                                      >
+                                        {((myAccountInfo?.is_company ?? true) || /agencia|agency|company|empresa/i.test(myAccountInfo?.name || accounts.find((a) => a.id === selectedAccountId)?.name || ""))
+                                          ? "Empresa"
+                                          : "Creador"}
                                       </span>
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
                                       Tus publicaciones en Linkedin
                                     </p>
                                   </div>
@@ -3612,9 +3628,6 @@ export default function SignalsPage({
                                       </h4>
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                                         ⚡ Auto-Sync Diario
-                                      </span>
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                        100% Manos Libres
                                       </span>
                                     </div>
                                     <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
