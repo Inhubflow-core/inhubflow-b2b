@@ -49,6 +49,7 @@ import {
   RiEditLine,
   RiUserAddLine,
   RiUserLine,
+  RiUserHeartLine,
   RiArrowUpLine,
   RiEyeLine,
   RiMegaphoneLine,
@@ -531,7 +532,20 @@ export default function SignalsPage({
   const [sourceStrategy, setSourceStrategy] = useState<"linkedin" | "web" | "hybrid">("linkedin");
 
   // Buscador Inteligente de Posts en LinkedIn
-  const [postSearchMode, setPostSearchMode] = useState<"search" | "manual">("search");
+  const [postSearchMode, setPostSearchMode] = useState<"search" | "my_posts" | "manual">("search");
+  const [myPosts, setMyPosts] = useState<Array<{
+    id: string;
+    shareUrl: string;
+    text: string;
+    date: string | null;
+    reactionCount: number;
+    commentCount: number;
+    author: { name: string; publicIdentifier?: string };
+  }>>([]);
+  const [isLoadingMyPosts, setIsLoadingMyPosts] = useState<boolean>(false);
+  const [myPostsLoaded, setMyPostsLoaded] = useState<boolean>(false);
+  const [myAccountInfo, setMyAccountInfo] = useState<{ name: string; publicIdentifier?: string } | null>(null);
+  const [manualMyPostUrl, setManualMyPostUrl] = useState<string>("");
   const [postSearchCompetitor, setPostSearchCompetitor] = useState("");
   const [selectedCompetitorEntity, setSelectedCompetitorEntity] = useState<{
     id: string;
@@ -738,6 +752,40 @@ export default function SignalsPage({
     setSelectedPostUrls(top);
     setNewTargetUrl(top.join("\n"));
   };
+
+  const loadMyRecentPosts = useCallback(async () => {
+    const accId = selectedAccountId || (accounts && accounts[0]?.id);
+    if (!accId) {
+      toast.error("Debes seleccionar una cuenta de LinkedIn conectada");
+      return;
+    }
+    setIsLoadingMyPosts(true);
+    try {
+      const res = await fetch("/api/signals/posts/my-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account_id: accId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const fetchedPosts = data.posts || [];
+        setMyPosts(fetchedPosts);
+        setMyAccountInfo(data.account || null);
+        setMyPostsLoaded(true);
+        if (fetchedPosts.length === 0) {
+          toast.info("No se encontraron publicaciones recientes en tu perfil de LinkedIn");
+        } else {
+          toast.success(`Se encontraron ${fetchedPosts.length} publicaciones de tu perfil`);
+        }
+      } else {
+        toast.error(data.error || "No se pudieron obtener tus publicaciones");
+      }
+    } catch {
+      toast.error("Error al conectar con el servidor para obtener tus publicaciones");
+    } finally {
+      setIsLoadingMyPosts(false);
+    }
+  }, [selectedAccountId, accounts]);
 
   const handleToggleExtraction = (kind: "comments" | "reactions") => {
     let nextComments = extractComments;
@@ -2850,8 +2898,8 @@ export default function SignalsPage({
                     ========================================================= */}
                     {signalCategoryTab === "posts" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
-                        {/* Selector de modo: Buscador Inteligente vs Manual */}
-                        <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3">
+                        {/* Selector de modo: Buscador Inteligente vs Mis Posts vs Manual */}
+                        <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 flex-wrap gap-2">
                           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-xs">
                             <button
                               type="button"
@@ -2862,7 +2910,23 @@ export default function SignalsPage({
                                   : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
                               }`}
                             >
-                              <RiSearchLine size={13} /> Buscador de Posts en LinkedIn (Recomendado)
+                              <RiSearchLine size={13} /> Buscador de Posts (Competidores)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPostSearchMode("my_posts");
+                                if (!myPostsLoaded && !isLoadingMyPosts) {
+                                  loadMyRecentPosts();
+                                }
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all ${
+                                postSearchMode === "my_posts"
+                                  ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-300 shadow-2xs"
+                                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+                              }`}
+                            >
+                              <RiUserHeartLine size={13} /> Mis Propios Posts (Inbound)
                             </button>
                             <button
                               type="button"
@@ -3448,6 +3512,193 @@ export default function SignalsPage({
                                 </p>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* MODO MIS PROPIOS POSTS (INBOUND) */}
+                        {postSearchMode === "my_posts" && (
+                          <div className="space-y-4 animate-in fade-in duration-150">
+                            <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3.5">
+                              <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-950/50 border border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-300 flex items-center justify-center shrink-0">
+                                    <RiUserHeartLine size={20} />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                        Tus Publicaciones en LinkedIn
+                                      </h4>
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                        Prospección Inbound
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      {myAccountInfo?.name
+                                        ? `Cuenta conectada: ${myAccountInfo.name}`
+                                        : "Monitorea a los usuarios que interactúan con tus publicaciones para iniciar charlas cálidas."}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={loadMyRecentPosts}
+                                  disabled={isLoadingMyPosts}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-all cursor-pointer disabled:opacity-60 shadow-2xs"
+                                >
+                                  <RiRefreshLine className={isLoadingMyPosts ? "animate-spin" : ""} size={13} />
+                                  {isLoadingMyPosts ? "Cargando..." : "Actualizar mis publicaciones"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* CARGANDO POSTS */}
+                            {isLoadingMyPosts && (
+                              <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-300 dark:border-gray-700 space-y-3">
+                                <RiRefreshLine className="animate-spin text-brand-500 mx-auto" size={28} />
+                                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                  Consultando tus publicaciones recientes en LinkedIn...
+                                </p>
+                              </div>
+                            )}
+
+                            {/* LISTA DE POSTS DEL USUARIO */}
+                            {!isLoadingMyPosts && myPosts.length > 0 && (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    {myPosts.length} {myPosts.length === 1 ? "publicación encontrada" : "publicaciones encontradas"} en tu perfil
+                                  </p>
+                                  <span className="text-[11px] text-gray-400">
+                                    Haz clic en una publicación para activarla o quitarla del monitor
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-2.5 max-h-96 overflow-y-auto pr-1">
+                                  {myPosts.map((post) => {
+                                    const isSelected = selectedPostUrls.includes(post.shareUrl);
+                                    return (
+                                      <div
+                                        key={post.id}
+                                        onClick={() => toggleSelectPost(post.shareUrl)}
+                                        className={`p-3.5 rounded-xl border transition-all cursor-pointer text-left ${
+                                          isSelected
+                                            ? "bg-brand-50/60 dark:bg-brand-950/30 border-brand-500 shadow-xs ring-1 ring-brand-500/50"
+                                            : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 hover:border-brand-300 hover:shadow-xs"
+                                        }`}
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                              <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                                                {post.author.name}
+                                              </span>
+                                              {post.date && (
+                                                <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                  <RiTimeLine size={10} /> {post.date}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {post.text && (
+                                              <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+                                                {post.text}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            {post.shareUrl && (
+                                              <a
+                                                href={post.shareUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="p-1 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/40 transition-colors"
+                                                title="Ver en LinkedIn"
+                                              >
+                                                <RiExternalLinkLine size={14} />
+                                              </a>
+                                            )}
+                                            <span
+                                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                                                isSelected
+                                                  ? "bg-brand-600 text-white shadow-2xs"
+                                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-brand-50 hover:text-brand-600"
+                                              }`}
+                                            >
+                                              {isSelected ? "✓ Seleccionado" : "+ Monitorear"}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-2.5 flex items-center gap-2 flex-wrap text-xs">
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                            <RiThumbUpLine size={11} /> {post.reactionCount} reacciones
+                                          </span>
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                            <RiChat1Line size={11} /> {post.commentCount} comentarios
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* SIN POSTS O ENLACE MANUAL DE APOYO */}
+                            {!isLoadingMyPosts && myPosts.length === 0 && myPostsLoaded && (
+                              <div className="p-6 text-center rounded-2xl bg-white dark:bg-gray-800/40 border-2 border-dashed border-gray-300 dark:border-gray-700 space-y-2">
+                                <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center mx-auto">
+                                  <RiUserHeartLine size={20} />
+                                </div>
+                                <h5 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                  No se encontraron publicaciones recientes en tu perfil de LinkedIn
+                                </h5>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                                  Si publicaste un post recientemente o manejas una página de empresa, puedes agregar el enlace directo aquí abajo para monitorear sus likes y comentarios de inmediato.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* ENTRADA RÁPIDA DE ENLACE DE PUBLICACIÓN PROPIA */}
+                            <div className="p-3.5 rounded-xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/80 space-y-2">
+                              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                ¿Tienes el enlace de una publicación específica tuya?
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={manualMyPostUrl}
+                                  onChange={(e) => setManualMyPostUrl(e.target.value)}
+                                  placeholder="https://www.linkedin.com/feed/update/urn:li:activity:..."
+                                  className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900 shadow-2xs placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const trimmed = manualMyPostUrl.trim();
+                                    if (!trimmed || !trimmed.startsWith("http")) {
+                                      toast.error("Ingresa una URL válida de LinkedIn");
+                                      return;
+                                    }
+                                    if (!selectedPostUrls.includes(trimmed)) {
+                                      const next = [...selectedPostUrls, trimmed];
+                                      setSelectedPostUrls(next);
+                                      setNewTargetUrl(next.join("\n"));
+                                      toast.success("Publicación añadida al monitoreo");
+                                    } else {
+                                      toast.info("Esta publicación ya está en la lista");
+                                    }
+                                    setManualMyPostUrl("");
+                                  }}
+                                  className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer"
+                                >
+                                  + Añadir a Monitoreo
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
 
