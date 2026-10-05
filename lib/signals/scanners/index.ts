@@ -35,6 +35,12 @@ export interface SignalScannerClient {
   getPostComments(postId: string, accountId?: string, limit?: number): Promise<{ items: UnipilePostComment[] }>;
   getPostReactions(postId: string, accountId?: string, limit?: number): Promise<{ items: UnipilePostReaction[] }>;
   getPost?(postId: string, accountId?: string): Promise<UnipilePostItem | null>;
+  getUserPosts?(params: {
+    account_id: string;
+    identifier: string;
+    limit?: number;
+    is_company?: boolean;
+  }): Promise<UnipilePostItem[]>;
   resolveProfile(identifier: string, accountId: string): Promise<UnipileProfile>;
 }
 
@@ -338,9 +344,48 @@ function parseReactionLead(
 }
 
 async function scanPostEngagement(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
-  const targetUrls = parseTargetUrls(context.monitor.target_url);
-  if (targetUrls.length === 0) {
-    throw new SignalScanError("Se requiere al menos una URL válida de publicación de LinkedIn", "invalid_configuration", false);
+  const isAllMyPosts = Boolean(
+    context.monitor.target_url && (
+      context.monitor.target_url.includes("ALL_MY_POSTS") ||
+      context.monitor.target_url.includes("AUTO_INBOUND")
+    )
+  );
+
+  let targetUrls: string[] = [];
+
+  if (isAllMyPosts) {
+    if (client.getUserPosts) {
+      try {
+        const targetIdentifier = context.userIdentifier || "me";
+        const myPosts = await client.getUserPosts({
+          account_id: context.remoteAccountId,
+          identifier: targetIdentifier,
+          limit: 15,
+        });
+
+        targetUrls = (myPosts || []).map((p) => {
+          const urn = p.social_id || p.id || "";
+          const digits = String(urn).match(/([0-9]{10,25})/)?.[1] || "";
+          return digits
+            ? `https://www.linkedin.com/feed/update/urn:li:activity:${digits}/`
+            : (p.share_url || "");
+        }).filter(Boolean);
+      } catch (err) {
+        console.warn("[SignalRadar] Error al auto-descubrir publicaciones para ALL_MY_POSTS:", err);
+      }
+    }
+
+    if (targetUrls.length === 0) {
+      return {
+        leads: [],
+        diagnostics: { candidatesSeen: 0, candidatesEmitted: 0 },
+      };
+    }
+  } else {
+    targetUrls = parseTargetUrls(context.monitor.target_url);
+    if (targetUrls.length === 0) {
+      throw new SignalScanError("Se requiere al menos una URL válida de publicación de LinkedIn", "invalid_configuration", false);
+    }
   }
 
   const postsToScan = targetUrls.slice(0, 15);

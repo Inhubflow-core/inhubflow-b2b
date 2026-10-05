@@ -241,6 +241,7 @@ export interface UnipilePostComment {
 export interface UnipilePostReaction {
   id?: string;
   reaction_type?: 'LIKE' | 'CELEBRATE' | 'SUPPORT' | 'LOVE' | 'INSIGHTFUL' | 'CURIOUS' | string;
+  value?: string;
   author: {
     id: string;
     name?: string;

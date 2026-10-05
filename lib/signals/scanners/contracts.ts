@@ -49,6 +49,7 @@ export interface SignalScanResult {
 export interface SignalScannerContext {
   monitor: SignalMonitor;
   remoteAccountId: string;
+  userIdentifier?: string | null;
   icp: SignalIcpFilters;
   keywords: string[];
   cursor: SignalScanCursor | null;

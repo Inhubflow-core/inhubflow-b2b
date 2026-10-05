@@ -53,6 +53,7 @@ import {
   RiArrowUpLine,
   RiEyeLine,
   RiMegaphoneLine,
+  RiFlashlightLine,
   RiLinkedinBoxFill,
 } from "react-icons/ri";
 
@@ -533,6 +534,7 @@ export default function SignalsPage({
 
   // Buscador Inteligente de Posts en LinkedIn
   const [postSearchMode, setPostSearchMode] = useState<"search" | "my_posts" | "manual">("search");
+  const [isAutoAllMyPosts, setIsAutoAllMyPosts] = useState<boolean>(false);
   const [myPosts, setMyPosts] = useState<Array<{
     id: string;
     shareUrl: string;
@@ -822,7 +824,8 @@ export default function SignalsPage({
     }
     if (wizardStep === 2) {
       if (signalCategoryTab === "posts") {
-        if (!newTargetUrl.trim() && selectedPostUrls.length === 0) {
+        const isAllMyPostsActive = postSearchMode === "my_posts" && isAutoAllMyPosts;
+        if (!isAllMyPostsActive && !newTargetUrl.trim() && selectedPostUrls.length === 0) {
           toast.error(t("signalRadar.toasts.targetRequired"));
           return;
         }
@@ -904,6 +907,7 @@ export default function SignalsPage({
     setNewTargetUrl("");
     setSelectedPostUrls([]);
     setDiscoveredPosts([]);
+    setIsAutoAllMyPosts(false);
     setPostSearchKeywords("");
     setIcpTitle("CEO, Director, Gerente General");
     setIcpCountry("Global / Todos");
@@ -982,7 +986,11 @@ export default function SignalsPage({
     let urls: string[] = [];
     if (monitor.target_url) {
       const trimmed = monitor.target_url.trim();
-      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      if (trimmed === "ALL_MY_POSTS" || trimmed.includes("ALL_MY_POSTS")) {
+        setIsAutoAllMyPosts(true);
+        setPostSearchMode("my_posts");
+        setSignalCategoryTab("posts");
+      } else if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
         try {
           const parsed = JSON.parse(trimmed);
           if (Array.isArray(parsed)) {
@@ -991,10 +999,14 @@ export default function SignalsPage({
         } catch {
           urls = [trimmed];
         }
+        setIsAutoAllMyPosts(false);
       } else if (trimmed) {
         const splitUrls = trimmed.split(/[\n,]+/).map((u) => u.trim()).filter((u) => u.startsWith("http"));
         urls = splitUrls.length > 0 ? splitUrls : [trimmed];
+        setIsAutoAllMyPosts(false);
       }
+    } else {
+      setIsAutoAllMyPosts(false);
     }
     setSelectedPostUrls(urls);
     setNewTargetUrl(urls.join("\n"));
@@ -1247,13 +1259,18 @@ export default function SignalsPage({
       toast.error("El SDR IA aún no cumple los requisitos para Piloto Automático");
       return;
     }
+    const isAllMyPostsActive = signalCategoryTab === "posts" && postSearchMode === "my_posts" && isAutoAllMyPosts;
     const monitorName =
       newName.trim() ||
-      (signalCategoryTab === "icp_triggers"
+      (isAllMyPostsActive
+        ? `Radar Inbound: Todas mis publicaciones (${myAccountInfo?.name || "LinkedIn"})`
+        : signalCategoryTab === "icp_triggers"
         ? `${def?.title || "Radar ICP"} - ${icpTitles.slice(0, 2).join(", ") || icpCountry}`
         : `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`);
 
-    const targetUrlToSend = selectedPostUrls.length > 1
+    const targetUrlToSend = isAllMyPostsActive
+      ? "ALL_MY_POSTS"
+      : selectedPostUrls.length > 1
       ? JSON.stringify(selectedPostUrls)
       : (selectedPostUrls[0] || newTargetUrl.trim() || undefined);
 
@@ -2269,6 +2286,14 @@ export default function SignalsPage({
 
                       {m.target_url && (() => {
                         let displayUrl = m.target_url.trim();
+                        if (displayUrl === "ALL_MY_POSTS" || displayUrl.includes("ALL_MY_POSTS")) {
+                          return (
+                            <div className="flex items-center gap-1.5 text-xs text-purple-700 dark:text-purple-300 font-semibold bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 px-2.5 py-1 rounded-lg w-fit">
+                              <RiFlashlightLine size={13} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                              <span>Todas mis publicaciones (Auto-Sync diario activo)</span>
+                            </div>
+                          );
+                        }
                         let isMulti = false;
                         let count = 1;
                         if (displayUrl.startsWith("[") && displayUrl.endsWith("]")) {
@@ -3553,6 +3578,76 @@ export default function SignalsPage({
                               </div>
                             </div>
 
+                            {/* Tarjeta Destacada: Auto-Sync de Todas las Publicaciones (Actuales y Futuras) */}
+                            <div
+                              onClick={() => {
+                                const next = !isAutoAllMyPosts;
+                                setIsAutoAllMyPosts(next);
+                                if (next) {
+                                  toast.success("Monitoreo automático de todas tus publicaciones activado");
+                                }
+                              }}
+                              className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                                isAutoAllMyPosts
+                                  ? "bg-gradient-to-r from-purple-500/10 via-brand-500/10 to-emerald-500/10 border-brand-500 shadow-sm ring-1 ring-brand-500"
+                                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 shadow-xs hover:border-brand-300"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                    isAutoAllMyPosts
+                                      ? "bg-brand-500 text-white shadow-xs"
+                                      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300"
+                                  }`}>
+                                    <RiFlashlightLine size={20} />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                                        Monitorear automáticamente todas mis publicaciones (Actuales y Futuras)
+                                      </h4>
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                        ⚡ Auto-Sync Diario
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                        100% Manos Libres
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                      InHubFlow revisará periódicamente tu perfil y detectará todas las interacciones de tus publicaciones activas y de los nuevos posts que publiques día a día, sin necesidad de agregarlos uno a uno.
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-0.5 shrink-0">
+                                  <div
+                                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                      isAutoAllMyPosts ? "bg-brand-600" : "bg-gray-300 dark:bg-gray-700"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                        isAutoAllMyPosts ? "translate-x-5" : "translate-x-0"
+                                      }`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {isAutoAllMyPosts && (
+                                <div className="mt-3 pt-3 border-t border-brand-200/60 dark:border-brand-800/60 flex items-center justify-between text-xs text-brand-700 dark:text-brand-300 flex-wrap gap-2">
+                                  <span className="flex items-center gap-1.5 font-medium">
+                                    <RiCheckLine size={16} className="text-brand-600 font-bold shrink-0" />
+                                    Auto-Sync activo: Puedes avanzar al <strong>Paso 3</strong> directamente sin seleccionar URLs.
+                                  </span>
+                                  <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Frecuencia configurable en Paso 4
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
                             {/* CARGANDO POSTS */}
                             {isLoadingMyPosts && (
                               <div className="p-8 text-center rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-300 dark:border-gray-700 space-y-3">
@@ -4589,7 +4684,9 @@ export default function SignalsPage({
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
                           <span className="text-xs text-gray-400 block font-medium">Disparador / Posts</span>
                           <strong className="text-gray-800 dark:text-gray-200 truncate block" title={selectedPostUrls.join(", ")}>
-                            {selectedPostUrls.length > 0
+                            {isAutoAllMyPosts && postSearchMode === "my_posts"
+                              ? "⚡ Todas mis publicaciones (Auto-Sync diario)"
+                              : selectedPostUrls.length > 0
                               ? `${selectedPostUrls.length} publicación(es)`
                               : newCompetitor.trim() || keywordsList[0] || "Configurado"}
                           </strong>

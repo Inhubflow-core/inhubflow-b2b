@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const actor = requireApiActor(req, res);
+  const actor = await requireApiActor(req, res);
   if (!actor) return;
 
   const rawAccountId = req.method === "POST" ? req.body?.account_id : req.query?.account_id;

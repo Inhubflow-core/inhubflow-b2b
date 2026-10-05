@@ -67,7 +67,7 @@ export interface ListLeadsQuery {
 
 export interface SignalRadarServiceOptions {
   getDatabase?: () => Database.Database;
-  client?: SignalScannerClient & Pick<UnipileClient, "isConfigured" | "listAccounts" | "getAccount">;
+  client?: SignalScannerClient & Pick<UnipileClient, "isConfigured" | "listAccounts" | "getAccount" | "getUserPosts">;
   webClient?: WebSearchClient;
   generateMessage?: typeof generateSignalMessage;
   now?: () => number;
@@ -385,9 +385,13 @@ export class SignalRadarService {
       const cursor = parseJson<SignalScanCursor | null>(monitor.cursor_json, null);
       const requestedLimit = Math.max(1, Math.min(icp.result_limit || 50, 100));
       const scanLimit = Math.max(requestedLimit, Math.min(100, requestedLimit * 3));
+      const imParams = (account?.connection_params as any)?.im;
+      const userIdentifier = imParams?.id || imParams?.publicIdentifier || account?.name || "me";
+
       const raw = await scanRealSignals(this.client, {
         monitor,
         remoteAccountId: resolved.unipileAccountId,
+        userIdentifier,
         icp,
         keywords,
         cursor,
