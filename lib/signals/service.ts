@@ -287,26 +287,32 @@ export class SignalRadarService {
       ORDER BY datetime(sl.last_detected_at) DESC LIMIT ? OFFSET ?
     `).all(...params, limit, offset) as SignalLead[];
 
-    // Si algún monitor tiene activo exclude_author_employees, proteger la vista del dashboard y auto-limpiar
+    // Si algún monitor tiene activo exclude_author_employees (o por defecto si es undefined), proteger la vista del dashboard y auto-limpiar
     let filteredItems = items;
     try {
       filteredItems = items.filter((leadItem) => {
         const mon = db.prepare("SELECT icp_filters_json, competitor_name FROM signal_monitors WHERE id = ?").get(leadItem.monitor_id) as { icp_filters_json?: string; competitor_name?: string } | undefined;
-        if (!mon?.icp_filters_json) return true;
         try {
-          const icp = JSON.parse(mon.icp_filters_json);
-          if (icp?.exclude_author_employees) {
+          const icp = mon?.icp_filters_json ? JSON.parse(mon.icp_filters_json) : {};
+          if (icp?.exclude_author_employees !== false) {
             let meta: any = {};
             try { meta = JSON.parse(leadItem.metadata_json || "{}"); } catch {}
             const latestEv = meta?.latestEvidence || meta || {};
+            const snippet = leadItem.signal_snippet || latestEv.snippet || "";
+            const snippetAuthorMatch = snippet.match(/(?:post|publicaci[oó]n) de ([^:\n"]+):/i);
+            const snippetAuthor = snippetAuthorMatch ? snippetAuthorMatch[1].trim() : null;
+
             const mappedLead: any = {
               fullName: leadItem.full_name,
               headline: leadItem.headline,
               company: leadItem.company,
               evidence: {
+                snippet,
                 metadata: {
                   ...latestEv,
-                  competitorName: mon.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany,
+                  competitorName: mon?.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany || snippetAuthor,
+                  postAuthorCompany: latestEv.postAuthorCompany || snippetAuthor,
+                  postAuthor: latestEv.postAuthor || snippetAuthor,
                 },
               },
             };
@@ -479,22 +485,29 @@ export class SignalRadarService {
 
       const persisted = await this.persistDiscoveredLeads(monitor, enriched, scanRunId, icp);
 
-      // Si el monitor tiene activo "Excluir empleados del autor", depurar cualquier prospecto que pertenezca a la empresa del autor
-      if (icp.exclude_author_employees) {
+      // Si el monitor tiene activo "Excluir empleados del autor" (o por defecto si es undefined), depurar prospectos
+      if (icp.exclude_author_employees !== false) {
         try {
           const pendingLeads = db.prepare("SELECT * FROM signal_leads WHERE monitor_id = ? AND status = 'pending'").all(monitor.id) as SignalLead[];
           for (const pl of pendingLeads) {
             let meta: any = {};
             try { meta = JSON.parse(pl.metadata_json || "{}"); } catch {}
             const latestEv = meta?.latestEvidence || meta || {};
+            const snippet = pl.signal_snippet || latestEv.snippet || "";
+            const snippetAuthorMatch = snippet.match(/(?:post|publicaci[oó]n) de ([^:\n"]+):/i);
+            const snippetAuthor = snippetAuthorMatch ? snippetAuthorMatch[1].trim() : null;
+
             const mappedLead: any = {
               fullName: pl.full_name,
               headline: pl.headline,
               company: pl.company,
               evidence: {
+                snippet,
                 metadata: {
                   ...latestEv,
-                  competitorName: monitor.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany,
+                  competitorName: monitor.competitor_name || latestEv.competitorName || latestEv.postAuthorCompany || snippetAuthor,
+                  postAuthorCompany: latestEv.postAuthorCompany || snippetAuthor,
+                  postAuthor: latestEv.postAuthor || snippetAuthor,
                 },
               },
             };

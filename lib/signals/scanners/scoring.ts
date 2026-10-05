@@ -826,10 +826,15 @@ export function isAuthorEmployeeOrAffiliate(
   metadata?: Record<string, unknown> | null
 ): boolean {
   const meta = metadata || lead.evidence?.metadata || {};
+  const snippet = lead.evidence?.snippet || "";
+  const snippetAuthorMatch = snippet.match(/(?:post|publicaci[oó]n) de ([^:\n"]+):/i);
+  const snippetAuthor = snippetAuthorMatch ? snippetAuthorMatch[1].trim() : null;
+
   const rawTargets = [
     meta.postAuthorCompany,
     meta.competitorName,
     meta.postAuthor,
+    snippetAuthor,
   ];
 
   const targetEntities: string[] = [];
@@ -982,8 +987,8 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
     }
   }
 
-  // 6. Anti-Auto-Bombo: Excluir empleados del autor del post o de su empresa
-  if (icp.exclude_author_employees) {
+  // 6. Anti-Auto-Bombo: Excluir empleados del autor del post o de su empresa (activo por defecto si no es false explícito)
+  if (icp.exclude_author_employees !== false) {
     if (isAuthorEmployeeOrAffiliate(lead)) {
       return false;
     }

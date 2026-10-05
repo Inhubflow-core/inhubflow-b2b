@@ -27,7 +27,7 @@ const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/sc
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
-const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch, classifyCommentIntent, passesIcp } = require("../lib/signals/scanners/scoring.ts");
+const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch, classifyCommentIntent, passesIcp, isAuthorEmployeeOrAffiliate } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -574,7 +574,40 @@ async function run() {
     assert.equal(extractCompanyFromHeadline(renanLead.headline), "Prospectme", "extractCompanyFromHeadline debe extraer Prospectme para 'Cofundador Prospectme'");
     assert.equal(passesIcp(stevensonLead, { exclude_author_employees: true }), false, "BDR na Prospectme debe ser descartado por anti-auto-bombo");
     assert.equal(passesIcp(renanLead, { exclude_author_employees: true }), false, "Cofundador Prospectme debe ser descartado por anti-auto-bombo");
+    // Por defecto (undefined) debe descartar empleados
+    assert.equal(passesIcp(stevensonLead, {}), false, "Por defecto debe descartar empleados");
+    assert.equal(passesIcp(renanLead, {}), false, "Por defecto debe descartar fundadores");
     assert.equal(passesIcp(stevensonLead, { exclude_author_employees: false }), true, "Sin filtro anti-auto-bombo debe permitirse");
+
+    // Extracción de autor desde el snippet
+    const leadWithOnlySnippet = {
+      fullName: "Stevenson Marcello",
+      headline: "BDR na Prospectme",
+      company: "Prospectme",
+      evidence: {
+        snippet: 'Reaccionó (LIKE) al post de Prospectme: "ANUNCIO"',
+        metadata: {},
+      },
+    };
+    assert.equal(isAuthorEmployeeOrAffiliate(leadWithOnlySnippet), true, "Debe detectar al autor desde el texto del snippet");
+
+    // Validar esquema de validación preserva exclude_author_employees
+    const { SignalMonitorCreateSchema } = require("../lib/signals/validation.ts");
+    const parsedMon = SignalMonitorCreateSchema.safeParse({
+      name: "Monitor Test",
+      type: "post_engagement",
+      target_url: "https://linkedin.com/feed/update/urn:li:activity:123",
+      account_id: "11111111-1111-1111-1111-111111111111",
+      target_list_id: "list-1",
+      icp_filters: {
+        exclude_author_employees: true,
+        prioritize_high_intent_comments: true,
+      },
+    });
+    assert.equal(parsedMon.success, true, "Esquema debe aceptar y validar el monitor");
+    assert.equal(parsedMon.data.icp_filters.exclude_author_employees, true, "Zod debe preservar exclude_author_employees");
+    assert.equal(parsedMon.data.icp_filters.prioritize_high_intent_comments, true, "Zod debe preservar prioritize_high_intent_comments");
+
     console.log("▶ Anti-Auto-Bombo descarta con precisión a empleados ('BDR na...') y cofundadores del autor");
   }
 
