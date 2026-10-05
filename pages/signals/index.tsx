@@ -208,6 +208,21 @@ export interface SignalDefinition {
 }
 
 export const SIGNAL_DEFINITIONS: SignalDefinition[] = [
+  // Super-Monitor Todo en Uno
+  {
+    id: "super_monitor",
+    title: "Super-Monitor Radar 360°",
+    badge: "⚡ Todo en Uno",
+    level: 1,
+    levelTitle: "⚡ Radar Unificado Multiseñal",
+    group: "A",
+    groupTitle: "Social & Competidores",
+    description: "Monitor omnicanal todo en uno: rastrea publicaciones en LinkedIn, palabras clave y disparadores de ICP en simultáneo.",
+    icon: RiRadarLine,
+    color: "text-purple-500",
+    badgeBg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+    inputKind: "keywords",
+  },
   // Nivel 1: Máxima Intención (Calientes - Competencia y Comunidad)
   {
     id: "post_engagement",
@@ -507,6 +522,45 @@ export default function SignalsPage({
 
   // Paso 2: Señales de Intención (Pestañas de Navegación: "posts" vs "keywords" vs "icp_triggers")
   const [signalCategoryTab, setSignalCategoryTab] = useState<"posts" | "keywords" | "icp_triggers">("posts");
+  
+  // Niveles Activos en el Monitor (Soporta Nivel 1, Nivel 2, Nivel 3 o Super-Monitor Todo en Uno)
+  const [enabledLevels, setEnabledLevels] = useState<{
+    posts: boolean;
+    keywords: boolean;
+    icp_triggers: boolean;
+  }>({
+    posts: true,
+    keywords: false,
+    icp_triggers: false,
+  });
+
+  const toggleLevelEnabled = (level: "posts" | "keywords" | "icp_triggers", e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEnabledLevels((prev) => {
+      const isCurrentlyActive = prev[level];
+      const nextActive = !isCurrentlyActive;
+      const updated = { ...prev, [level]: nextActive };
+
+      // Validar que al menos un nivel quede activo
+      const activeCount = Object.values(updated).filter(Boolean).length;
+      if (activeCount === 0) {
+        toast.error("Debes tener al menos un nivel activo en el radar");
+        return prev;
+      }
+
+      if (nextActive) {
+        setSignalCategoryTab(level);
+        toast.success(`Nivel activado: ${level === "posts" ? "01 Post en Linkedin" : level === "keywords" ? "02 Palabras Clave & Mercado" : "03 Disparadores de ICP"}`);
+      } else {
+        toast.info(`Nivel desactivado: ${level === "posts" ? "01 Post en Linkedin" : level === "keywords" ? "02 Palabras Clave & Mercado" : "03 Disparadores de ICP"}`);
+      }
+      return updated;
+    });
+  };
+
+  const activeLevelsCount = (enabledLevels.posts ? 1 : 0) + (enabledLevels.keywords ? 1 : 0) + (enabledLevels.icp_triggers ? 1 : 0);
+  const isSuperMonitor = activeLevelsCount > 1;
+
   const [selectedMarketEvents, setSelectedMarketEvents] = useState<string[]>([]);
   const handleToggleMarketEvent = (id: string) => {
     setSelectedMarketEvents((prev) =>
@@ -876,20 +930,33 @@ export default function SignalsPage({
       return;
     }
     if (wizardStep === 2) {
-      if (signalCategoryTab === "posts") {
+      // Validar que al menos un nivel esté activo
+      const anyActive = Object.values(enabledLevels).some(Boolean);
+      if (!anyActive) {
+        toast.error("Debes activar al menos un nivel de señales para continuar");
+        return;
+      }
+
+      // Validar cada nivel activo
+      if (enabledLevels.posts) {
         const isAllMyPostsActive = postSearchMode === "my_posts" && isAutoAllMyPosts;
         if (!isAllMyPostsActive && !newTargetUrl.trim() && selectedPostUrls.length === 0) {
-          toast.error(t("signalRadar.toasts.targetRequired"));
+          toast.error("En el Nivel 01 (Post en Linkedin) debes configurar al menos una publicación o activar el monitoreo automático");
+          setSignalCategoryTab("posts");
           return;
         }
-      } else if (signalCategoryTab === "keywords") {
+      }
+      if (enabledLevels.keywords) {
         if (keywordsList.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
-          toast.error(t("signalRadar.toasts.keywordsRequired"));
+          toast.error("En el Nivel 02 (Palabras Clave & Mercado) debes agregar al menos una palabra clave o evento de mercado");
+          setSignalCategoryTab("keywords");
           return;
         }
-      } else if (signalCategoryTab === "icp_triggers") {
+      }
+      if (enabledLevels.icp_triggers) {
         if (selectedIcpSignals.length === 0) {
-          toast.error(t("signalRadar.toasts.icpSignalRequired"));
+          toast.error("En el Nivel 03 (Disparadores de ICP) debes seleccionar al menos 1 disparador de decisor");
+          setSignalCategoryTab("icp_triggers");
           return;
         }
       }
@@ -948,6 +1015,7 @@ export default function SignalsPage({
     setWizardStep(1);
     setNewName("");
     setSignalCategoryTab("posts");
+    setEnabledLevels({ posts: true, keywords: false, icp_triggers: false });
     setSelectedMarketEvents([]);
     setSelectedIcpSignals(["new_in_role"]);
     setNewType("post_engagement");
@@ -999,9 +1067,28 @@ export default function SignalsPage({
     const icpSignalTypes = ["new_in_role", "internal_promotion", "hiring_spree", "company_growth", "profile_viewers", "active_poster"];
     let initialEvents: string[] = [];
     let initialIcpSignals: string[] = [];
+    let initialActiveLevels = {
+      posts: true,
+      keywords: false,
+      icp_triggers: false,
+    };
     if (monitor.icp_filters_json) {
       try {
         const icp = JSON.parse(monitor.icp_filters_json);
+        if (Array.isArray(icp.active_levels) && icp.active_levels.length > 0) {
+          initialActiveLevels = {
+            posts: icp.active_levels.includes("posts"),
+            keywords: icp.active_levels.includes("keywords"),
+            icp_triggers: icp.active_levels.includes("icp_triggers"),
+          };
+        } else if (monitor.type === "super_monitor") {
+          initialActiveLevels = { posts: true, keywords: true, icp_triggers: true };
+        } else if (icpSignalTypes.includes(monitorType)) {
+          initialActiveLevels = { posts: false, keywords: false, icp_triggers: true };
+        } else if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
+          initialActiveLevels = { posts: false, keywords: true, icp_triggers: false };
+        }
+
         if (Array.isArray(icp.event_kinds)) {
           initialEvents = icp.event_kinds.filter((k: string) =>
             ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(k)
@@ -1011,7 +1098,11 @@ export default function SignalsPage({
           );
         }
       } catch {}
+    } else if (monitor.type === "super_monitor") {
+      initialActiveLevels = { posts: true, keywords: true, icp_triggers: true };
     }
+    setEnabledLevels(initialActiveLevels);
+
     if (initialEvents.length === 0 && ["funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType)) {
       initialEvents = [monitorType];
     }
@@ -1021,7 +1112,13 @@ export default function SignalsPage({
     setSelectedMarketEvents(initialEvents);
     setSelectedIcpSignals(initialIcpSignals.length > 0 ? initialIcpSignals : ["new_in_role"]);
 
-    if (icpSignalTypes.includes(monitorType) || initialIcpSignals.length > 0) {
+    if (initialActiveLevels.posts) {
+      setSignalCategoryTab("posts");
+    } else if (initialActiveLevels.keywords) {
+      setSignalCategoryTab("keywords");
+    } else if (initialActiveLevels.icp_triggers) {
+      setSignalCategoryTab("icp_triggers");
+    } else if (icpSignalTypes.includes(monitorType) || initialIcpSignals.length > 0) {
       setSignalCategoryTab("icp_triggers");
     } else if (["keyword_intent", "competitor_audience", "funding_round", "company_news", "industry_event", "acquisition_event"].includes(monitorType) || initialEvents.length > 0) {
       setSignalCategoryTab("keywords");
@@ -1292,12 +1389,20 @@ export default function SignalsPage({
   const handleCreateMonitor = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    // Determinar niveles activos seleccionados
+    const activeLevelsArray: ("posts" | "keywords" | "icp_triggers")[] = [];
+    if (enabledLevels.posts) activeLevelsArray.push("posts");
+    if (enabledLevels.keywords) activeLevelsArray.push("keywords");
+    if (enabledLevels.icp_triggers) activeLevelsArray.push("icp_triggers");
+
     let effectiveType = newType;
-    if (signalCategoryTab === "posts") {
+    if (activeLevelsArray.length > 1) {
+      effectiveType = "super_monitor";
+    } else if (enabledLevels.posts) {
       if (extractComments && extractReactions) effectiveType = "post_engagement";
       else if (extractComments && !extractReactions) effectiveType = "high_intent_comments";
       else if (!extractComments && extractReactions) effectiveType = "competitor_reactions";
-    } else if (signalCategoryTab === "keywords") {
+    } else if (enabledLevels.keywords) {
       if (selectedMarketEvents.length > 0) {
         effectiveType = selectedMarketEvents[0];
       } else if (newCompetitor.trim() && keywordsList.length === 0) {
@@ -1305,14 +1410,14 @@ export default function SignalsPage({
       } else {
         effectiveType = "keyword_intent";
       }
-    } else if (signalCategoryTab === "icp_triggers") {
+    } else if (enabledLevels.icp_triggers) {
       effectiveType = selectedIcpSignals[0] || "new_in_role";
     }
 
     const def = SIGNAL_DEFINITIONS.find((d) => d.id === effectiveType) || SIGNAL_DEFINITIONS.find((d) => d.id === newType);
     if (!selectedAccountId) { toast.error("Selecciona una cuenta de LinkedIn"); return; }
     if (!newTargetList) { toast.error("Selecciona una lista de destino"); return; }
-    if (accountCapabilities && !accountCapabilities.supportedSignals.includes(effectiveType)) {
+    if (accountCapabilities && !accountCapabilities.supportedSignals.includes(effectiveType) && effectiveType !== "super_monitor") {
       toast.error("La cuenta seleccionada no es compatible con esta señal");
       return;
     }
@@ -1324,12 +1429,14 @@ export default function SignalsPage({
       toast.error("El SDR IA aún no cumple los requisitos para Piloto Automático");
       return;
     }
-    const isAllMyPostsActive = signalCategoryTab === "posts" && postSearchMode === "my_posts" && isAutoAllMyPosts;
+    const isAllMyPostsActive = enabledLevels.posts && postSearchMode === "my_posts" && isAutoAllMyPosts;
     const monitorName =
       newName.trim() ||
-      (isAllMyPostsActive
+      (activeLevelsArray.length > 1
+        ? `Super-Monitor Radar 360° - ${icpTitles.slice(0, 2).join(", ") || icpCountry} (${activeLevelsArray.length} Niveles)`
+        : isAllMyPostsActive
         ? `Radar Inbound: Todas mis publicaciones (${myAccountInfo?.name || "LinkedIn"})`
-        : signalCategoryTab === "icp_triggers"
+        : enabledLevels.icp_triggers
         ? `${def?.title || "Radar ICP"} - ${icpTitles.slice(0, 2).join(", ") || icpCountry}`
         : `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`);
 
@@ -1338,6 +1445,14 @@ export default function SignalsPage({
       : selectedPostUrls.length > 1
       ? JSON.stringify(selectedPostUrls)
       : (selectedPostUrls[0] || newTargetUrl.trim() || undefined);
+
+    const eventKindsToSend = [
+      ...(enabledLevels.icp_triggers ? selectedIcpSignals : []),
+      ...(enabledLevels.keywords && selectedMarketEvents.length > 0 ? selectedMarketEvents : []),
+    ];
+    if (eventKindsToSend.length === 0) {
+      eventKindsToSend.push(effectiveType);
+    }
 
     setCreatingMonitor(true);
     try {
@@ -1349,8 +1464,8 @@ export default function SignalsPage({
             name: monitorName,
             type: effectiveType,
             competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
-            target_url: targetUrlToSend,
-            keywords: signalCategoryTab === "icp_triggers" ? [] : keywordsList,
+            target_url: enabledLevels.posts ? targetUrlToSend : undefined,
+            keywords: enabledLevels.keywords ? keywordsList : [],
             icp_filters: {
               titles: icpTitles,
               locations: icpLocations,
@@ -1358,10 +1473,9 @@ export default function SignalsPage({
               company: icpCompany.trim() || undefined,
               industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
               time_window_days: timeWindowDays,
-              source_strategy: signalCategoryTab === "icp_triggers" ? "linkedin" : (selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy),
-              event_kinds: signalCategoryTab === "icp_triggers"
-                ? selectedIcpSignals
-                : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
+              source_strategy: enabledLevels.keywords && selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
+              event_kinds: eventKindsToSend,
+              active_levels: activeLevelsArray,
               exclude_author_employees: excludeAuthorEmployees,
               prioritize_high_intent_comments: prioritizeHighIntent,
             },
@@ -1405,8 +1519,8 @@ export default function SignalsPage({
           name: monitorName,
           type: effectiveType,
           competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
-          target_url: targetUrlToSend,
-          keywords: signalCategoryTab === "icp_triggers" ? [] : keywordsList,
+          target_url: enabledLevels.posts ? targetUrlToSend : undefined,
+          keywords: enabledLevels.keywords ? keywordsList : [],
           icp_filters: {
             titles: icpTitles,
             locations: icpLocations,
@@ -1414,10 +1528,9 @@ export default function SignalsPage({
             company: icpCompany.trim() || undefined,
             industries: icpCompany.split(/[,;]+/).map((s) => s.trim()).filter(Boolean),
             time_window_days: timeWindowDays,
-            source_strategy: signalCategoryTab === "icp_triggers" ? "linkedin" : (selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy),
-            event_kinds: signalCategoryTab === "icp_triggers"
-              ? selectedIcpSignals
-              : (selectedMarketEvents.length > 0 ? selectedMarketEvents : [effectiveType]),
+            source_strategy: enabledLevels.keywords && selectedMarketEvents.length > 0 ? "hybrid" : sourceStrategy,
+            event_kinds: eventKindsToSend,
+            active_levels: activeLevelsArray,
             exclude_author_employees: excludeAuthorEmployees,
             prioritize_high_intent_comments: prioritizeHighIntent,
           },
@@ -2936,85 +3049,240 @@ export default function SignalsPage({
                       <span className="text-xs text-gray-400 dark:text-gray-500">{t("signalRadar.wizard.step2.stepOf")}</span>
                     </div>
 
-                    {/* Selector de Categoría (Pestañas de Navegación del Paso 2) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 p-1.5 rounded-2xl bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-indigo-500/10 dark:from-brand-950/30 dark:via-brand-950/20 dark:to-indigo-950/30 text-xs gap-1.5 border border-brand-500/20 dark:border-brand-500/10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignalCategoryTab("posts");
-                          setNewType("post_engagement");
-                        }}
-                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
-                          signalCategoryTab === "posts"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
-                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
-                        }`}
-                      >
-                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
-                          signalCategoryTab === "posts"
-                            ? "text-brand-600 dark:text-brand-400"
-                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
-                        }`}>
-                          01
-                        </span>
-                        <div className="min-w-0">
-                          <span className="block leading-tight font-bold text-xs truncate">Post en Linkedin</span>
-                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">Likes y Comentarios</span>
-                        </div>
-                      </button>
+                    {/* Selector de Categoría y Activación Multi-Nivel (Super-Monitor Todo en Uno) */}
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        {/* CARD 01: POST EN LINKEDIN */}
+                        <div
+                          onClick={() => {
+                            setSignalCategoryTab("posts");
+                            setNewType("post_engagement");
+                          }}
+                          className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
+                            signalCategoryTab === "posts"
+                              ? "bg-white dark:bg-gray-850 shadow-sm border-brand-500 ring-2 ring-brand-500/20"
+                              : "bg-white/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 hover:bg-white dark:hover:bg-gray-800 shadow-2xs"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                                enabledLevels.posts
+                                  ? "text-brand-600 dark:text-brand-400"
+                                  : "text-gray-300 dark:text-gray-600"
+                              }`}>
+                                01
+                              </span>
+                              <div className="min-w-0">
+                                <span className="block leading-tight font-bold text-xs text-gray-900 dark:text-white truncate">
+                                  Post en Linkedin
+                                </span>
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                  Likes y Comentarios
+                                </span>
+                              </div>
+                            </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignalCategoryTab("keywords");
-                          setNewType("keyword_intent");
-                        }}
-                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
-                          signalCategoryTab === "keywords"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
-                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
-                        }`}
-                      >
-                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
-                          signalCategoryTab === "keywords"
-                            ? "text-brand-600 dark:text-brand-400"
-                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
-                        }`}>
-                          02
-                        </span>
-                        <div className="min-w-0">
-                          <span className="block leading-tight font-bold text-xs truncate">Palabras Clave & Mercado</span>
-                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">Menciones y Noticias</span>
-                        </div>
-                      </button>
+                            {/* Checkbox de activación / desactivación */}
+                            <button
+                              type="button"
+                              onClick={(e) => toggleLevelEnabled("posts", e)}
+                              className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer shrink-0"
+                              title={enabledLevels.posts ? "Desactivar Nivel 01" : "Activar Nivel 01"}
+                            >
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                enabledLevels.posts
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                  : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                              }`}>
+                                {enabledLevels.posts ? "✓ Activo" : "Omitido"}
+                              </span>
+                              <div
+                                className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all ${
+                                  enabledLevels.posts
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "border-2 border-gray-300 dark:border-gray-600 text-transparent"
+                                }`}
+                              >
+                                ✓
+                              </div>
+                            </button>
+                          </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignalCategoryTab("icp_triggers");
-                          if (selectedIcpSignals.length === 0) {
-                            setSelectedIcpSignals(["new_in_role"]);
-                          }
-                          setNewType(selectedIcpSignals[0] || "new_in_role");
-                        }}
-                        className={`group flex items-center gap-3 py-3 px-3.5 rounded-xl transition-all cursor-pointer text-left ${
-                          signalCategoryTab === "icp_triggers"
-                            ? "bg-white dark:bg-gray-850 text-gray-900 dark:text-white shadow-xs border border-gray-300 dark:border-gray-700"
-                            : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-700/50"
-                        }`}
-                      >
-                        <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
-                          signalCategoryTab === "icp_triggers"
-                            ? "text-brand-600 dark:text-brand-400"
-                            : "text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500"
-                        }`}>
-                          03
-                        </span>
-                        <div className="min-w-0">
-                          <span className="block leading-tight font-bold text-xs truncate">Disparadores de ICP</span>
-                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500 block truncate">100% Automático (Cero URLs)</span>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">
+                            Rastrea interacciones en tus propios posts o publicaciones de competidores.
+                          </p>
                         </div>
-                      </button>
+
+                        {/* CARD 02: PALABRAS CLAVE & MERCADO */}
+                        <div
+                          onClick={() => {
+                            setSignalCategoryTab("keywords");
+                            setNewType("keyword_intent");
+                          }}
+                          className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
+                            signalCategoryTab === "keywords"
+                              ? "bg-white dark:bg-gray-850 shadow-sm border-brand-500 ring-2 ring-brand-500/20"
+                              : "bg-white/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 hover:bg-white dark:hover:bg-gray-800 shadow-2xs"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                                enabledLevels.keywords
+                                  ? "text-brand-600 dark:text-brand-400"
+                                  : "text-gray-300 dark:text-gray-600"
+                              }`}>
+                                02
+                              </span>
+                              <div className="min-w-0">
+                                <span className="block leading-tight font-bold text-xs text-gray-900 dark:text-white truncate">
+                                  Palabras Clave & Mercado
+                                </span>
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                  Menciones y Noticias
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Checkbox de activación / desactivación */}
+                            <button
+                              type="button"
+                              onClick={(e) => toggleLevelEnabled("keywords", e)}
+                              className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer shrink-0"
+                              title={enabledLevels.keywords ? "Desactivar Nivel 02" : "Activar Nivel 02"}
+                            >
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                enabledLevels.keywords
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                  : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                              }`}>
+                                {enabledLevels.keywords ? "✓ Activo" : "Omitido"}
+                              </span>
+                              <div
+                                className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all ${
+                                  enabledLevels.keywords
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "border-2 border-gray-300 dark:border-gray-600 text-transparent"
+                                }`}
+                              >
+                                ✓
+                              </div>
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">
+                            Detecta menciones en LinkedIn y noticias públicas de mercado cruzadas con tu ICP.
+                          </p>
+                        </div>
+
+                        {/* CARD 03: DISPARADORES DE ICP */}
+                        <div
+                          onClick={() => {
+                            setSignalCategoryTab("icp_triggers");
+                            if (selectedIcpSignals.length === 0) {
+                              setSelectedIcpSignals(["new_in_role"]);
+                            }
+                            setNewType(selectedIcpSignals[0] || "new_in_role");
+                          }}
+                          className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
+                            signalCategoryTab === "icp_triggers"
+                              ? "bg-white dark:bg-gray-850 shadow-sm border-brand-500 ring-2 ring-brand-500/20"
+                              : "bg-white/70 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-700 hover:bg-white dark:hover:bg-gray-800 shadow-2xs"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`text-2xl sm:text-3xl font-black tracking-tight shrink-0 select-none transition-colors ${
+                                enabledLevels.icp_triggers
+                                  ? "text-brand-600 dark:text-brand-400"
+                                  : "text-gray-300 dark:text-gray-600"
+                              }`}>
+                                03
+                              </span>
+                              <div className="min-w-0">
+                                <span className="block leading-tight font-bold text-xs text-gray-900 dark:text-white truncate">
+                                  Disparadores de ICP
+                                </span>
+                                <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                  100% Automático (Cero URLs)
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Checkbox de activación / desactivación */}
+                            <button
+                              type="button"
+                              onClick={(e) => toggleLevelEnabled("icp_triggers", e)}
+                              className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer shrink-0"
+                              title={enabledLevels.icp_triggers ? "Desactivar Nivel 03" : "Activar Nivel 03"}
+                            >
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                enabledLevels.icp_triggers
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                  : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                              }`}>
+                                {enabledLevels.icp_triggers ? "✓ Activo" : "Omitido"}
+                              </span>
+                              <div
+                                className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold transition-all ${
+                                  enabledLevels.icp_triggers
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "border-2 border-gray-300 dark:border-gray-600 text-transparent"
+                                }`}
+                              >
+                                ✓
+                              </div>
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">
+                            Detecta cambios de cargo recientes, ascensos, contrataciones y visitantes de tu ICP.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* BANNER DINÁMICO: SUPER-MONITOR TODO EN UNO VS MONITOR ENFOCADO */}
+                      {isSuperMonitor ? (
+                        <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-500/10 via-brand-500/10 to-indigo-500/10 border border-purple-300/80 dark:border-purple-800/80 flex items-center justify-between text-xs gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-purple-600 to-brand-500 text-white shadow-xs font-black text-sm shrink-0">
+                              ⚡
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-gray-900 dark:text-white font-bold leading-tight">
+                                Super-Monitor Todo en Uno Activo ({activeLevelsCount} de 3 Niveles Seleccionados)
+                              </p>
+                              <p className="text-gray-600 dark:text-gray-400 text-[11px] truncate">
+                                Escaneo simultáneo de {[
+                                  enabledLevels.posts && "Posts (Nivel 1)",
+                                  enabledLevels.keywords && "Palabras Clave (Nivel 2)",
+                                  enabledLevels.icp_triggers && "ICP Triggers (Nivel 3)"
+                                ].filter(Boolean).join(" + ")}. Todos los prospectos se unificarán en tu radar.
+                              </p>
+                            </div>
+                          </div>
+                          <span className="hidden sm:inline-block text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 px-2.5 py-1 rounded-full border border-purple-200 dark:border-purple-800 shrink-0">
+                            Radar 360° Multiseñal
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-2xl bg-brand-50/50 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-800 flex items-center justify-between text-xs gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-500 text-white shadow-xs font-bold text-sm shrink-0">
+                              🎯
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-gray-900 dark:text-white font-bold leading-tight">
+                                Monitor Enfocado (1 Nivel Activo: {enabledLevels.posts ? "Nivel 01 Post en Linkedin" : enabledLevels.keywords ? "Nivel 02 Palabras Clave" : "Nivel 03 ICP Triggers"})
+                              </p>
+                              <p className="text-gray-600 dark:text-gray-400 text-[11px] truncate">
+                                Marca las casillas de los otros niveles si quieres escanearlos juntos en un Super-Monitor.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* =========================================================
@@ -3022,6 +3290,28 @@ export default function SignalsPage({
                     ========================================================= */}
                     {signalCategoryTab === "posts" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
+                        {/* AVISO SI ESTE NIVEL ESTÁ DESACTIVADO */}
+                        {!enabledLevels.posts && (
+                          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 min-w-0">
+                              <RiShieldCheckLine size={20} className="text-amber-600 shrink-0" />
+                              <div>
+                                <strong className="block font-bold">Nivel 01 (Post en Linkedin) está actualmente omitido</strong>
+                                <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                                  Puedes configurar tus posts aquí, pero no se escanearán en este monitor a menos que actives su casilla.
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleLevelEnabled("posts")}
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all"
+                            >
+                              ✓ Activar este Nivel
+                            </button>
+                          </div>
+                        )}
+
                         {/* Selector de modo: Buscador Inteligente vs Mis Posts vs Manual */}
                         <div className="flex items-center justify-between border-b border-gray-300 dark:border-gray-700 pb-3 flex-wrap gap-2">
                           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-xs">
@@ -4128,6 +4418,28 @@ export default function SignalsPage({
                        ========================================================= */}
                     {signalCategoryTab === "keywords" && (
                       <div className="space-y-5 animate-in fade-in duration-150">
+                        {/* AVISO SI ESTE NIVEL ESTÁ DESACTIVADO */}
+                        {!enabledLevels.keywords && (
+                          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 min-w-0">
+                              <RiShieldCheckLine size={20} className="text-amber-600 shrink-0" />
+                              <div>
+                                <strong className="block font-bold">Nivel 02 (Palabras Clave & Mercado) está actualmente omitido</strong>
+                                <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                                  Tus términos y eventos configurados no se escanearán a menos que actives la casilla de este nivel.
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleLevelEnabled("keywords")}
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all"
+                            >
+                              ✓ Activar este Nivel
+                            </button>
+                          </div>
+                        )}
+
                         {/* 1. Palabras Clave de Intención de Compra */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
@@ -4351,6 +4663,28 @@ export default function SignalsPage({
                        ========================================================= */}
                     {signalCategoryTab === "icp_triggers" && (
                       <div className="space-y-4 animate-in fade-in duration-150">
+                        {/* AVISO SI ESTE NIVEL ESTÁ DESACTIVADO */}
+                        {!enabledLevels.icp_triggers && (
+                          <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-200 min-w-0">
+                              <RiShieldCheckLine size={20} className="text-amber-600 shrink-0" />
+                              <div>
+                                <strong className="block font-bold">Nivel 03 (Disparadores de ICP) está actualmente omitido</strong>
+                                <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                                  Las señales de cambio de cargo, ascensos o contrataciones no se rastrearán a menos que actives la casilla de este nivel.
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleLevelEnabled("icp_triggers")}
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all"
+                            >
+                              ✓ Activar este Nivel
+                            </button>
+                          </div>
+                        )}
+
                         {/* Cabecera de los 6 disparadores */}
                         <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 shadow-xs space-y-3">
                           <div className="flex items-center justify-between">
@@ -4912,7 +5246,9 @@ export default function SignalsPage({
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">
                           <span className="text-xs text-gray-400 block font-medium">Señal Elegida</span>
                           <strong className="text-brand-600 truncate block">
-                            {SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title}
+                            {isSuperMonitor
+                              ? `⚡ Super-Monitor (${activeLevelsCount} Niveles)`
+                              : (SIGNAL_DEFINITIONS.find((s) => s.id === newType)?.title || "Señales")}
                           </strong>
                         </div>
                         <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-850 border border-gray-200 dark:border-gray-700">

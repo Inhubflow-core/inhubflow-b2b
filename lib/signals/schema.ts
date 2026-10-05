@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 
 export const SIGNAL_TYPES = [
+  "super_monitor",
   "post_engagement",
   "competitor_reactions",
   "high_intent_comments",
@@ -41,6 +42,7 @@ export interface SignalIcpFilters {
   result_limit?: number;
   source_strategy?: "linkedin" | "web" | "hybrid";
   event_kinds?: string[];
+  active_levels?: ("posts" | "keywords" | "icp_triggers")[];
   exclude_author_employees?: boolean;
   prioritize_high_intent_comments?: boolean;
 }

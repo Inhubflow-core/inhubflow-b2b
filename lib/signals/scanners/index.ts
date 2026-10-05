@@ -807,6 +807,71 @@ export async function scanRealSignals(
 ): Promise<SignalScanResult> {
   if (context.shouldAbort?.()) throw new SignalScanError("Investigación cancelada", "provider_error", false);
   const webTypes = ["funding_round", "company_news", "acquisition_event", "industry_event"];
+
+  // 1. Orquestación de Super-Monitor (Multi-Nivel: Posts, Palabras Clave y/o Disparadores de ICP)
+  const activeLevels = context.icp.active_levels || [];
+  if (context.monitor.type === "super_monitor" || activeLevels.length > 1) {
+    const tasks: Promise<SignalScanResult>[] = [];
+
+    // Nivel 1: Publicaciones en LinkedIn
+    if (activeLevels.includes("posts") || (!activeLevels.length && Boolean(context.monitor.target_url))) {
+      tasks.push(
+        scanPostEngagement(client, {
+          ...context,
+          monitor: { ...context.monitor, type: "post_engagement" },
+        })
+      );
+    }
+
+    // Nivel 2: Palabras Clave y Mercado
+    if (activeLevels.includes("keywords") || (!activeLevels.length && (context.keywords.length > 0 || Boolean(context.monitor.competitor_name)))) {
+      const kwContext: SignalScannerContext = {
+        ...context,
+        monitor: { ...context.monitor, type: "keyword_intent" },
+      };
+      if (context.icp.source_strategy === "web" && webClient) {
+        tasks.push(scanWebSignals(webClient, client, kwContext));
+      } else if (context.icp.source_strategy === "hybrid" && webClient) {
+        tasks.push(scanPosts(client, kwContext, false));
+        tasks.push(scanWebSignals(webClient, client, kwContext));
+      } else {
+        tasks.push(scanPosts(client, kwContext, false));
+      }
+
+      // Eventos de noticias de mercado si están activados
+      const webEvents = (context.icp.event_kinds || []).filter((k) => webTypes.includes(k));
+      for (const webEv of webEvents) {
+        if (webClient) {
+          tasks.push(scanWebSignals(webClient, client, { ...context, monitor: { ...context.monitor, type: webEv as SignalType } }));
+        }
+      }
+    }
+
+    // Nivel 3: Disparadores de ICP (Cero URLs, Automático)
+    if (activeLevels.includes("icp_triggers") || (!activeLevels.length && context.monitor.type === "super_monitor")) {
+      const icpSignals = (context.icp.event_kinds || []).filter((k) => !webTypes.includes(k));
+      if (icpSignals.length > 0) {
+        for (const sig of icpSignals) {
+          tasks.push(scanSingleSignalType(client, context, sig));
+        }
+      } else {
+        tasks.push(scanRoleChanges(client, { ...context, monitor: { ...context.monitor, type: "new_in_role" } }));
+      }
+    }
+
+    if (tasks.length > 0) {
+      const settled = await Promise.allSettled(tasks);
+      const successful = settled
+        .filter((r): r is PromiseFulfilledResult<SignalScanResult> => r.status === "fulfilled")
+        .map((r) => r.value);
+      if (successful.length > 0) {
+        return mergeScanResults(successful, context.limit);
+      }
+      const firstError = settled.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      throw firstError?.reason instanceof Error ? firstError.reason : new SignalScanError("Ninguna de las fuentes activas del Super-Monitor respondió", "provider_error", true);
+    }
+  }
+
   if (webTypes.includes(context.monitor.type)) {
     if (!webClient) throw new SignalScanError("La fuente web complementaria no está configurada", "unsupported_capability", false);
     return scanWebSignals(webClient, client, context);
