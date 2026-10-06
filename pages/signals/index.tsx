@@ -591,6 +591,10 @@ export default function SignalsPage({
   };
   const [selectedIcpSignals, setSelectedIcpSignals] = useState<string[]>(["new_in_role"]);
   const handleToggleIcpSignal = (id: string) => {
+    if ((id === "company_growth" || id === "profile_viewers") && accountCapabilities && !accountCapabilities.salesNavigator) {
+      toast.error("Este disparador requiere una cuenta con LinkedIn Sales Navigator");
+      return;
+    }
     setSelectedIcpSignals((prev) =>
       prev.includes(id) ? (prev.length > 1 ? prev.filter((item) => item !== id) : prev) : [...prev, id]
     );
@@ -1014,9 +1018,15 @@ export default function SignalsPage({
       if (enabledLevels.posts) {
         const isAllMyPostsActive = postSearchMode === "my_posts" && isAutoAllMyPosts;
         if (!isAllMyPostsActive && !newTargetUrl.trim() && selectedPostUrls.length === 0) {
-          toast.error("En el Nivel 01 (Post en Linkedin) debes configurar al menos una publicación o activar el monitoreo automático");
-          setSignalCategoryTab("posts");
-          return;
+          // Si el usuario tiene activo Nivel 2 o Nivel 3 válidos y está en otra pestaña, omitir Nivel 1 silenciosamente
+          if ((enabledLevels.keywords && (keywordsList.length > 0 || customKeywordInput.trim() || newCompetitor.trim() || selectedMarketEvents.length > 0)) ||
+              (enabledLevels.icp_triggers && selectedIcpSignals.length > 0)) {
+            setEnabledLevels((prev) => ({ ...prev, posts: false }));
+          } else {
+            toast.error("En el Nivel 01 (Post en Linkedin) debes configurar al menos una publicación o activar el monitoreo automático");
+            setSignalCategoryTab("posts");
+            return;
+          }
         }
       }
       if (enabledLevels.keywords) {
@@ -1033,9 +1043,13 @@ export default function SignalsPage({
           setCustomKeywordInput("");
         }
         if (currentKws.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
-          toast.error("En el Nivel 02 (Palabras Clave & Mercado) debes agregar al menos una palabra clave o evento de mercado");
-          setSignalCategoryTab("keywords");
-          return;
+          if (enabledLevels.icp_triggers && selectedIcpSignals.length > 0) {
+            setEnabledLevels((prev) => ({ ...prev, keywords: false }));
+          } else {
+            toast.error("En el Nivel 02 (Palabras Clave & Mercado) debes agregar al menos una palabra clave o evento de mercado");
+            setSignalCategoryTab("keywords");
+            return;
+          }
         }
       }
       if (enabledLevels.icp_triggers) {
@@ -3213,6 +3227,7 @@ export default function SignalsPage({
                           onClick={() => {
                             setSignalCategoryTab("posts");
                             setNewType("post_engagement");
+                            setEnabledLevels((prev) => ({ ...prev, posts: true }));
                           }}
                           className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
                             signalCategoryTab === "posts"
@@ -3275,6 +3290,14 @@ export default function SignalsPage({
                           onClick={() => {
                             setSignalCategoryTab("keywords");
                             setNewType("keyword_intent");
+                            setEnabledLevels((prev) => {
+                              const isPostsEmpty = !newTargetUrl.trim() && selectedPostUrls.length === 0 && !(postSearchMode === "my_posts" && isAutoAllMyPosts);
+                              return {
+                                ...prev,
+                                keywords: true,
+                                ...(isPostsEmpty ? { posts: false } : {}),
+                              };
+                            });
                           }}
                           className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
                             signalCategoryTab === "keywords"
@@ -3340,6 +3363,14 @@ export default function SignalsPage({
                               setSelectedIcpSignals(["new_in_role"]);
                             }
                             setNewType(selectedIcpSignals[0] || "new_in_role");
+                            setEnabledLevels((prev) => {
+                              const isPostsEmpty = !newTargetUrl.trim() && selectedPostUrls.length === 0 && !(postSearchMode === "my_posts" && isAutoAllMyPosts);
+                              return {
+                                ...prev,
+                                icp_triggers: true,
+                                ...(isPostsEmpty ? { posts: false } : {}),
+                              };
+                            });
                           }}
                           className={`group relative p-3.5 rounded-2xl transition-all cursor-pointer border select-none ${
                             signalCategoryTab === "icp_triggers"
@@ -4828,17 +4859,21 @@ export default function SignalsPage({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (selectedIcpSignals.length === 6) {
+                                  const maxCount = accountCapabilities?.salesNavigator ? 6 : 4;
+                                  if (selectedIcpSignals.length >= maxCount) {
                                     setSelectedIcpSignals(["new_in_role"]);
                                   } else {
-                                    setSelectedIcpSignals([
+                                    const available = [
                                       "new_in_role",
                                       "internal_promotion",
                                       "hiring_spree",
-                                      "company_growth",
-                                      "profile_viewers",
                                       "active_poster",
-                                    ]);
+                                      ...(accountCapabilities?.salesNavigator ? ["company_growth", "profile_viewers"] : []),
+                                    ];
+                                    setSelectedIcpSignals(available);
+                                    if (accountCapabilities && !accountCapabilities.salesNavigator) {
+                                      toast.info("Se seleccionaron los 4 disparadores compatibles con tu cuenta");
+                                    }
                                   }
                                 }}
                                 className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"

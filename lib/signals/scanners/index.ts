@@ -624,71 +624,96 @@ function parseExperienceStart(value: string | null | undefined): number | null {
 
 async function scanRoleChanges(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
   const phrases = context.monitor.type === "internal_promotion"
-    ? ["promoted to", "ascendido a", "promovido a"]
-    : ["new role", "nuevo cargo", "nueva posición", "nuevo puesto"];
+    ? [
+        '"promoted to"',
+        '"ascendido a"',
+        '"promovido a"',
+        '"promovida a"',
+        '"promovido para"',
+        '"nuevo rol dentro de"',
+        '"nueva posición en"',
+        '"nova posição na"',
+      ]
+    : [
+        '"starting a new position"',
+        '"started a new position"',
+        '"new role as"',
+        '"nuevo cargo"',
+        '"nueva etapa"',
+        '"nuevo puesto"',
+        '"nuevo rol"',
+        '"novo cargo"',
+        '"nova posição"',
+        '"happy to share that I have joined"',
+        '"feliz de anunciar"',
+      ];
+
   const { posts, cursor } = await postSearch(client, context, {
     keywords: phrases.join(" OR "),
     sort_by: "date",
     date_posted: "past_month",
-    ...(context.icp.titles?.length ? { author: { keywords: context.icp.titles.join(" OR ") } } : {}),
   });
   const leads: DiscoveredSignalLead[] = [];
   const maxAge = Math.max(1, context.icp.time_window_days || 90) * 86_400_000;
   for (const post of posts.slice(0, context.limit)) {
     const url = profileUrl(post.author?.public_identifier);
     if (!url || !post.author?.name) continue;
+
+    let profile: UnipileProfile | null = null;
     try {
-      const profile = await client.resolveProfile(url, context.remoteAccountId);
-      const current = profile.work_experience?.find((item) => item.current) || profile.work_experience?.[0];
-      const prior = profile.work_experience?.find((item) => item !== current);
-      const started = parseExperienceStart(current?.start);
-      if (started && Date.now() - started > maxAge) continue;
-
-      const headline = profile.headline || post.author?.headline || "";
-      const inferredCompany = extractCompanyFromHeadline(headline);
-      const company = current?.company || inferredCompany || null;
-
-      // Determinación de promoción interna:
-      // 1. Por historial de work_experience si está disponible
-      // 2. O por texto del post si anuncia explícitamente ascenso interno cuando la experiencia está vacía
-      let internal = false;
-      if (current?.company && prior?.company) {
-        internal = current.company.toLowerCase() === prior.company.toLowerCase();
-      } else {
-        const postText = (post.text || "").toLowerCase();
-        internal = /promoted\s+to|ascendido\s+a|promovido\s+a|nuevo\s+rol\s+dentro\s+de|nueva\s+posici[oó]n\s+en/i.test(postText);
-      }
-
-      if (context.monitor.type === "internal_promotion" && !internal) continue;
-
-      const lead = authorLead({
-        monitorId: context.monitor.id,
-        signalType: context.monitor.type,
-        sourceType: "role_announcement_post",
-        sourceId: post.social_id || post.id,
-        sourceUrl: post.share_url,
-        occurredAt: post.parsed_datetime || (started ? new Date(started).toISOString() : null),
-        snippet: post.text?.slice(0, 300) || (internal ? "Ascenso interno reciente" : "Cambio de cargo reciente"),
-        id: profile.provider_id,
-        publicIdentifier: profile.public_identifier || post.author?.public_identifier,
-        name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || post.author?.name,
-        headline: headline || current?.position || null,
-        explicitProfileUrl: profile.public_profile_url || profile.profile_url || url,
-        metadata: {
-          currentRole: current || null,
-          previousRole: prior || null,
-          internalPromotion: internal,
-          throttledExperience: Boolean(profile.throttled_sections?.includes("experience") || !profile.work_experience?.length),
-          resolvedProfile: profile,
-        },
-      });
-      if (lead) {
-        lead.company = company;
-        lead.location = profile.location || current?.location || null;
-        leads.push(lead);
-      }
+      profile = await client.resolveProfile(url, context.remoteAccountId);
     } catch {
-      // A profile that cannot be verified is not emitted as a role-change lead.
+      profile = null;
+    }
+
+    const current = profile?.work_experience?.find((item) => item.current) || profile?.work_experience?.[0];
+    const prior = profile?.work_experience?.find((item) => item !== current);
+    const started = parseExperienceStart(current?.start);
+    if (started && Date.now() - started > maxAge) continue;
+
+    const headline = profile?.headline || post.author?.headline || "";
+    const inferredCompany = extractCompanyFromHeadline(headline);
+    const company = current?.company || inferredCompany || null;
+
+    // Determinación de promoción interna:
+    // 1. Por historial de work_experience si está disponible
+    // 2. O por texto del post si anuncia explícitamente ascenso interno cuando la experiencia está vacía
+    let internal = false;
+    if (current?.company && prior?.company) {
+      internal = current.company.toLowerCase() === prior.company.toLowerCase();
+    } else {
+      const postText = (post.text || "").toLowerCase();
+      internal = /promoted\s+to|ascendido\s+a|promovido\s+a|promovida\s+a|nuevo\s+rol\s+dentro\s+de|nueva\s+posici[oó]n\s+en|nova\s+posi[cç][aã]o\s+na/i.test(postText);
+    }
+
+    if (context.monitor.type === "internal_promotion" && !internal) continue;
+
+    const lead = authorLead({
+      monitorId: context.monitor.id,
+      signalType: context.monitor.type,
+      sourceType: "role_announcement_post",
+      sourceId: post.social_id || post.id,
+      sourceUrl: post.share_url,
+      occurredAt: post.parsed_datetime || (started ? new Date(started).toISOString() : null),
+      snippet: post.text?.slice(0, 300) || (internal ? "Ascenso interno reciente" : "Cambio de cargo reciente"),
+      id: profile?.provider_id || post.author?.id,
+      publicIdentifier: profile?.public_identifier || post.author?.public_identifier,
+      name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || post.author?.name,
+      headline: headline || current?.position || null,
+      explicitProfileUrl: profile?.public_profile_url || profile?.profile_url || url,
+      profileImageUrl: profile?.profile_picture_url || post.author?.profile_picture_url || null,
+      metadata: {
+        currentRole: current || null,
+        previousRole: prior || null,
+        internalPromotion: internal,
+        throttledExperience: Boolean(profile?.throttled_sections?.includes("experience") || !profile?.work_experience?.length),
+        resolvedProfile: profile,
+      },
+    });
+    if (lead) {
+      lead.company = company;
+      lead.location = profile?.location || current?.location || null;
+      leads.push(lead);
     }
   }
   return { leads, cursor: { cursor } };
@@ -716,39 +741,60 @@ async function peopleAtCompanies(
   locationIds: string[] = []
 ): Promise<DiscoveredSignalLead[]> {
   const leads: DiscoveredSignalLead[] = [];
+  const effectiveTitles = (context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t));
   for (const company of companies.slice(0, 5)) {
-    const response = await client.searchLinkedIn({
-      account_id: context.remoteAccountId,
-      api: context.hasSalesNavigator ? "sales_navigator" : "classic",
-      category: "people",
-      limit: Math.min(10, context.limit),
-      ...(context.hasSalesNavigator
-        ? {
-            company: { include: [company.id] },
-            ...(context.icp.titles?.length ? { keywords: context.icp.titles.join(" OR ") } : {}),
-            ...(locationIds.length ? { location: { include: locationIds } } : {}),
-          }
-        : {
-            company: [company.id],
-            ...(context.icp.titles?.length ? { advanced_keywords: { title: context.icp.titles.join(" OR ") } } : {}),
-            ...(locationIds.length ? { location: locationIds } : {}),
-          }),
-    });
-    for (const person of response.items.filter(isPerson)) {
-      const lead = searchPersonLead(context.monitor.id, signalType, person, `${company.name} tiene vacantes o crecimiento activo`);
-      if (lead) {
-        lead.company = lead.company || company.name;
-        lead.companySize = company.headcount || null;
-        lead.evidence.sourceType = signalType === "company_growth" ? "company_growth_search" : "company_hiring_search";
-        lead.evidence.sourceId = company.id;
-        lead.evidence.sourceUrl = company.profile_url || null;
-        lead.evidence.metadata = {
-          companyId: company.id,
-          jobOffers: company.job_offers_count || null,
-          headcountGrowth: company.headcount_growth || null,
-        };
-        leads.push(lead);
+    try {
+      let response = await client.searchLinkedIn({
+        account_id: context.remoteAccountId,
+        api: context.hasSalesNavigator ? "sales_navigator" : "classic",
+        category: "people",
+        limit: Math.min(10, context.limit),
+        ...(context.hasSalesNavigator
+          ? {
+              company: { include: [company.id] },
+              ...(effectiveTitles.length ? { keywords: effectiveTitles.join(" OR ") } : {}),
+              ...(locationIds.length ? { location: { include: locationIds } } : {}),
+            }
+          : {
+              company: [company.id],
+              ...(effectiveTitles.length ? { advanced_keywords: { title: effectiveTitles.join(" OR ") } } : {}),
+              ...(locationIds.length ? { location: locationIds } : {}),
+            }),
+      });
+
+      // Fallback para Classic si no devuelve prospectos con company.id
+      if (!context.hasSalesNavigator && (!response.items || response.items.filter(isPerson).length === 0) && company.name) {
+        response = await client.searchLinkedIn({
+          account_id: context.remoteAccountId,
+          api: "classic",
+          category: "people",
+          limit: Math.min(10, context.limit),
+          advanced_keywords: {
+            company: company.name,
+            ...(effectiveTitles.length ? { title: effectiveTitles.join(" OR ") } : {}),
+          },
+          ...(locationIds.length ? { location: locationIds } : {}),
+        });
       }
+
+      for (const person of response.items.filter(isPerson)) {
+        const lead = searchPersonLead(context.monitor.id, signalType, person, `${company.name} tiene vacantes o crecimiento activo`);
+        if (lead) {
+          lead.company = lead.company || company.name;
+          lead.companySize = company.headcount || null;
+          lead.evidence.sourceType = signalType === "company_growth" ? "company_growth_search" : "company_hiring_search";
+          lead.evidence.sourceId = company.id;
+          lead.evidence.sourceUrl = company.profile_url || null;
+          lead.evidence.metadata = {
+            companyId: company.id,
+            jobOffers: company.job_offers_count || null,
+            headcountGrowth: company.headcount_growth || null,
+          };
+          leads.push(lead);
+        }
+      }
+    } catch (err) {
+      console.warn(`[SignalRadar] No se pudieron obtener decisores para la empresa ${company.name}:`, err);
     }
   }
   return leads;
@@ -764,13 +810,20 @@ async function scanCompanies(client: SignalScannerClient, context: SignalScanner
     ...(context.icp.company ? [context.icp.company] : []),
     ...(context.icp.industries || []),
   ].filter(Boolean);
+  const effectiveKeywords = companyKeywords.length > 0
+    ? companyKeywords
+    : ((context.icp.industries && context.icp.industries.length > 0)
+        ? context.icp.industries
+        : ((context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t)).length > 0
+            ? (context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t))
+            : ["Software", "Tecnología", "B2B", "Servicios"]));
   const response = await client.searchLinkedIn({
     account_id: context.remoteAccountId,
     api: growth ? "sales_navigator" : "classic",
     category: "companies",
     limit: Math.min(25, context.limit),
     cursor: context.cursor?.cursor || undefined,
-    ...(companyKeywords.length ? { keywords: companyKeywords.join(" OR ") } : {}),
+    keywords: effectiveKeywords.join(" OR "),
     ...(locationIds.length ? (growth ? { location: { include: locationIds } } : { location: locationIds }) : {}),
     ...(growth ? { headcount_growth: { min: 20 } } : { has_job_offers: true }),
   });

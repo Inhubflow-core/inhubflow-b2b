@@ -843,6 +843,20 @@ export function isAuthorEmployeeOrAffiliate(
   lead: DiscoveredSignalLead,
   metadata?: Record<string, unknown> | null
 ): boolean {
+  // En señales directas de decisor (Nivel 3: new_in_role, internal_promotion, active_poster, hiring_spree, company_growth, profile_viewers, job_changes),
+  // el prospecto buscado es precisamente el decisor; no es un comentarista con auto-bombo en post ajeno.
+  if ([
+    "new_in_role",
+    "internal_promotion",
+    "active_poster",
+    "job_changes",
+    "profile_viewers",
+    "hiring_spree",
+    "company_growth",
+  ].includes(lead.signalType)) {
+    return false;
+  }
+
   const meta = metadata || lead.evidence?.metadata || {};
   const snippet = lead.evidence?.snippet || "";
   const snippetAuthorMatch = snippet.match(/(?:post|publicaci[oó]n) de ([^:\n"]+):/i);
