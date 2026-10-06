@@ -373,9 +373,27 @@ const TITLE_SYNONYMS: Record<string, string[]> = {
   ],
 };
 
+export function isAllOrWildcardTitle(title?: string | null): boolean {
+  if (!title) return true;
+  const n = normalize(title);
+  return (
+    !n ||
+    n === "todos" ||
+    n === "all" ||
+    n === "cualquiera" ||
+    n === "cualquier cargo" ||
+    n === "sin filtrar" ||
+    n.includes("todos") ||
+    n.includes("sin filtrar")
+  );
+}
+
 export function expandTitleCriteria(titles: string[]): string[] {
   const result = new Set<string>();
-  for (const rawTitle of titles) {
+  const effectiveTitles = (titles || []).filter((t) => !isAllOrWildcardTitle(t));
+  if (effectiveTitles.length === 0) return [];
+
+  for (const rawTitle of effectiveTitles) {
     const norm = normalize(rawTitle);
     if (!norm) continue;
     result.add(rawTitle);
@@ -927,17 +945,16 @@ export function passesIcp(lead: DiscoveredSignalLead, icp: SignalIcpFilters): bo
 
   // 2. Cargos: con expansión semántica inteligente (inglés/español)
   if (icp.titles?.length) {
-    const isAllTitles = icp.titles.some((t) => {
-      const n = normalize(t);
-      return n === "todos" || n === "all" || n === "cualquiera" || n === "cualquier cargo" || n.includes("todos");
-    });
+    const isAllTitles = icp.titles.some(isAllOrWildcardTitle);
 
     if (!isAllTitles) {
       if (!lead.headline) return false;
       const expandedTitles = expandTitleCriteria(icp.titles);
-      const matchesTitle = containsAny(lead.headline, expandedTitles);
-      if (!matchesTitle) {
-        return false;
+      if (expandedTitles.length > 0) {
+        const matchesTitle = containsAny(lead.headline, expandedTitles);
+        if (!matchesTitle) {
+          return false;
+        }
       }
     }
   }

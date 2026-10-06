@@ -752,9 +752,20 @@ export default function SignalsPage({
   };
 
   const handleAddKeyword = (kw: string) => {
-    const k = kw.trim();
-    if (k && !keywordsList.includes(k)) {
-      setKeywordsList([...keywordsList, k]);
+    if (!kw) return;
+    const splitKws = kw
+      .split(/[,;\n]+/)
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    if (splitKws.length > 0) {
+      setKeywordsList((prev) => {
+        const next = [...prev];
+        for (const item of splitKws) {
+          if (!next.includes(item)) next.push(item);
+        }
+        return next;
+      });
     }
     setCustomKeywordInput("");
   };
@@ -1009,7 +1020,19 @@ export default function SignalsPage({
         }
       }
       if (enabledLevels.keywords) {
-        if (keywordsList.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
+        let currentKws = [...keywordsList];
+        if (customKeywordInput.trim()) {
+          const splitKws = customKeywordInput
+            .split(/[,;\n]+/)
+            .map((k) => k.trim())
+            .filter(Boolean);
+          for (const item of splitKws) {
+            if (!currentKws.includes(item)) currentKws.push(item);
+          }
+          setKeywordsList(currentKws);
+          setCustomKeywordInput("");
+        }
+        if (currentKws.length === 0 && !newCompetitor.trim() && selectedMarketEvents.length === 0) {
           toast.error("En el Nivel 02 (Palabras Clave & Mercado) debes agregar al menos una palabra clave o evento de mercado");
           setSignalCategoryTab("keywords");
           return;
@@ -1460,6 +1483,16 @@ export default function SignalsPage({
     if (enabledLevels.keywords) activeLevelsArray.push("keywords");
     if (enabledLevels.icp_triggers) activeLevelsArray.push("icp_triggers");
 
+    // Auto-commit de cualquier palabra clave pendiente en el input
+    const pendingKws = customKeywordInput.trim()
+      ? customKeywordInput.split(/[,;\n]+/).map((k) => k.trim()).filter(Boolean)
+      : [];
+    const effectiveKeywordsList = Array.from(new Set([...keywordsList, ...pendingKws]));
+    if (pendingKws.length > 0) {
+      setKeywordsList(effectiveKeywordsList);
+      setCustomKeywordInput("");
+    }
+
     let effectiveType = newType;
     if (activeLevelsArray.length > 1) {
       effectiveType = "super_monitor";
@@ -1468,9 +1501,11 @@ export default function SignalsPage({
       else if (extractComments && !extractReactions) effectiveType = "high_intent_comments";
       else if (!extractComments && extractReactions) effectiveType = "competitor_reactions";
     } else if (enabledLevels.keywords) {
-      if (selectedMarketEvents.length > 0) {
+      if (effectiveKeywordsList.length > 0) {
+        effectiveType = "keyword_intent";
+      } else if (selectedMarketEvents.length > 0) {
         effectiveType = selectedMarketEvents[0];
-      } else if (newCompetitor.trim() && keywordsList.length === 0) {
+      } else if (newCompetitor.trim()) {
         effectiveType = "competitor_audience";
       } else {
         effectiveType = "keyword_intent";
@@ -1526,7 +1561,7 @@ export default function SignalsPage({
         ? `Radar Inbound: Todas mis publicaciones (${myAccountInfo?.name || "LinkedIn"})`
         : enabledLevels.icp_triggers
         ? `${def?.title || "Radar ICP"} - ${icpTitles.slice(0, 2).join(", ") || icpCountry}`
-        : `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || keywordsList[0] || "ICP"}`);
+        : `${def?.title || "Radar"} - ${newCompetitor.trim() || postSearchCompetitor.trim() || effectiveKeywordsList[0] || "ICP"}`);
 
     const targetUrlToSend = isAllMyPostsActive
       ? "ALL_MY_POSTS"
@@ -1553,7 +1588,7 @@ export default function SignalsPage({
             type: effectiveType,
             competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
             target_url: enabledLevels.posts ? targetUrlToSend : undefined,
-            keywords: enabledLevels.keywords ? keywordsList : [],
+            keywords: enabledLevels.keywords ? effectiveKeywordsList : [],
             icp_filters: {
               titles: icpTitles,
               locations: icpLocations,
@@ -1608,7 +1643,7 @@ export default function SignalsPage({
           type: effectiveType,
           competitor_name: newCompetitor.trim() || postSearchCompetitor.trim() || undefined,
           target_url: enabledLevels.posts ? targetUrlToSend : undefined,
-          keywords: enabledLevels.keywords ? keywordsList : [],
+          keywords: enabledLevels.keywords ? effectiveKeywordsList : [],
           icp_filters: {
             titles: icpTitles,
             locations: icpLocations,
@@ -4575,7 +4610,12 @@ export default function SignalsPage({
                                     handleAddKeyword(customKeywordInput);
                                   }
                                 }}
-                                placeholder="Escribe una frase y pulsa Enter (ej: 'busco CRM', 'alternativa a Lemlist')..."
+                                onBlur={() => {
+                                  if (customKeywordInput.trim()) {
+                                    handleAddKeyword(customKeywordInput);
+                                  }
+                                }}
+                                placeholder="Escribe palabras clave o frases (puedes separar por comas: ej. 'automatización de ventas, prospección B2B')..."
                                 className="w-full rounded-xl border border-gray-300 bg-white pl-10 pr-8 py-2.5 text-sm text-gray-900 shadow-xs transition-all placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-brand-500"
                               />
                               {customKeywordInput && (

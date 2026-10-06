@@ -19,6 +19,7 @@ import {
   evidenceFingerprint,
   extractCompanyFromHeadline,
   expandTitleCriteria,
+  isAllOrWildcardTitle,
   isAnonymousLinkedInMember,
   isAnonymousOrInvalidLinkedInUrl,
   classifyCommentIntent,
@@ -506,7 +507,8 @@ async function scanPostEngagement(client: SignalScannerClient, context: SignalSc
 async function scanPosts(client: SignalScannerClient, context: SignalScannerContext, activeOnly: boolean): Promise<SignalScanResult> {
   const keywords = context.keywords.filter(Boolean);
   const targetIndustries = [context.icp.company, ...(context.icp.industries || [])].filter(Boolean) as string[];
-  const query = keywords.join(" OR ") || targetIndustries.join(" OR ") || context.monitor.competitor_name || context.icp.titles?.join(" OR ") || "B2B";
+  const effectiveTitlesForQuery = (context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t));
+  const query = keywords.join(" OR ") || targetIndustries.join(" OR ") || context.monitor.competitor_name || effectiveTitlesForQuery.join(" OR ") || "B2B";
 
   let datePosted: "past_24h" | "past_week" | "past_month" | undefined;
   if (activeOnly) {
@@ -520,8 +522,8 @@ async function scanPosts(client: SignalScannerClient, context: SignalScannerCont
   }
 
   const locationIds = await resolveLocationIds(client, context);
-  const expandedTitles = context.icp.titles?.length
-    ? expandTitleCriteria(context.icp.titles)
+  const expandedTitles = effectiveTitlesForQuery.length
+    ? expandTitleCriteria(effectiveTitlesForQuery)
     : [];
   const { posts, cursor } = await postSearch(client, context, {
     keywords: query,

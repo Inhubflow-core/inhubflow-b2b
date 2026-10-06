@@ -27,7 +27,7 @@ const { scanRealSignals, accountHasSalesNavigator } = require("../lib/signals/sc
 const { deterministicAntiStalkerMessage, validateAntiStalkerMessage } = require("../lib/signals/message-template.ts");
 const { deterministicSignalResearchPlan } = require("../lib/signals/research-planner.ts");
 const { scanWebSignals, companyMatches, extractFoundersFromArticle, effectiveTitles } = require("../lib/signals/scanners/web.ts");
-const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch, classifyCommentIntent, passesIcp, isAuthorEmployeeOrAffiliate } = require("../lib/signals/scanners/scoring.ts");
+const { extractCompanyFromHeadline, hasIncompatibleScript, hasConflictingCountry, getB2bTermVariants, getPrimaryCityForCountry, hasRegionalLanguageMatch, classifyCommentIntent, passesIcp, isAuthorEmployeeOrAffiliate, isAllOrWildcardTitle, expandTitleCriteria } = require("../lib/signals/scanners/scoring.ts");
 const { WebSearchClient } = require("../lib/serper/client.ts");
 
 function baseDb() {
@@ -643,6 +643,26 @@ async function run() {
 
     console.log("▶ Coincidencia tolerante a acentos y lemas en posts de competidores validada");
     console.log("▶ Aislamiento estricto de posts del competidor (descarte de autores ajenos) validado");
+
+    // Validar tratamiento de títulos comodín ("Todos", "All", etc.)
+    assert.equal(isAllOrWildcardTitle("Todos"), true);
+    assert.equal(isAllOrWildcardTitle("Todos (Sin filtrar cargo)"), true);
+    assert.equal(isAllOrWildcardTitle("all"), true);
+    assert.equal(isAllOrWildcardTitle("cualquiera"), true);
+    assert.equal(isAllOrWildcardTitle("Cualquier cargo"), true);
+    assert.equal(isAllOrWildcardTitle("CEO"), false);
+    assert.equal(isAllOrWildcardTitle("Director de Ventas"), false);
+
+    assert.deepEqual(expandTitleCriteria(["Todos", "todos"]), []);
+    assert.deepEqual(expandTitleCriteria(["Todos (Sin filtrar cargo)"]), []);
+    assert.ok(expandTitleCriteria(["CEO"]).includes("ceo"));
+
+    // Validar separación de keywords por comas
+    const rawKws = "automatización de ventas, prospección B2B, contratar SDRs";
+    const parsedKws = rawKws.split(/[,;\n]+/).map((k) => k.trim()).filter(Boolean);
+    assert.deepEqual(parsedKws, ["automatización de ventas", "prospección B2B", "contratar SDRs"]);
+
+    console.log("▶ Filtro de cargos comodín ('Todos') y separación de palabras clave por comas validado");
   }
 
   console.log("✅ SIGNAL RADAR REAL, DEDUPLICADO E INTEGRADO VALIDADO");

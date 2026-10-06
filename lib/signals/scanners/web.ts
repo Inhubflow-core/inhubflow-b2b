@@ -1,7 +1,7 @@
 import type { SignalIcpFilters } from "../schema";
 import type { DiscoveredSignalLead, SignalScanResult, SignalScannerContext } from "./contracts";
 import { SignalScanError } from "./contracts";
-import { evidenceFingerprint, extractCompanyFromHeadline, companyMatches } from "./scoring";
+import { evidenceFingerprint, extractCompanyFromHeadline, companyMatches, isAllOrWildcardTitle } from "./scoring";
 import { type SignalScannerClient, resolveLocationIds } from "./index";
 import type { WebSearchClient, WebSearchResult } from "@/lib/serper/client";
 import type { UnipileSearchPerson } from "@/lib/unipile/types";
@@ -246,7 +246,8 @@ function locationQueryTerm(location: string): string {
 }
 
 function webQuery(context: SignalScannerContext): string {
-  const titles = context.icp.titles?.length ? `(${context.icp.titles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
+  const cleanTitles = (context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t));
+  const titles = cleanTitles.length ? `(${cleanTitles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
   const locations = (context.icp.locations || []).map(locationQueryTerm);
   const location = locations.length > 1 ? `(${locations.join(" OR ")})` : (locations[0] || "");
   const terms: Record<string, string> = {
