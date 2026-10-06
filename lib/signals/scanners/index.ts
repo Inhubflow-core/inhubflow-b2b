@@ -23,6 +23,7 @@ import {
   isAnonymousLinkedInMember,
   isAnonymousOrInvalidLinkedInUrl,
   classifyCommentIntent,
+  isSpanishCountry,
 } from "./scoring";
 import { scanWebSignals } from "./web";
 
@@ -522,14 +523,13 @@ async function scanPosts(client: SignalScannerClient, context: SignalScannerCont
   }
 
   const locationIds = await resolveLocationIds(client, context);
-  const expandedTitles = effectiveTitlesForQuery.length
-    ? expandTitleCriteria(effectiveTitlesForQuery)
-    : [];
+  const coreTitles = effectiveTitlesForQuery.slice(0, 3);
+  const authorKeywords = coreTitles.length > 0 ? coreTitles.join(" OR ") : undefined;
   const { posts, cursor } = await postSearch(client, context, {
     keywords: query,
     sort_by: "date",
     ...(datePosted ? { date_posted: datePosted } : {}),
-    ...(expandedTitles.length ? { author: { keywords: expandedTitles.join(" OR ") } } : {}),
+    ...(authorKeywords ? { author: { keywords: authorKeywords } } : {}),
     ...(locationIds.length ? { location: locationIds } : {}),
   });
   const cutoff = Date.now() - (activeOnly ? 48 : Math.max(1, context.icp.time_window_days || 7) * 24) * 3_600_000;
@@ -623,30 +623,16 @@ function parseExperienceStart(value: string | null | undefined): number | null {
 }
 
 async function scanRoleChanges(client: SignalScannerClient, context: SignalScannerContext): Promise<SignalScanResult> {
+  const targetCountry = (context.icp.locations && context.icp.locations[0]) || "";
+  const isSpanish = !targetCountry || isSpanishCountry(targetCountry);
+
   const phrases = context.monitor.type === "internal_promotion"
-    ? [
-        '"promoted to"',
-        '"ascendido a"',
-        '"promovido a"',
-        '"promovida a"',
-        '"promovido para"',
-        '"nuevo rol dentro de"',
-        '"nueva posición en"',
-        '"nova posição na"',
-      ]
-    : [
-        '"starting a new position"',
-        '"started a new position"',
-        '"new role as"',
-        '"nuevo cargo"',
-        '"nueva etapa"',
-        '"nuevo puesto"',
-        '"nuevo rol"',
-        '"novo cargo"',
-        '"nova posição"',
-        '"happy to share that I have joined"',
-        '"feliz de anunciar"',
-      ];
+    ? (isSpanish
+        ? ['"promovido a"', '"ascendido a"', '"promoted to"']
+        : ['"promoted to"', '"new role at"', '"promovido a"'])
+    : (isSpanish
+        ? ['"nuevo cargo"', '"nueva etapa"', '"new role"', '"starting a new position"']
+        : ['"starting a new position"', '"new role"', '"nuevo cargo"']);
 
   const { posts, cursor } = await postSearch(client, context, {
     keywords: phrases.join(" OR "),
@@ -655,9 +641,10 @@ async function scanRoleChanges(client: SignalScannerClient, context: SignalScann
   });
   const leads: DiscoveredSignalLead[] = [];
   const maxAge = Math.max(1, context.icp.time_window_days || 90) * 86_400_000;
-  for (const post of posts.slice(0, context.limit)) {
+  for (const post of posts) {
+    if (leads.length >= context.limit) break;
     const url = profileUrl(post.author?.public_identifier);
-    if (!url || !post.author?.name) continue;
+    if (!url || !post.author?.name || isAnonymousLinkedInMember(post.author.name)) continue;
 
     let profile: UnipileProfile | null = null;
     try {
@@ -756,14 +743,17 @@ async function peopleAtCompanies(
               ...(locationIds.length ? { location: { include: locationIds } } : {}),
             }
           : {
-              company: [company.id],
-              ...(effectiveTitles.length ? { advanced_keywords: { title: effectiveTitles.join(" OR ") } } : {}),
+              advanced_keywords: {
+                company: company.name,
+                ...(effectiveTitles.length ? { title: effectiveTitles[0] } : {}),
+              },
               ...(locationIds.length ? { location: locationIds } : {}),
             }),
       });
 
-      // Fallback para Classic si no devuelve prospectos con company.id
-      if (!context.hasSalesNavigator && (!response.items || response.items.filter(isPerson).length === 0) && company.name) {
+      // Fallback para Classic si no devuelve prospectos con nombre visible
+      const hasNamedPersons = (response.items || []).some((item) => isPerson(item) && !isAnonymousLinkedInMember(item.name));
+      if (!context.hasSalesNavigator && !hasNamedPersons && company.name) {
         response = await client.searchLinkedIn({
           account_id: context.remoteAccountId,
           api: "classic",
@@ -771,7 +761,6 @@ async function peopleAtCompanies(
           limit: Math.min(10, context.limit),
           advanced_keywords: {
             company: company.name,
-            ...(effectiveTitles.length ? { title: effectiveTitles.join(" OR ") } : {}),
           },
           ...(locationIds.length ? { location: locationIds } : {}),
         });
