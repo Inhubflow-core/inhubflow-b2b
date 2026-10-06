@@ -79,35 +79,62 @@ function cleanCompany(value: string): string | null {
     .replace(/[,:|–—-].*$/, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (cleaned.length < 2 || cleaned.length > 100) return null;
+  if (cleaned.length < 2 || cleaned.length > 35) return null;
+  const words = cleaned.split(/\s+/);
+  if (words.length > 4) return null;
+  if (!/^[A-ZÁÉÍÓÚÑ0-9]/.test(cleaned)) return null;
+  if (/^(?:¿|si|por|estos|estas|los|las|un|una|el|la|su|sus|cada|todo|toda|tras|segun|según)\b/i.test(cleaned)) return null;
+  if (/\b(?:dice|hace|tienen|tiene|pide|piden|esta|está|estan|están|seran|serán|debe|deben|puede|pueden)\b/i.test(cleaned)) return null;
   const norm = normalize(cleaned);
   if (INVALID_COMPANY_NAMES.has(norm)) return null;
   if (/^(?:spain|españa|chile|mexico|colombia|argentina|peru|brasil)[-\s]+based/i.test(value)) return null;
   return cleaned;
 }
 
+const CORPORATE_ACTION_VERBS = [
+  "has raised", "raises", "raised", "secures", "secured", "closes", "closed", "lands",
+  "levantó", "levanta", "recaudó", "recauda", "obtuvo", "obtiene", "cierra", "cerró",
+  "recibe financiamiento", "recibe inversión", "recibe", "recibió",
+  "amarra financiamiento", "amarra", "amarró", "capta", "captó", "consigue", "consiguió",
+  "acelera su expansión", "acelera expansión", "fortalece su expansión", "continúa su expansión",
+  "consolida su expansión", "anuncia su expansión", "anuncia expansión", "amplía su presencia",
+  "invierte en", "invierte", "invertirá", "apuesta por",
+  "abre nuevo", "abre su", "abre oficinas", "abre centro", "inaugura",
+  "analiza deuda para financiar", "financia su", "financia",
+  "llega a", "pone en marcha", "pone otra pieza a su expansión", "anuncia", "announces",
+  "acquires", "acquired", "to acquire", "compra", "adquiere", "adquirió",
+  "speaks at", "attends", "participa en", "presenta en", "asiste a"
+].sort((a, b) => b.length - a.length);
+
+const CORPORATE_ACTION_VERB_REGEX = new RegExp(`\\b(${CORPORATE_ACTION_VERBS.join("|")})\\b`, "i");
+
 function extractCompany(result: WebSearchResult, type: string): string | null {
   const corpus = [result.title, result.snippet || ""];
-  const verbs = type === "acquisition_event"
-    ? "acquires|acquired|to acquire|compra|adquiere|adquirió"
-    : type === "industry_event"
-      ? "speaks at|attends|participa en|presenta en|asiste a"
-      : "has raised|raises|raised|secures|secured|closes|closed|lands|announces|levantó|levanta|recaudó|recauda|obtuvo|cierra|cerró|anuncia";
-  const pattern = new RegExp(`(?:^|\\b)(.{2,80}?)\\s+(?:${verbs})\\b`, "i");
   for (const rawText of corpus) {
     const text = rawText
       .replace(/^(?:economía|noticias|actualidad|news|breaking|reportaje|entrevista)[\s.:–-]+/i, "")
       .replace(/^[A-ZÁÉÍÓÚÑa-záéíóúñ]+'s\s+/i, "")
-      .replace(/^(?:[a-zA-ZáéíóúñÁÉÍÓÚÑ]+[-\s]+based\s+)?(?:la\s+)?(?:startup|empresa|compañía)\s+(?:española\s+|chilena\s+|mexicana\s+|colombiana\s+)?/i, "")
       .trim();
-    const match = text.match(pattern);
-    if (match?.[1]) {
-      const candidate = cleanCompany(match[1].replace(/^.*?\bstartup\s+/i, ""));
+
+    const match = text.match(CORPORATE_ACTION_VERB_REGEX);
+    if (match && typeof match.index === "number" && match.index > 0) {
+      const before = text.slice(0, match.index).trim();
+      const cleanedCandidate = before
+        .replace(/^(?:la\s+|el\s+)?(?:startup|fintech|empresa|compañía|proptech|edtech|cadena|marca|holding|grupo)\s+(?:española\s+|chilena\s+|mexicana\s+|colombiana\s+)?/i, "")
+        .replace(/^(?:en|para|tras|con)\s+/i, "")
+        .replace(/[,:–—-].*$/, "")
+        .trim();
+      const candidate = cleanCompany(cleanedCandidate);
+      if (candidate) return candidate;
+    }
+
+    const startupMatch = text.match(/\b(?:startup|fintech|empresa|marca)\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ&.-]*(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ&.-]*){0,3})/i);
+    if (startupMatch?.[1]) {
+      const candidate = cleanCompany(startupMatch[1]);
       if (candidate) return candidate;
     }
   }
-  const startup = result.title.match(/\bstartup\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ&.-]*(?:\s+[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ&.-]*){0,3})/);
-  if (startup?.[1]) return cleanCompany(startup[1]);
+
   return null;
 }
 
@@ -141,10 +168,11 @@ export function extractFoundersFromArticle(text: string): string[] {
 }
 
 export function effectiveTitles(requestedTitles: string[] | undefined, signalType: string): string[] {
-  const base = requestedTitles && requestedTitles.length > 0 ? [...requestedTitles] : ["CEO", "Founder"];
+  const clean = (requestedTitles || []).filter((t) => !isAllOrWildcardTitle(t));
+  const base = clean.length > 0 ? [...clean] : ["CEO", "Founder", "Director"];
   const isFounderQuery = base.some((t) => /ceo|founder|fundador|director|socio|co-founder|cofundador/i.test(t));
-  if (isFounderQuery || ["funding_round", "company_growth", "acquisition_event"].includes(signalType)) {
-    const founderVariants = ["CEO", "Founder", "Co-Founder", "Cofundador", "Co-Fundador", "Socio Fundador", "Partner"];
+  if (isFounderQuery || ["funding_round", "company_growth", "acquisition_event", "company_news"].includes(signalType)) {
+    const founderVariants = ["CEO", "Founder", "Co-Founder", "Cofundador", "Co-Fundador", "Socio Fundador", "Partner", "Director"];
     for (const v of founderVariants) {
       if (!base.some((b) => b.toLowerCase() === v.toLowerCase())) {
         base.push(v);
@@ -155,9 +183,10 @@ export function effectiveTitles(requestedTitles: string[] | undefined, signalTyp
 }
 
 function titleMatches(headline: string | null | undefined, titles: string[], signalType = "funding_round"): boolean {
-  if (titles.length === 0) return true;
+  const clean = (titles || []).filter((t) => !isAllOrWildcardTitle(t));
+  if (clean.length === 0) return true;
   const normalized = normalize(headline);
-  const effTitles = effectiveTitles(titles, signalType);
+  const effTitles = effectiveTitles(clean, signalType);
   return effTitles.some((title) => normalized.includes(normalize(title)));
 }
 
@@ -246,30 +275,43 @@ function locationQueryTerm(location: string): string {
 }
 
 function webQuery(context: SignalScannerContext): string {
-  const cleanTitles = (context.icp.titles || []).filter((t) => !isAllOrWildcardTitle(t));
-  const titles = cleanTitles.length ? `(${cleanTitles.map((title) => `"${title}"`).join(" OR ")})` : "(CEO OR Founder OR Director)";
-  const locations = (context.icp.locations || []).map(locationQueryTerm);
-  const location = locations.length > 1 ? `(${locations.join(" OR ")})` : (locations[0] || "");
-  const terms: Record<string, string> = {
-    funding_round: '("ronda de inversión" OR "levantó inversión" OR "financiamiento" OR "capital semilla" OR "Serie A" OR "funding round" OR "raised funding" OR "round di finanziamento" OR "ha raccolto" OR "levée de fonds" OR "finanzierungsrunde")',
-    acquisition_event: '(acquisition OR acquired OR acquires OR adquisición OR adquirió OR acquisizione OR acquise)',
-    industry_event: '(conference OR summit OR event OR conferencia OR feria OR conferenza)',
-    company_news: '(announcement OR expansion OR launch OR noticia OR anuncio OR expansión OR annuncio OR lancio)',
+  const targetLocation = context.icp.locations?.[0]?.trim() || "";
+  const locationClean = targetLocation ? (targetLocation.includes(" ") ? `"${targetLocation}"` : targetLocation) : "";
+  const expansionTerm = targetLocation ? `"expansión en ${targetLocation}"` : '"expansión"';
+
+  const eventTermsMap: Record<string, string[]> = {
+    funding_round: ['"ronda de inversión"', '"Serie A"', '"capital semilla"'],
+    company_news: ['"anuncia inversión"', expansionTerm],
+    acquisition_event: ['"adquisición"', '"compra de"', '"adquirió"'],
+    industry_event: ["conferencia", "summit", "congreso"],
   };
 
   const activeKinds = (context.icp.event_kinds && context.icp.event_kinds.length > 0)
     ? context.icp.event_kinds
     : [context.monitor.type];
-  const matchedEventTerms = activeKinds.map((kind) => terms[kind]).filter(Boolean);
-  const eventClause = matchedEventTerms.length > 1 ? `(${matchedEventTerms.join(" OR ")})` : (matchedEventTerms[0] || "");
-  const domainKeywords = (context.keywords || []).filter((k) => {
-    const norm = normalize(k);
-    return !/ronda|inversion|inversión|funding|capital|semilla|serie a|acquisition|adquisicion|adquisición|evento|noticia|anuncio/i.test(norm);
-  });
+
+  const flatTerms: string[] = [];
+  for (const kind of activeKinds) {
+    if (eventTermsMap[kind]) flatTerms.push(...eventTermsMap[kind]);
+  }
+
+  // Tomar hasta 3 o 4 términos clave para que Google News no devuelva 0 resultados por exceso de operadores
+  const uniqueTerms = Array.from(new Set(flatTerms)).slice(0, 4);
+  const eventClause = uniqueTerms.length > 0 ? `(${uniqueTerms.join(" OR ")})` : "";
+  const companyTarget = context.icp.company ? `"${context.icp.company}"` : "";
+
+  const hasMarketEvents = uniqueTerms.length > 0;
+  const domainKeywords = !hasMarketEvents
+    ? (context.keywords || []).filter((k) => {
+        const norm = normalize(k);
+        return !/ronda|inversion|inversión|funding|capital|semilla|serie a|acquisition|adquisicion|adquisición|evento|noticia|anuncio/i.test(norm);
+      }).slice(0, 3)
+    : [];
   const keywordClause = domainKeywords.length > 0
     ? `(${domainKeywords.map((k) => (k.includes(" ") ? `"${k}"` : k)).join(" OR ")})`
     : "";
-  return [eventClause, keywordClause, titles, location].filter(Boolean).join(" ");
+
+  return [companyTarget, eventClause, keywordClause, locationClean].filter(Boolean).join(" ");
 }
 
 const MAX_SERPER_SEARCHES_PER_SCAN = 8;
@@ -434,7 +476,12 @@ export async function scanWebSignals(
 
   const country = locationCode(context.icp);
   const language = searchLanguage(country);
-  const response = await web.search({
+  const isNewsQuery = ["funding_round", "company_news", "acquisition_event", "industry_event"].includes(context.monitor.type)
+    || (context.icp.event_kinds && context.icp.event_kinds.some((k) => ["funding_round", "company_news", "acquisition_event", "industry_event"].includes(k)));
+  const searchFn = isNewsQuery && typeof (web as any).searchNews === "function"
+    ? (web as any).searchNews.bind(web)
+    : web.search.bind(web);
+  const response = await searchFn({
     query,
     country,
     language,

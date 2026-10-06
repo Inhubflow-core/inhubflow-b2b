@@ -86,8 +86,12 @@ export class WebSearchClient {
     let data: Record<string, unknown>;
     try { data = JSON.parse(text) as Record<string, unknown>; }
     catch { throw new WebSearchProviderError("La fuente web devolvió una respuesta inválida", "invalid_response", true, status); }
-    const organic = Array.isArray(data.organic) ? data.organic : [];
-    const items = organic.map((raw): WebSearchResult | null => {
+    const rawList = Array.isArray(data.news)
+      ? data.news
+      : Array.isArray(data.organic)
+      ? data.organic
+      : [];
+    const items = rawList.map((raw): WebSearchResult | null => {
       if (!raw || typeof raw !== "object") return null;
       const row = raw as Record<string, unknown>;
       if (typeof row.title !== "string" || typeof row.link !== "string") return null;
@@ -110,7 +114,7 @@ export class WebSearchClient {
     };
   }
 
-  async search(input: WebSearchInput): Promise<WebSearchResponse> {
+  private async execute(targetEndpoint: string, input: WebSearchInput): Promise<WebSearchResponse> {
     if (!this.apiKey) throw new WebSearchProviderError("La fuente web no está configurada", "missing_credentials", false);
     const limit = Math.max(1, Math.min(input.limit || 10, 50));
     const payload: Record<string, unknown> = {
@@ -126,7 +130,7 @@ export class WebSearchClient {
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const response = await this.fetcher(this.endpoint, {
+        const response = await this.fetcher(targetEndpoint, {
           method: "POST",
           headers: { "X-API-KEY": this.apiKey, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -137,7 +141,7 @@ export class WebSearchClient {
           // Si Serper rechaza la consulta con 400 debido a num > 10 en cuentas free ("Query pattern not allowed for free accounts")
           if (response.status === 400 && Number(payload.num) > 10) {
             payload.num = 10;
-            const fallbackResponse = await this.fetcher(this.endpoint, {
+            const fallbackResponse = await this.fetcher(targetEndpoint, {
               method: "POST",
               headers: { "X-API-KEY": this.apiKey, "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -166,6 +170,14 @@ export class WebSearchClient {
       "unavailable",
       true,
     );
+  }
+
+  async search(input: WebSearchInput): Promise<WebSearchResponse> {
+    return this.execute(this.endpoint, input);
+  }
+
+  async searchNews(input: WebSearchInput): Promise<WebSearchResponse> {
+    return this.execute("https://google.serper.dev/news", input);
   }
 }
 
